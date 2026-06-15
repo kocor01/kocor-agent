@@ -55,6 +55,7 @@ class AnthropicClient(LLMClient):
         """
         client = Anthropic(
             api_key=self._api_key,
+            auth_token=self._api_key,
             base_url=self._base_url,
         )
 
@@ -103,6 +104,7 @@ class AnthropicClient(LLMClient):
         """
         client = Anthropic(
             api_key=self._api_key,
+            auth_token=self._api_key,
             base_url=self._base_url,
         )
 
@@ -183,19 +185,36 @@ class AnthropicClient(LLMClient):
 
     def _normalize_in(self, messages: list[Message]) -> list[dict]:
         """内部消息格式 → Anthropic 消息格式"""
-        result = []
+        result: list[dict] = []
+        pending_tool_results: list[dict] = []
+
+        def _flush_tool_results():
+            nonlocal pending_tool_results
+            if pending_tool_results:
+                result.append({"role": "user", "content": pending_tool_results})
+                pending_tool_results = []
+
         for msg in messages:
+            if msg.role == "tool":
+                pending_tool_results.append({
+                    "type": "tool_result",
+                    "tool_use_id": msg.tool_call_id,
+                    "content": msg.content,
+                })
+                continue
+
+            # 非 tool 消息，先 flush 累积的 tool_results
+            _flush_tool_results()
+
             match msg.role:
                 case "user":
                     result.append({"role": "user", "content": msg.content})
                 case "assistant":
                     if msg.tool_calls:
                         content_blocks = []
+                        if msg.content:
+                            content_blocks.append({"type": "text", "text": msg.content})
                         for tc in msg.tool_calls:
-                            # 如果有文本内容，先加 text block
-                            if msg.content:
-                                content_blocks.append({"type": "text", "text": msg.content})
-                            # 加 tool_use block
                             try:
                                 input_dict = json.loads(tc.function.arguments)
                             except json.JSONDecodeError:
@@ -209,18 +228,9 @@ class AnthropicClient(LLMClient):
                         result.append({"role": "assistant", "content": content_blocks})
                     else:
                         result.append({"role": "assistant", "content": msg.content})
-                case "tool":
-                    # Anthropic 中 tool 结果是 user 角色的 tool_result block
-                    result.append({
-                        "role": "user",
-                        "content": [
-                            {
-                                "type": "tool_result",
-                                "tool_use_id": msg.tool_call_id,
-                                "content": msg.content,
-                            }
-                        ],
-                    })
+
+        # 末尾可能还有未 flush 的 tool_results
+        _flush_tool_results()
         return result
 
     def _normalize_out(self, response) -> Message:

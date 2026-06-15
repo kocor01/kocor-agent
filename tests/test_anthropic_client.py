@@ -146,6 +146,41 @@ class TestAnthropicClient:
         result = client.generate(messages)
         assert result.content == "done"
 
+    @patch("kocor.anthropic_client.Anthropic")
+    def test_normalize_multiple_tool_results(self, mock_anthropic_cls):
+        """测试多个 tool_result 被合并到同一条 user 消息"""
+        mock_client = MagicMock()
+        mock_anthropic_cls.return_value = mock_client
+        mock_client.messages.create.return_value = MagicMock(
+            content=[MockTextBlock(text="merged")],
+            stop_reason="end_turn",
+        )
+
+        client = AnthropicClient(self._make_config())
+        messages = [
+            Message(role="user", content="do two things"),
+            Message(role="assistant", content="", tool_calls=[
+                ToolCall(id="toolu_1", function=FunctionCall(name="read_file", arguments='{"path":"a.txt"}')),
+                ToolCall(id="toolu_2", function=FunctionCall(name="write_file", arguments='{"path":"b.txt"}')),
+            ]),
+            Message(role="tool", content="content a", tool_call_id="toolu_1"),
+            Message(role="tool", content="content b", tool_call_id="toolu_2"),
+        ]
+        result = client.generate(messages)
+        assert result.content == "merged"
+
+        # 验证两个 tool_result 被合并到同一条 user 消息中
+        call_args = mock_client.messages.create.call_args
+        api_messages = call_args.kwargs["messages"]
+        # 预期: [user, assistant(2 tool_use), user(2 tool_result)]
+        assert len(api_messages) == 3
+        assert api_messages[2]["role"] == "user"
+        assert len(api_messages[2]["content"]) == 2
+        assert api_messages[2]["content"][0]["type"] == "tool_result"
+        assert api_messages[2]["content"][0]["tool_use_id"] == "toolu_1"
+        assert api_messages[2]["content"][1]["type"] == "tool_result"
+        assert api_messages[2]["content"][1]["tool_use_id"] == "toolu_2"
+
 
 @dataclass
 class MockTextDelta:
