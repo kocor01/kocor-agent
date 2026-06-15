@@ -6,10 +6,10 @@
 
 from __future__ import annotations
 
-from typing import Protocol
+from typing import Iterator, Protocol
 
 from kocor.config import LLMConfig
-from kocor.message import Message, ToolCall
+from kocor.message import Message, StreamChunk, ToolCall
 
 
 class ToolDefinition:
@@ -68,6 +68,26 @@ class LLMClient(Protocol):
             Message:
             - 纯文本: Message(role="assistant", content="...")
             - 工具调用: Message(role="assistant", content="", tool_calls=[...])
+        """
+        ...
+
+    def stream(
+        self,
+        messages: list[Message],
+        tools: list[ToolDefinition] | None = None,
+        max_tokens: int = 4096,
+        temperature: float = 0.0,
+    ) -> Iterator[StreamChunk]:
+        """流式生成响应。
+
+        Args:
+            messages: 消息列表（含历史）
+            tools: 可用工具定义列表
+            max_tokens: 最大生成长度
+            temperature: 采样温度
+
+        Yields:
+            StreamChunk: 流式数据块
         """
         ...
 

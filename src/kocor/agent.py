@@ -5,8 +5,10 @@
 
 from __future__ import annotations
 
+from typing import Iterator
+
 from kocor.llm_client import LLMClient, ToolDefinition
-from kocor.message import Message
+from kocor.message import Message, StreamChunk, ToolCall, ToolResult
 from kocor.tools import ToolRegistry
 
 DEFAULT_SYSTEM_PROMPT = """\
@@ -82,5 +84,72 @@ class Agent:
                     tool_call_id=result.tool_call_id,
                 ))
 
-        # 超时
+       # 超时
         return f"Agent 在 {self.max_iterations} 次迭代后仍未完成，可能任务过于复杂。"
+
+    def stream(self, user_input: str) -> Iterator[StreamChunk]:
+        """流式执行 Agent 循环。
+
+        Args:
+            user_input: 用户输入
+
+        Yields:
+            StreamChunk: 流式数据块
+        """
+        messages: list[Message] = [
+            Message(role="system", content=self.system_prompt),
+            Message(role="user", content=user_input),
+        ]
+
+        for _ in range(self.max_iterations):
+            # 1. 流式调用 LLM
+            accumulated_content = ""
+            accumulated_tool_calls: list[ToolCall] = []
+
+            for chunk in self.llm.stream(
+                messages,
+                tools=self.tools.get_definitions(),
+            ):
+                accumulated_content += chunk.content
+                if chunk.tool_calls:
+                    for tc in chunk.tool_calls:
+                        # 避免重复添加同一 tool_call
+                        if not any(t.id == tc.id for t in accumulated_tool_calls):
+                            accumulated_tool_calls.append(tc)
+                yield chunk
+
+                # 收到 is_final 后处理
+                if chunk.is_final:
+                    # 将完整的 assistant 消息追加到 messages
+                    if accumulated_tool_calls:
+                        messages.append(Message(
+                            role="assistant",
+                            content=accumulated_content,
+                            tool_calls=accumulated_tool_calls,
+                        ))
+                    else:
+                        messages.append(Message(
+                            role="assistant",
+                            content=accumulated_content,
+                        ))
+
+                    # 2. 检查是否有工具调用
+                    if not accumulated_tool_calls:
+                        # 最终答案，结束循环
+                        return
+
+                    # 3. 执行工具（阻塞，不 yield），执行后 yield 结果块
+                    for tool_call in accumulated_tool_calls:
+                        result = self.tools.execute(tool_call)
+                        messages.append(Message(
+                            role="tool",
+                            content=result.content,
+                            tool_call_id=result.tool_call_id,
+                        ))
+                        yield StreamChunk(tool_result=result, is_final=True)
+
+        # 超时
+        yield StreamChunk(
+            content=f"Agent 在 {self.max_iterations} 次迭代后仍未完成，可能任务过于复杂。",
+            is_final=True,
+        )
