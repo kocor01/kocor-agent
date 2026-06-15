@@ -1,6 +1,6 @@
 """测试消息数据模型"""
 
-from kocor.message import Message, ToolCall, FunctionCall, ToolResult
+from kocor.message import FunctionCall, Message, ToolCall, ToolResult
 
 
 class TestMessage:
@@ -114,7 +114,7 @@ class TestStreamChunk:
 
     def test_stream_chunk_with_tool_calls(self):
         """测试带工具调用的 chunk"""
-        from kocor.message import StreamChunk, ToolCall, FunctionCall
+        from kocor.message import FunctionCall, StreamChunk, ToolCall
 
         chunk = StreamChunk(
             tool_calls=[

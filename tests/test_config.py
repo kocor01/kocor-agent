@@ -79,3 +79,45 @@ class TestLoadConfig:
         assert cfg.provider == "anthropic"
         assert cfg.max_iterations == 30
         assert cfg.timeout == 60
+
+
+class TestLoadConfigValidation:
+    """测试配置验证"""
+
+    def setup_method(self):
+        self._saved = {}
+        for key in ["KOCOR_PROVIDER", "KOCOR_MAX_ITERATIONS", "KOCOR_TIMEOUT"]:
+            self._saved[key] = os.environ.pop(key, None)
+
+    def teardown_method(self):
+        for key, val in self._saved.items():
+            if val is not None:
+                os.environ[key] = val
+            else:
+                os.environ.pop(key, None)
+
+    def test_load_invalid_provider_raises(self):
+        os.environ["KOCOR_PROVIDER"] = "gemini"
+        try:
+            load_config()
+            assert False, "应抛出 ValueError"
+        except ValueError as e:
+            assert "不支持的 provider" in str(e) or "gemini" in str(e)
+
+    def test_load_invalid_max_iterations_raises(self):
+        os.environ["KOCOR_PROVIDER"] = "openai"
+        os.environ["KOCOR_MAX_ITERATIONS"] = "abc"
+        try:
+            load_config()
+            assert False, "应抛出 ValueError"
+        except ValueError:
+            pass
+
+    def test_load_invalid_timeout_raises(self):
+        os.environ["KOCOR_PROVIDER"] = "openai"
+        os.environ["KOCOR_TIMEOUT"] = "-1"
+        try:
+            load_config()
+            assert False, "应抛出 ValueError"
+        except ValueError:
+            pass

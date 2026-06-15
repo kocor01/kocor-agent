@@ -9,7 +9,7 @@ from __future__ import annotations
 from typing import Iterator, Protocol
 
 from kocor.config import LLMConfig
-from kocor.message import Message, StreamChunk, ToolCall
+from kocor.message import Message, StreamChunk
 
 
 class ToolDefinition:
@@ -92,6 +92,19 @@ class LLMClient(Protocol):
         ...
 
 
+_clients: dict[str, type[LLMClient]] = {}
+
+
+def register_client(provider: str, client_class: type[LLMClient]) -> None:
+    """注册 LLM 客户端实现。
+
+    Args:
+        provider: provider 名称
+        client_class: 客户端类（必须实现 LLMClient 协议）
+    """
+    _clients[provider] = client_class
+
+
 def create_llm_client(config: LLMConfig) -> LLMClient:
     """根据配置创建 LLM 客户端。
 
@@ -104,14 +117,18 @@ def create_llm_client(config: LLMConfig) -> LLMClient:
     Raises:
         ValueError: 不支持的 provider
     """
-    match config.provider:
-        case "openai":
-            from kocor.openai_client import OpenAIClient
+    # 内置注册（惰性，仅在首次调用时执行）
+    if not _clients:
+        from kocor.anthropic_client import AnthropicClient
+        from kocor.openai_client import OpenAIClient
 
-            return OpenAIClient(config)
-        case "anthropic":
-            from kocor.anthropic_client import AnthropicClient
+        register_client("openai", OpenAIClient)
+        register_client("anthropic", AnthropicClient)
 
-            return AnthropicClient(config)
-        case unknown:
-            raise ValueError(f"不支持的 provider: {unknown}")
+    client_class = _clients.get(config.provider)
+    if client_class is None:
+        raise ValueError(
+            f"不支持的 provider: '{config.provider}'，"
+            f"可选值: {sorted(_clients.keys())}"
+        )
+    return client_class(config)

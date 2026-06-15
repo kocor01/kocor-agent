@@ -2,10 +2,9 @@
 
 from unittest.mock import MagicMock
 
-from kocor.agent import Agent, DEFAULT_SYSTEM_PROMPT
-from kocor.config import LLMConfig
+from kocor.agent import DEFAULT_SYSTEM_PROMPT, Agent
 from kocor.llm_client import LLMClient, ToolDefinition
-from kocor.message import Message, StreamChunk, ToolCall, FunctionCall, ToolResult
+from kocor.message import FunctionCall, Message, StreamChunk, ToolCall, ToolResult
 
 
 class FakeLLMClient(LLMClient):
@@ -154,8 +153,6 @@ class TestAgentSystemPrompt:
 
     def test_default_system_prompt(self):
         """默认 system prompt 包含 Kocor"""
-        llm = FakeLLMClient([Message(role="assistant", content="hi")])
-        agent = Agent(llm=llm, max_iterations=20)
         assert "Kocor" in DEFAULT_SYSTEM_PROMPT
 
     def test_custom_system_prompt(self):

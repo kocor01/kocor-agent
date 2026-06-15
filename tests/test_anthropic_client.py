@@ -1,12 +1,12 @@
 """测试 Anthropic 客户端"""
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from unittest.mock import MagicMock, patch
 
+from kocor.anthropic_client import AnthropicClient
 from kocor.config import LLMConfig
 from kocor.llm_client import ToolDefinition
-from kocor.message import Message, StreamChunk, ToolCall, FunctionCall
-from kocor.anthropic_client import AnthropicClient
+from kocor.message import FunctionCall, Message, ToolCall
 
 
 @dataclass
@@ -39,6 +39,7 @@ class TestAnthropicClient:
         client = AnthropicClient(self._make_config())
         assert client.provider == "anthropic"
 
+    
     @patch("kocor.anthropic_client.Anthropic")
     def test_generate_text_response(self, mock_anthropic_cls):
         """测试纯文本响应"""

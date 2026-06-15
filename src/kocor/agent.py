@@ -7,8 +7,8 @@ from __future__ import annotations
 
 from typing import Iterator
 
-from kocor.llm_client import LLMClient, ToolDefinition
-from kocor.message import Message, StreamChunk, ToolCall, ToolResult
+from kocor.llm_client import LLMClient
+from kocor.message import Message, StreamChunk, ToolCall
 from kocor.tools import ToolRegistry
 
 DEFAULT_SYSTEM_PROMPT = """\

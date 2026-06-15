@@ -1,13 +1,11 @@
 """测试工具系统"""
 
-import json
 import os
 import tempfile
-from unittest.mock import patch, mock_open
+from unittest.mock import mock_open, patch
 
-import kocor.tools
 from kocor.message import FunctionCall, ToolCall, ToolResult
-from kocor.tools import ToolRegistry, create_default_tools, _resolve_safe_path
+from kocor.tools import ToolRegistry, _resolve_safe_path, create_default_tools
 
 
 class TestToolRegistry:
@@ -99,37 +97,33 @@ class TestResolveSafePath:
     def test_path_within_allowed_dir(self):
         """目录内的路径正常解析"""
         with tempfile.TemporaryDirectory() as tmpdir:
-            with patch.object(kocor.tools, "_ALLOWED_DIR", tmpdir):
-                resolved = _resolve_safe_path("subdir/file.txt")
-                expected = os.path.realpath(os.path.join(tmpdir, "subdir/file.txt"))
-                assert resolved == expected
+            resolved = _resolve_safe_path("subdir/file.txt", tmpdir)
+            expected = os.path.realpath(os.path.join(tmpdir, "subdir/file.txt"))
+            assert resolved == expected
 
     def test_path_traversal_rejected(self):
         """相对路径遍历抛出 PermissionError"""
         with tempfile.TemporaryDirectory() as tmpdir:
-            with patch.object(kocor.tools, "_ALLOWED_DIR", tmpdir):
-                try:
-                    _resolve_safe_path("../outside.txt")
-                    assert False, "应抛出 PermissionError"
-                except PermissionError:
-                    pass
+            try:
+                _resolve_safe_path("../outside.txt", tmpdir)
+                assert False, "应抛出 PermissionError"
+            except PermissionError:
+                pass
 
     def test_path_traversal_deeply_nested(self):
         """深层路径遍历抛出 PermissionError"""
         with tempfile.TemporaryDirectory() as tmpdir:
-            with patch.object(kocor.tools, "_ALLOWED_DIR", tmpdir):
-                try:
-                    _resolve_safe_path("a/b/c/../../../../etc/passwd")
-                    assert False, "应抛出 PermissionError"
-                except PermissionError:
-                    pass
+            try:
+                _resolve_safe_path("a/b/c/../../../../etc/passwd", tmpdir)
+                assert False, "应抛出 PermissionError"
+            except PermissionError:
+                pass
 
     def test_path_to_allowed_dir_itself(self):
         """路径指向允许目录本身"""
         with tempfile.TemporaryDirectory() as tmpdir:
-            with patch.object(kocor.tools, "_ALLOWED_DIR", tmpdir):
-                resolved = _resolve_safe_path(".")
-                assert resolved == os.path.realpath(tmpdir)
+            resolved = _resolve_safe_path(".", tmpdir)
+            assert resolved == os.path.realpath(tmpdir)
 
 
 class TestCreateDefaultTools:
@@ -162,27 +156,24 @@ class TestCreateDefaultTools:
         result = tools.execute(tool_call)
         assert "hello world" in result.content
 
+    @patch("kocor.tools.os.makedirs")
     @patch("kocor.tools.os.path.exists")
-    def test_write_file(self, mock_exists):
+    def test_write_file(self, mock_exists, mock_makedirs):
         """测试写入文件"""
         mock_exists.return_value = True
         tools = create_default_tools()
 
-        try:
-            tool_call = ToolCall(
-                id="call_1",
-                function=FunctionCall(name="write_file", arguments='{"path": "out.txt", "content": "test content"}'),
-            )
-            result = tools.execute(tool_call)
-            assert "success" in result.content.lower() or "成功" in result.content
-        finally:
-            if os.path.exists("out.txt"):
-                os.remove("out.txt")
+        tool_call = ToolCall(
+            id="call_1",
+            function=FunctionCall(name="write_file", arguments='{"path": "out.txt", "content": "test content"}'),
+        )
+        result = tools.execute(tool_call)
+        assert "success" in result.content.lower() or "成功" in result.content
 
     def test_read_file_path_traversal_rejected(self):
         """读取文件路径遍历被拒绝"""
         with tempfile.TemporaryDirectory() as tmpdir:
-            with patch.object(kocor.tools, "_ALLOWED_DIR", tmpdir):
+            with patch("kocor.tools.os.getcwd", return_value=tmpdir):
                 tools = create_default_tools()
 
                 tool_call = ToolCall(
@@ -198,7 +189,7 @@ class TestCreateDefaultTools:
     def test_write_file_path_traversal_rejected(self):
         """写入文件路径遍历被拒绝"""
         with tempfile.TemporaryDirectory() as tmpdir:
-            with patch.object(kocor.tools, "_ALLOWED_DIR", tmpdir):
+            with patch("kocor.tools.os.getcwd", return_value=tmpdir):
                 tools = create_default_tools()
 
                 tool_call = ToolCall(
@@ -250,6 +241,25 @@ class TestCreateDefaultTools:
         env = _call_kwargs.get("env", os.environ)
         assert "OPENAI_API_KEY" not in env
         assert "ANTHROPIC_API_KEY" not in env
+
+    @patch("kocor.tools.subprocess.run")
+    def test_sanitize_env_keeps_non_sensitive_keys(self, mock_run):
+        """非敏感变量（如含 'key' 子串的）不被过滤"""
+        mock_run.return_value = type("MockResult", (), {
+            "returncode": 0,
+            "stdout": "ok\n",
+            "stderr": "",
+        })()
+
+        # 确认 KEYBOARD_LAYOUT 等非敏感变量不被过滤
+        from kocor.tools import _sanitize_env
+        env = _sanitize_env()
+        assert "PATH" in env  # PATH 永远不应被过滤
+        # KEYBOARD_LAYOUT 含有 'key' 子串，但不以 _API_KEY 等结尾，不应被过滤
+        # 注: 此变量可能不存在于实际环境中，但 _sanitize_env 不应主动删除它
+        import os
+        if "KEYBOARD_LAYOUT" in os.environ:
+            assert "KEYBOARD_LAYOUT" in env
 
     @patch("kocor.tools.subprocess.run")
     def test_run_python_failure(self, mock_run):

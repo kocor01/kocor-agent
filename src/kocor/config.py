@@ -31,10 +31,33 @@ def load_config() -> LLMConfig:
 
     Returns:
         配置对象
+
+    Raises:
+        ValueError: provider 非法或整数参数无效
     """
     raw = os.environ.get("KOCOR_PROVIDER", "openai").lower()
+    valid_providers = {"openai", "anthropic"}
+    if raw not in valid_providers:
+        raise ValueError(f"不支持的 provider: '{raw}'，可选值: {sorted(valid_providers)}")
+
+    max_iterations_raw = os.environ.get("KOCOR_MAX_ITERATIONS", "20")
+    try:
+        max_iterations = int(max_iterations_raw)
+    except ValueError:
+        raise ValueError(f"KOCOR_MAX_ITERATIONS 必须是整数，当前值: '{max_iterations_raw}'")
+    if max_iterations < 1:
+        raise ValueError(f"KOCOR_MAX_ITERATIONS 必须 >= 1，当前值: {max_iterations}")
+
+    timeout_raw = os.environ.get("KOCOR_TIMEOUT", "30")
+    try:
+        timeout = int(timeout_raw)
+    except ValueError:
+        raise ValueError(f"KOCOR_TIMEOUT 必须是整数，当前值: '{timeout_raw}'")
+    if timeout < 1:
+        raise ValueError(f"KOCOR_TIMEOUT 必须 >= 1，当前值: {timeout}")
+
     return LLMConfig(
         provider=raw,
-        max_iterations=int(os.environ.get("KOCOR_MAX_ITERATIONS", "20")),
-        timeout=int(os.environ.get("KOCOR_TIMEOUT", "30")),
+        max_iterations=max_iterations,
+        timeout=timeout,
     )

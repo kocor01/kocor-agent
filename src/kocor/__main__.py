@@ -9,99 +9,122 @@
 from __future__ import annotations
 
 import argparse
-import os
 import sys
+from typing import Iterator
 
 from dotenv import load_dotenv
 
 from kocor.agent import Agent
 from kocor.config import load_config
 from kocor.llm_client import create_llm_client
+from kocor.message import StreamChunk
 from kocor.tools import create_default_tools
 
 W = 58
 
 
-def _print_stream_formatted(chunks):
-    round_num = 0
-    pending_round = False
-    tool_calls: list = []
-    has_reasoning = False
-    has_content = False
-    has_tool_section = False
-    tool_result_idx = 0
+class _StreamFormatter:
+    """管理流式输出的格式状态。"""
 
-    def _round_header(n: int):
+    def __init__(self, width: int = W):
+        self.width = width
+        self.round_num = 0
+        self.pending_round = False
+        self.tool_calls: list = []
+        self.has_reasoning = False
+        self.has_content = False
+        self.has_tool_section = False
+        self.tool_result_idx = 0
+
+    def _round_header(self, n: int) -> None:
         title = f"⚡ 第 {n} 次请求"
-        fill = W - len(title) - 2
+        fill = self.width - 2 - len(title)
         print(f"\n── {title} {'─' * max(0, fill)}")
 
+    def handle_chunk(self, chunk) -> None:
+        if not chunk.tool_result and not self._in_round():
+            self.round_num += 1
+            self.pending_round = True
+
+        if self.pending_round and (chunk.reasoning or chunk.content or chunk.tool_calls or chunk.is_final):
+            self._round_header(self.round_num)
+            self.pending_round = False
+
+        self._handle_reasoning(chunk)
+        self._handle_content(chunk)
+        self._handle_tool_calls(chunk)
+        self._handle_tool_results(chunk)
+        self._handle_end_of_round(chunk)
+
+    def _in_round(self) -> bool:
+        return bool(self.pending_round or self.has_reasoning or self.has_content or self.has_tool_section)
+
+    def _handle_reasoning(self, chunk) -> None:
+        if not chunk.reasoning:
+            return
+        if not self.has_reasoning:
+            print("\n\U0001f9e0 思维过程")
+            print(f"{'─' * self.width}")
+            self.has_reasoning = True
+        print(chunk.reasoning, end="", flush=True)
+
+    def _handle_content(self, chunk) -> None:
+        if not chunk.content:
+            return
+        if not self.has_content:
+            print("\n\n\U0001f4ac 回答")
+            print(f"{'─' * self.width}")
+            self.has_content = True
+        print(chunk.content, end="", flush=True)
+
+    def _handle_tool_calls(self, chunk) -> None:
+        if not chunk.tool_calls:
+            return
+        seen_ids = {tc.id for tc in self.tool_calls}
+        for tc in chunk.tool_calls:
+            if tc.id not in seen_ids:
+                self.tool_calls.append(tc)
+                seen_ids.add(tc.id)
+        if not self.has_tool_section and not chunk.tool_result:
+            print("\n\n\U0001f527 工具调用")
+            print(f"{'─' * self.width}")
+            self.has_tool_section = True
+
+    def _handle_tool_results(self, chunk) -> None:
+        if not chunk.tool_result:
+            return
+        if self.tool_result_idx < len(self.tool_calls):
+            tc = self.tool_calls[self.tool_result_idx]
+            content = chunk.tool_result.content
+            if len(content) > 200:
+                content = content[:200] + "..."
+            if self.tool_result_idx > 0:
+                print()
+            print(f"{self.tool_result_idx + 1:2}. {tc.function.name}({tc.function.arguments})")
+            print(f"{'─' * (self.width - 4)}")
+            print(f"{content}")
+            self.tool_result_idx += 1
+
+    def _handle_end_of_round(self, chunk) -> None:
+        if not chunk.is_final:
+            return
+        self.has_reasoning = False
+        self.has_content = False
+        self.has_tool_section = False
+        if chunk.tool_result and self.tool_result_idx >= len(self.tool_calls) and self.tool_calls:
+            self.tool_calls.clear()
+            self.tool_result_idx = 0
+
+    def flush_remaining(self) -> None:
+        for tc in self.tool_calls[self.tool_result_idx:]:
+            print(f"• {tc.function.name}({tc.function.arguments})")
+
+
+def _print_stream_formatted(chunks: Iterator[StreamChunk]) -> None:
+    formatter = _StreamFormatter()
     for chunk in chunks:
-        if not chunk.tool_result and not pending_round and not has_reasoning and not has_content and not has_tool_section:
-            round_num += 1
-            pending_round = True
-
-        if pending_round and (chunk.reasoning or chunk.content or chunk.tool_calls or chunk.is_final):
-            _round_header(round_num)
-            pending_round = False
-
-        # --- reasoning ---
-        if chunk.reasoning:
-            if not has_reasoning:
-                print(f"\n\U0001f9e0 思维过程")
-                print(f"{'─' * W}")
-                has_reasoning = True
-            print(chunk.reasoning, end="", flush=True)
-
-        # --- content ---
-        if chunk.content:
-            if not has_reasoning:
-                print(f"\n\n\U0001f9e0 思维过程")
-                print(f"{'─' * W}")
-                has_reasoning = True
-            if not has_content:
-                print(f"\n\n\U0001f4ac 回答")
-                print(f"{'─' * W}")
-                has_content = True
-            print(chunk.content, end="", flush=True)
-
-        # --- tool calls ---
-        if chunk.tool_calls:
-            seen_ids = {tc.id for tc in tool_calls}
-            for tc in chunk.tool_calls:
-                if tc.id not in seen_ids:
-                    tool_calls.append(tc)
-                    seen_ids.add(tc.id)
-            if not has_tool_section and not chunk.tool_result:
-                print(f"\n\n\U0001f527 工具调用")
-                print(f"{'─' * W}")
-                has_tool_section = True
-
-        # --- tool results ---
-        if chunk.tool_result:
-            if tool_result_idx < len(tool_calls):
-                tc = tool_calls[tool_result_idx]
-                content = chunk.tool_result.content
-                if len(content) > 200:
-                    content = content[:200] + "..."
-                if tool_result_idx > 0:
-                    print()
-                print(f"{tool_result_idx + 1:2}. {tc.function.name}({tc.function.arguments})")
-                print(f"{'─' * (W - 4)}")
-                print(f"{content}")
-                tool_result_idx += 1
-
-        # --- end of round ---
-        if chunk.is_final:
-            has_reasoning = False
-            has_content = False
-            has_tool_section = False
-            if chunk.tool_result and tool_result_idx >= len(tool_calls) and tool_calls:
-                tool_calls.clear()
-                tool_result_idx = 0
-
-    for tc in tool_calls[tool_result_idx:]:
-        print(f"• {tc.function.name}({tc.function.arguments})")
+        formatter.handle_chunk(chunk)
+    formatter.flush_remaining()
 
 
 def parse_args():

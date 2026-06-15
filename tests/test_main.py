@@ -2,7 +2,7 @@
 
 from unittest.mock import MagicMock, patch
 
-from kocor.message import StreamChunk, ToolCall, FunctionCall
+from kocor.message import FunctionCall, StreamChunk, ToolCall
 
 
 class TestCLIParseArgs:
@@ -56,7 +56,7 @@ class TestCLIMain:
         ])
         mock_agent_cls.return_value = mock_agent
 
-        with patch("sys.stdout", new_callable=MagicMock) as mock_stdout:
+        with patch("sys.stdout", new_callable=MagicMock):
             main()
 
         mock_agent.stream.assert_called_once()
@@ -77,7 +77,7 @@ class TestCLIMain:
         mock_agent.run.return_value = "非流式结果"
         mock_agent_cls.return_value = mock_agent
 
-        with patch("sys.stdout", new_callable=MagicMock) as mock_stdout:
+        with patch("sys.stdout", new_callable=MagicMock):
             main()
 
         mock_agent.run.assert_called_once()
@@ -96,7 +96,7 @@ class TestCLIMain:
 
         mock_agent_cls.return_value = MagicMock()
 
-        with patch("sys.stdout", new_callable=MagicMock) as mock_stdout, \
+        with patch("sys.stdout", new_callable=MagicMock), \
              patch("sys.stdin", MagicMock(read=lambda: "")), \
              patch("sys.exit") as mock_exit:
             main()

@@ -1,9 +1,8 @@
 """测试 LLMClient 抽象接口"""
 
-from typing import Protocol
 
 from kocor.config import LLMConfig
-from kocor.llm_client import LLMClient, ToolDefinition, create_llm_client
+from kocor.llm_client import LLMClient, ToolDefinition, create_llm_client, register_client
 from kocor.message import Message, StreamChunk
 
 
@@ -48,7 +47,7 @@ class TestLLMClientInterface:
 
     def test_generate_with_tools_returns_message_with_tool_calls(self):
         """工具调用时返回含 tool_calls 的 Message"""
-        from kocor.message import ToolCall, FunctionCall
+        from kocor.message import FunctionCall, ToolCall
 
         class FakeClient(LLMClient):
             @property
@@ -88,7 +87,6 @@ class TestLLMClientStream:
 
     def test_stream_returns_iterator(self):
         """stream 返回 Iterator[StreamChunk]"""
-        from unittest.mock import MagicMock
 
         class FakeClient(LLMClient):
             @property
@@ -137,3 +135,27 @@ class TestCreateLLMClient:
             assert False, "Should have raised ValueError"
         except ValueError as e:
             assert "不支持的 provider" in str(e)
+
+    def test_register_client(self):
+        """测试 register_client 注册新 provider"""
+        class FakeClient(LLMClient):
+            def __init__(self, config: LLMConfig = None):
+                pass
+
+            @property
+            def provider(self) -> str:
+                return "fake"
+
+            def generate(self, messages, tools=None, max_tokens=4096, temperature=0.0) -> Message:
+                return Message(role="assistant", content="fake")
+
+        register_client("fake", FakeClient)
+        try:
+            config = LLMConfig(provider="fake")
+            client = create_llm_client(config)
+            assert isinstance(client, FakeClient)
+            assert client.provider == "fake"
+        finally:
+            # 清理注册表
+            from kocor.llm_client import _clients
+            _clients.pop("fake", None)

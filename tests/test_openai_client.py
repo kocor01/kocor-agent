@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 
 from kocor.config import LLMConfig
 from kocor.llm_client import ToolDefinition
-from kocor.message import Message, StreamChunk, ToolCall, ToolResult, FunctionCall
+from kocor.message import FunctionCall, Message, ToolCall
 from kocor.openai_client import OpenAIClient
 
 
@@ -20,6 +20,7 @@ class TestOpenAIClient:
         client = OpenAIClient(self._make_config())
         assert client.provider == "openai"
 
+    
     @patch("kocor.openai_client.OpenAI")
     def test_generate_text_response(self, mock_openai_cls):
         """测试纯文本响应"""

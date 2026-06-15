@@ -8,15 +8,11 @@ from __future__ import annotations
 import json
 import os
 import subprocess
-from typing import Any, Callable
+from typing import Callable
 
 from kocor.config import LLMConfig
 from kocor.llm_client import ToolDefinition
 from kocor.message import ToolCall, ToolResult
-
-# 文件操作允许的根目录和超时时间，由 create_default_tools 初始化
-_ALLOWED_DIR: str = ""
-_TIMEOUT: int = 30
 
 
 class ToolRegistry:
@@ -25,11 +21,15 @@ class ToolRegistry:
     Attributes:
         _tools: 工具定义映射
         _handlers: 工具处理器映射
+        _allowed_dir: 文件操作允许的根目录
+        _timeout: 工具执行超时（秒）
     """
 
-    def __init__(self):
+    def __init__(self, allowed_dir: str = "", timeout: int = 30):
         self._tools: dict[str, ToolDefinition] = {}
         self._handlers: dict[str, Callable] = {}
+        self._allowed_dir = allowed_dir or os.path.realpath(os.getcwd())
+        self._timeout = timeout
 
     def register(
         self,
@@ -105,11 +105,45 @@ def create_default_tools(config: LLMConfig | None = None) -> ToolRegistry:
     Returns:
         已注册内置工具的 ToolRegistry
     """
-    global _ALLOWED_DIR, _TIMEOUT
-    _ALLOWED_DIR = os.path.realpath(os.getcwd())
-    _TIMEOUT = config.timeout if config else 30
+    allowed_dir = os.path.realpath(os.getcwd())
+    timeout = config.timeout if config else 30
 
-    registry = ToolRegistry()
+    registry = ToolRegistry(allowed_dir=allowed_dir, timeout=timeout)
+
+    # 创建闭包捕获 allowed_dir 和 timeout，避免全局可变状态
+    def _read_file(path: str) -> str:
+        safe_path = _resolve_safe_path(path, allowed_dir)
+        if not os.path.exists(safe_path):
+            return f"Error: file not found: {path}"
+        with open(safe_path, "r", encoding="utf-8") as f:
+            return f.read()
+
+    def _write_file(path: str, content: str) -> str:
+        safe_path = _resolve_safe_path(path, allowed_dir)
+        os.makedirs(os.path.dirname(safe_path), exist_ok=True)
+        with open(safe_path, "w", encoding="utf-8") as f:
+            f.write(content)
+        return f"Success: wrote {len(content)} bytes to {path}"
+
+    def _run_python(code: str) -> str:
+        try:
+            result = subprocess.run(
+                ["python", "-c", code],
+                capture_output=True,
+                text=True,
+                timeout=timeout,
+                env=_sanitize_env(),
+            )
+            output = result.stdout
+            if result.stderr:
+                output += "\n" + result.stderr
+            if result.returncode != 0:
+                output = f"Exit code: {result.returncode}\n{output}"
+            return output.strip()
+        except subprocess.TimeoutExpired:
+            return f"Error: execution timed out after {timeout}s"
+        except Exception as e:
+            return f"Error: {type(e).__name__}: {e}"
 
     registry.register(
         name="read_file",
@@ -154,11 +188,12 @@ def create_default_tools(config: LLMConfig | None = None) -> ToolRegistry:
     return registry
 
 
-def _resolve_safe_path(path: str) -> str:
+def _resolve_safe_path(path: str, allowed_dir: str) -> str:
     """解析并校验路径是否在允许目录内，防止路径遍历攻击。
 
     Args:
         path: 用户传入的路径
+        allowed_dir: 允许的根目录
 
     Returns:
         归一化后的安全绝对路径
@@ -166,63 +201,18 @@ def _resolve_safe_path(path: str) -> str:
     Raises:
         PermissionError: 路径尝试逃逸到允许目录外
     """
-    resolved = os.path.realpath(os.path.join(_ALLOWED_DIR, path))
-    if resolved != _ALLOWED_DIR and not resolved.startswith(_ALLOWED_DIR + os.sep):
+    resolved = os.path.realpath(os.path.join(allowed_dir, path))
+    if resolved != allowed_dir and not resolved.startswith(allowed_dir + os.sep):
         raise PermissionError(f"Path traversal denied: {path}")
     return resolved
-
-
-def _read_file(path: str) -> str:
-    """读取文件内容"""
-    safe_path = _resolve_safe_path(path)
-    if not os.path.exists(safe_path):
-        return f"Error: file not found: {path}"
-    with open(safe_path, "r", encoding="utf-8") as f:
-        return f.read()
-
-
-def _write_file(path: str, content: str) -> str:
-    """写入文件内容"""
-    safe_path = _resolve_safe_path(path)
-    os.makedirs(os.path.dirname(safe_path), exist_ok=True)
-    with open(safe_path, "w", encoding="utf-8") as f:
-        f.write(content)
-    return f"Success: wrote {len(content)} bytes to {path}"
 
 
 def _sanitize_env() -> dict[str, str]:
     """创建不含敏感凭证的环境变量副本，防止子进程泄露 API Key。"""
     env = os.environ.copy()
-    _sensitive_keys = [key for key in env if "key" in key.lower()]
+    _sensitive_keys = [key for key in env
+                       if key.endswith(("_API_KEY", "_SECRET", "_TOKEN"))
+                       or key in ("OPENAI_ORG_ID",)]
     for key in _sensitive_keys:
         env.pop(key, None)
     return env
-
-
-def _run_python(code: str) -> str:
-    """在子进程中执行 Python 代码。
-
-    Args:
-        code: Python 代码字符串
-
-    Returns:
-        执行结果（stdout 或 stderr）
-    """
-    try:
-        result = subprocess.run(
-            ["python", "-c", code],
-            capture_output=True,
-            text=True,
-            timeout=_TIMEOUT,
-            env=_sanitize_env(),
-        )
-        output = result.stdout
-        if result.stderr:
-            output += "\n" + result.stderr
-        if result.returncode != 0:
-            output = f"Exit code: {result.returncode}\n{output}"
-        return output.strip()
-    except subprocess.TimeoutExpired:
-        return f"Error: execution timed out after {_TIMEOUT}s"
-    except Exception as e:
-        return f"Error: {type(e).__name__}: {e}"
