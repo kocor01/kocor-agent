@@ -1,3 +1,15 @@
+## 项目定位
+小而美的 LLM 自主 Agent 助手，不是通用 Agent 框架。
+
+## 项目环境
+- 开发环境：uv 包管理（强制）、python：3.12。
+- .env管理环境变量。
+- github代码管理。
+
+## 开发规范
+- 开发模式：TDD 测试驱动开发（强制），任何功能开发，必须先写失败的测试（Red），再写最小代码使测试通过（Green），最后重构代码（Refactor）。
+- 合理的架构设计，轻量、专注、易于扩展。
+
 # CLAUDE.md
 
 Behavioral guidelines to reduce common LLM coding mistakes. Merge with project-specific instructions as needed.

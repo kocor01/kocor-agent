@@ -5,7 +5,7 @@ from unittest.mock import MagicMock
 from kocor.agent import Agent, DEFAULT_SYSTEM_PROMPT
 from kocor.config import LLMConfig
 from kocor.llm_client import LLMClient, ToolDefinition
-from kocor.message import Message, ToolCall, FunctionCall, ToolResult
+from kocor.message import Message, StreamChunk, ToolCall, FunctionCall, ToolResult
 
 
 class FakeLLMClient(LLMClient):
@@ -164,6 +164,118 @@ class TestAgentSystemPrompt:
         agent = Agent(llm=llm, system_prompt="你是助手", max_iterations=20)
         agent.run("hi")
         assert llm.call_count == 1
+
+
+# 简单的 mock 类，用于 spec
+class FakeStreamLLMClient:
+    """伪造的 LLM 客户端，用于测试 Agent 流式循环"""
+
+    def __init__(self, responses: list[list[StreamChunk]]):
+        self.responses = responses
+        self.call_count = 0
+
+    @property
+    def provider(self) -> str:
+        return "fake"
+
+    def generate(self, messages, tools=None, max_tokens=4096, temperature=0.0) -> Message:
+        # 不用于 stream 测试
+        raise NotImplementedError
+
+    def stream(self, messages, tools=None, max_tokens=4096, temperature=0.0):
+        chunks = self.responses[self.call_count % len(self.responses)]
+        self.call_count += 1
+        yield from chunks
+
+
+class TestAgentStream:
+    """测试 Agent 流式"""
+
+    def test_stream_text_response(self):
+        """单次对话流式返回文本"""
+        llm = FakeStreamLLMClient([
+            [
+                StreamChunk(content="你好"),
+                StreamChunk(content=", 我是 Kocor"),
+                StreamChunk(is_final=True),
+            ]
+        ])
+        agent = Agent(llm=llm, max_iterations=20)
+        chunks = list(agent.stream("你好"))
+
+        assert len(chunks) == 3
+        assert chunks[0].content == "你好"
+        assert chunks[1].content == ", 我是 Kocor"
+        assert chunks[-1].is_final is True
+
+    def test_stream_tool_call_then_text(self):
+        """工具调用后继续流式输出"""
+        llm = FakeStreamLLMClient([
+            # 第一轮: 工具调用
+            [
+                StreamChunk(content="我来读文件"),
+                StreamChunk(
+                    content="",
+                    tool_calls=[ToolCall(
+                        id="call_1",
+                        function=FunctionCall(name="read_file", arguments='{"path": "a.txt"}'),
+                    )],
+                    is_final=True,
+                ),
+            ],
+            # 第二轮: 纯文本回复
+            [
+                StreamChunk(content="文件内容是: hello"),
+                StreamChunk(is_final=True),
+            ],
+        ])
+
+        mock_tools = MagicMock(spec=ToolRegistryMock)
+        mock_tools.get_definitions.return_value = []
+
+        def side_effect(tool_call):
+            return ToolResult(tool_call_id=tool_call.id, content="hello")
+
+        mock_tools.execute.side_effect = side_effect
+
+        agent = Agent(llm=llm, tools=mock_tools, max_iterations=20)
+        chunks = list(agent.stream("读 a.txt"))
+
+        # 文本 chunk + 工具调用 chunk + 文本 chunk + is_final
+        text_chunks = [c for c in chunks if c.content]
+        assert len(text_chunks) == 2
+        assert "我来读文件" in text_chunks[0].content
+        assert "文件内容是: hello" in text_chunks[1].content
+        assert chunks[-1].is_final is True
+
+    def test_stream_max_iterations(self):
+        """达到最大迭代次数后返回超时"""
+        llm = FakeStreamLLMClient([
+            [
+                StreamChunk(
+                    tool_calls=[ToolCall(
+                        id="call_1",
+                        function=FunctionCall(name="read_file", arguments='{}'),
+                    )],
+                    is_final=True,
+                ),
+            ]
+        ])
+
+        mock_tools = MagicMock(spec=ToolRegistryMock)
+        mock_tools.get_definitions.return_value = []
+        mock_tools.execute.return_value = ToolResult(
+            tool_call_id="call_1",
+            content="content",
+        )
+
+        agent = Agent(llm=llm, tools=mock_tools, max_iterations=2)
+        chunks = list(agent.stream("持续调用工具"))
+
+        # 最后应该有超时信息
+        assert chunks[-1].is_final is True
+        final_content = "".join(c.content for c in chunks)
+        assert "迭代" in final_content
 
 
 # 简单的 mock 类，用于 spec

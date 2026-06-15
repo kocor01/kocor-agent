@@ -1,11 +1,11 @@
 """测试 Anthropic 客户端"""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from unittest.mock import MagicMock, patch
 
 from kocor.config import LLMConfig
 from kocor.llm_client import ToolDefinition
-from kocor.message import Message, ToolCall, FunctionCall
+from kocor.message import Message, StreamChunk, ToolCall, FunctionCall
 from kocor.anthropic_client import AnthropicClient
 
 
@@ -145,3 +145,232 @@ class TestAnthropicClient:
         ]
         result = client.generate(messages)
         assert result.content == "done"
+
+
+@dataclass
+class MockTextDelta:
+    type: str = "text_delta"
+    text: str = ""
+
+
+@dataclass
+class MockInputJsonDelta:
+    type: str = "input_json_delta"
+    partial_json: str = ""
+    index: int = 0
+
+
+@dataclass
+class MockContentBlockDelta:
+    type: str = "content_block_delta"
+    delta: object = None
+    index: int = 0
+
+    def __post_init__(self):
+        if self.delta is None:
+            self.delta = MockTextDelta()
+
+
+@dataclass
+class MockContentBlockStart:
+    type: str = "content_block_start"
+    index: int = 0
+    content_block: object = None
+
+    def __post_init__(self):
+        if self.content_block is None:
+            self.content_block = MockToolBlock()
+
+
+@dataclass
+class MockContentBlockStop:
+    type: str = "content_block_stop"
+    index: int = 0
+
+
+@dataclass
+class MockMessageDelta:
+    type: str = "message_delta"
+    _stop_reason: str = None
+    delta: object = None
+
+    def __post_init__(self):
+        if self.delta is None:
+            self.delta = MagicMock()
+        self.delta.stop_reason = self._stop_reason
+
+
+@dataclass
+class MockMessageStart:
+    type: str = "message_start"
+    message: object = None
+
+
+@dataclass
+class MockMessageStop:
+    type: str = "message_stop"
+
+
+class TestAnthropicClientStream:
+    """测试 Anthropic 客户端流式"""
+
+    def _make_config(self, **kwargs) -> LLMConfig:
+        defaults = {"provider": "anthropic"}
+        defaults.update(kwargs)
+        return LLMConfig(**defaults)
+
+    @patch("kocor.anthropic_client.Anthropic")
+    def test_stream_text_response(self, mock_anthropic_cls):
+        """测试纯文本流式响应"""
+        mock_client = MagicMock()
+        mock_anthropic_cls.return_value = mock_client
+
+        mock_client.messages.create.return_value = [
+            MockContentBlockDelta(delta=MockTextDelta(text="Hello")),
+            MockContentBlockDelta(delta=MockTextDelta(text=" World")),
+            MockMessageDelta(_stop_reason="end_turn"),
+            MockMessageStop(),
+        ]
+
+        client = AnthropicClient(self._make_config())
+        chunks = list(client.stream([Message(role="user", content="hi")]))
+
+        assert len(chunks) == 3
+        assert chunks[0].content == "Hello"
+        assert chunks[0].is_final is False
+        assert chunks[1].content == " World"
+        assert chunks[2].is_final is True
+
+    @patch("kocor.anthropic_client.Anthropic")
+    def test_stream_tool_call(self, mock_anthropic_cls):
+        """测试工具调用流式响应"""
+        mock_client = MagicMock()
+        mock_anthropic_cls.return_value = mock_client
+
+        mock_client.messages.create.return_value = [
+            MockContentBlockDelta(delta=MockTextDelta(text="我来读文件")),
+            MockContentBlockStart(index=1, content_block=MockToolBlock(
+                id="toolu_123", name="read_file", input={},
+            )),
+            MockContentBlockDelta(index=1, delta=MockInputJsonDelta(partial_json='{"path":')),
+            MockContentBlockDelta(index=1, delta=MockInputJsonDelta(partial_json='"test.txt"}')),
+            MockContentBlockStop(index=1),
+            MockMessageDelta(_stop_reason="tool_use"),
+            MockMessageStop(),
+        ]
+
+        client = AnthropicClient(self._make_config())
+        chunks = list(client.stream(
+            [Message(role="user", content="读 test.txt")],
+            tools=[ToolDefinition(name="read_file", description="读文件", parameters={})],
+        ))
+
+        # 应该有文本块 + 工具调用块
+        text_chunks = [c for c in chunks if c.content]
+        tool_chunks = [c for c in chunks if c.tool_calls]
+        assert len(text_chunks) >= 1
+        assert text_chunks[0].content == "我来读文件"
+
+        # 最后一个工具调用 chunk 应包含完整 tool_call
+        assert len(tool_chunks) >= 1
+        last_tool_chunk = tool_chunks[-1]
+        assert len(last_tool_chunk.tool_calls) == 1
+        assert last_tool_chunk.tool_calls[0].function.name == "read_file"
+
+    @patch("kocor.anthropic_client.Anthropic")
+    def test_stream_is_final(self, mock_anthropic_cls):
+        """测试 is_final 标记"""
+        mock_client = MagicMock()
+        mock_anthropic_cls.return_value = mock_client
+
+        mock_client.messages.create.return_value = [
+            MockContentBlockDelta(delta=MockTextDelta(text="done")),
+            MockMessageDelta(_stop_reason="end_turn"),
+            MockMessageStop(),
+        ]
+
+        client = AnthropicClient(self._make_config())
+        chunks = list(client.stream([Message(role="user", content="hi")]))
+
+        assert chunks[-1].is_final is True
+
+
+@dataclass
+class MockThinkingDelta:
+    type: str = "thinking_delta"
+    thinking: str = ""
+
+
+@dataclass
+class MockThinkingBlock:
+    type: str = "thinking"
+    thinking: str = ""
+
+
+class TestAnthropicClientReasoning:
+    """测试 Anthropic 客户端思维链 (thinking → reasoning)"""
+
+    def _make_config(self, **kwargs) -> LLMConfig:
+        defaults = {"provider": "anthropic"}
+        defaults.update(kwargs)
+        return LLMConfig(**defaults)
+
+    @patch("kocor.anthropic_client.Anthropic")
+    def test_normalize_out_thinking_to_reasoning(self, mock_anthropic_cls):
+        """测试 thinking block 映射到 reasoning 字段"""
+        mock_client = MagicMock()
+        mock_anthropic_cls.return_value = mock_client
+
+        mock_thinking_block = MockThinkingBlock(thinking="让我先思考...")
+        mock_text_block = MockTextBlock(text="文件内容是 hello")
+        mock_response = MagicMock(content=[mock_thinking_block, mock_text_block], stop_reason="end_turn")
+        mock_client.messages.create.return_value = mock_response
+
+        client = AnthropicClient(self._make_config())
+        result = client.generate([Message(role="user", content="读文件")])
+
+        assert result.content == "文件内容是 hello"
+        assert result.reasoning == "让我先思考..."
+
+    @patch("kocor.anthropic_client.Anthropic")
+    def test_normalize_out_thinking_with_tool_use(self, mock_anthropic_cls):
+        """测试 thinking + tool_use 时 reasoning 也提取"""
+        mock_client = MagicMock()
+        mock_anthropic_cls.return_value = mock_client
+
+        mock_thinking_block = MockThinkingBlock(thinking="我需要读取文件...")
+        mock_tool_block = MockToolBlock(id="toolu_1", name="read_file", input={"path": "test.txt"})
+        mock_response = MagicMock(content=[mock_thinking_block, mock_tool_block], stop_reason="tool_use")
+        mock_client.messages.create.return_value = mock_response
+
+        client = AnthropicClient(self._make_config())
+        result = client.generate([Message(role="user", content="读文件")])
+
+        assert result.reasoning == "我需要读取文件..."
+        assert len(result.tool_calls) == 1
+        assert result.tool_calls[0].function.name == "read_file"
+
+    @patch("kocor.anthropic_client.Anthropic")
+    def test_stream_thinking(self, mock_anthropic_cls):
+        """测试流式 thinking delta 映射到 reasoning"""
+        mock_client = MagicMock()
+        mock_anthropic_cls.return_value = mock_client
+
+        mock_client.messages.create.return_value = [
+            MockContentBlockDelta(index=0, delta=MockThinkingDelta(thinking="让我")),
+            MockContentBlockDelta(index=0, delta=MockThinkingDelta(thinking="想想")),
+            MockContentBlockDelta(delta=MockTextDelta(text="读取文件")),
+            MockMessageDelta(_stop_reason="end_turn"),
+            MockMessageStop(),
+        ]
+
+        client = AnthropicClient(self._make_config())
+        chunks = list(client.stream([Message(role="user", content="读文件")]))
+
+        # reasoning 增量返回（与 content 一致）
+        reasoning_chunks = [c for c in chunks if c.reasoning]
+        assert len(reasoning_chunks) == 2
+        assert reasoning_chunks[0].reasoning == "让我"
+        assert reasoning_chunks[1].reasoning == "想想"
+        # 最后一个 chunk 是 is_final 信号
+        assert chunks[-1].is_final is True

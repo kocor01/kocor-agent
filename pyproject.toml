@@ -40,3 +40,8 @@ select = ["E", "F", "I"]
 [tool.mypy]
 python_version = "3.12"
 strict = true
+
+[dependency-groups]
+dev = [
+    "pytest-cov>=7.1.0",
+]
