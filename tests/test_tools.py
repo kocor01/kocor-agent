@@ -1,10 +1,13 @@
 """测试工具系统"""
 
 import json
+import os
+import tempfile
 from unittest.mock import patch, mock_open
 
+import kocor.tools
 from kocor.message import FunctionCall, ToolCall, ToolResult
-from kocor.tools import ToolRegistry, create_default_tools
+from kocor.tools import ToolRegistry, create_default_tools, _resolve_safe_path
 
 
 class TestToolRegistry:
@@ -90,6 +93,45 @@ class TestToolRegistry:
         assert names == {"tool_a", "tool_b"}
 
 
+class TestResolveSafePath:
+    """测试路径遍历防护"""
+
+    def test_path_within_allowed_dir(self):
+        """目录内的路径正常解析"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with patch.object(kocor.tools, "_ALLOWED_DIR", tmpdir):
+                resolved = _resolve_safe_path("subdir/file.txt")
+                expected = os.path.realpath(os.path.join(tmpdir, "subdir/file.txt"))
+                assert resolved == expected
+
+    def test_path_traversal_rejected(self):
+        """相对路径遍历抛出 PermissionError"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with patch.object(kocor.tools, "_ALLOWED_DIR", tmpdir):
+                try:
+                    _resolve_safe_path("../outside.txt")
+                    assert False, "应抛出 PermissionError"
+                except PermissionError:
+                    pass
+
+    def test_path_traversal_deeply_nested(self):
+        """深层路径遍历抛出 PermissionError"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with patch.object(kocor.tools, "_ALLOWED_DIR", tmpdir):
+                try:
+                    _resolve_safe_path("a/b/c/../../../../etc/passwd")
+                    assert False, "应抛出 PermissionError"
+                except PermissionError:
+                    pass
+
+    def test_path_to_allowed_dir_itself(self):
+        """路径指向允许目录本身"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with patch.object(kocor.tools, "_ALLOWED_DIR", tmpdir):
+                resolved = _resolve_safe_path(".")
+                assert resolved == os.path.realpath(tmpdir)
+
+
 class TestCreateDefaultTools:
     """测试内置工具创建"""
 
@@ -123,8 +165,6 @@ class TestCreateDefaultTools:
     @patch("kocor.tools.os.path.exists")
     def test_write_file(self, mock_exists):
         """测试写入文件"""
-        import os
-
         mock_exists.return_value = True
         tools = create_default_tools()
 
@@ -138,6 +178,38 @@ class TestCreateDefaultTools:
         finally:
             if os.path.exists("out.txt"):
                 os.remove("out.txt")
+
+    def test_read_file_path_traversal_rejected(self):
+        """读取文件路径遍历被拒绝"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with patch.object(kocor.tools, "_ALLOWED_DIR", tmpdir):
+                tools = create_default_tools()
+
+                tool_call = ToolCall(
+                    id="call_1",
+                    function=FunctionCall(
+                        name="read_file",
+                        arguments='{"path": "../etc/passwd"}',
+                    ),
+                )
+                result = tools.execute(tool_call)
+                assert "denied" in result.content.lower() or "拒绝" in result.content
+
+    def test_write_file_path_traversal_rejected(self):
+        """写入文件路径遍历被拒绝"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with patch.object(kocor.tools, "_ALLOWED_DIR", tmpdir):
+                tools = create_default_tools()
+
+                tool_call = ToolCall(
+                    id="call_1",
+                    function=FunctionCall(
+                        name="write_file",
+                        arguments='{"path": "../outside.txt", "content": "hack"}',
+                    ),
+                )
+                result = tools.execute(tool_call)
+                assert "denied" in result.content.lower() or "拒绝" in result.content
 
     @patch("kocor.tools.subprocess.run")
     def test_run_python_success(self, mock_run):
@@ -155,6 +227,29 @@ class TestCreateDefaultTools:
         )
         result = tools.execute(tool_call)
         assert "42" in result.content
+
+    @patch("kocor.tools.subprocess.run")
+    def test_run_python_strips_sensitive_env(self, mock_run):
+        """子进程不包含敏感环境变量"""
+        mock_run.return_value = type("MockResult", (), {
+            "returncode": 0,
+            "stdout": "ok\n",
+            "stderr": "",
+        })()
+
+        tools = create_default_tools()
+        tool_call = ToolCall(
+            id="call_1",
+            function=FunctionCall(
+                name="run_python", arguments='{"code": "print(42)"}'
+            ),
+        )
+        tools.execute(tool_call)
+
+        _call_kwargs = mock_run.call_args.kwargs
+        env = _call_kwargs.get("env", os.environ)
+        assert "OPENAI_API_KEY" not in env
+        assert "ANTHROPIC_API_KEY" not in env
 
     @patch("kocor.tools.subprocess.run")
     def test_run_python_failure(self, mock_run):

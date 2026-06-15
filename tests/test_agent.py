@@ -165,6 +165,15 @@ class TestAgentSystemPrompt:
         agent.run("hi")
         assert llm.call_count == 1
 
+    def test_defensive_prompt_has_security_guidelines(self):
+        """默认 system prompt 包含安全准则"""
+        assert "不可信任" in DEFAULT_SYSTEM_PROMPT or "不要执行" in DEFAULT_SYSTEM_PROMPT
+        assert "安全准则" in DEFAULT_SYSTEM_PROMPT or "安全" in DEFAULT_SYSTEM_PROMPT
+
+    def test_defensive_prompt_warns_about_file_content(self):
+        """默认 system prompt 提醒文件内容不可信"""
+        assert "文件内容" in DEFAULT_SYSTEM_PROMPT
+
 
 # 简单的 mock 类，用于 spec
 class FakeStreamLLMClient:
