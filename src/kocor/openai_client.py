@@ -109,11 +109,14 @@ class OpenAIClient(LLMClient):
             tools=openai_tools,
             stream=True,
         ):
+            if not chunk.choices:
+                continue
             delta = chunk.choices[0].delta
-            is_final = chunk.choices[0].finish_reason is not None
+            finish_reason = chunk.choices[0].finish_reason
+            is_final = finish_reason is not None and finish_reason != ""
 
-            # reasoning 增量（仅推理模型返回此字段）
-            reasoning_text = getattr(delta, "reasoning", None)
+            # reasoning 增量（兼容 OpenAI o-series reasoning 和 DeepSeek reasoning_content）
+            reasoning_text = getattr(delta, "reasoning", None) or getattr(delta, "reasoning_content", None)
 
             # 构建 chunk（reasoning 传增量，与 content 一致）
             stream_chunk = StreamChunk(

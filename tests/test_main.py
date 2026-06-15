@@ -279,8 +279,7 @@ class TestCLIFormattedOutput:
 
         output = "".join(captured)
         assert "第 1 次请求" in output
-        assert "╭" in output
-        assert "╰" in output
+        assert "──" in output
 
     @patch("kocor.__main__.Agent")
     @patch("sys.argv", ["kocor", "--stream", "读文件"])
@@ -304,7 +303,7 @@ class TestCLIFormattedOutput:
             main()
 
         output = "".join(captured)
-        assert "思维链" in output
+        assert "思维过程" in output
         assert "让我思考" in output
 
     @patch("kocor.__main__.Agent")
@@ -328,7 +327,7 @@ class TestCLIFormattedOutput:
             main()
 
         output = "".join(captured)
-        assert "结果输出" in output
+        assert "回答" in output
         assert "答案是42" in output
 
     @patch("kocor.__main__.Agent")

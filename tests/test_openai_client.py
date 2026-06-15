@@ -129,12 +129,13 @@ class TestOpenAIClient:
 class MockOpenAIChunk:
     """Mock OpenAI streaming chunk"""
 
-    def __init__(self, content=None, tool_calls=None, finish_reason=None, reasoning=None):
+    def __init__(self, content=None, tool_calls=None, finish_reason=None, reasoning=None, reasoning_content=None):
         delta = MagicMock()
         delta.content = content
         delta.tool_calls = tool_calls
         delta.index = 0
         delta.reasoning = reasoning
+        delta.reasoning_content = reasoning_content
         self.choices = [MagicMock(delta=delta, finish_reason=finish_reason)]
 
 
