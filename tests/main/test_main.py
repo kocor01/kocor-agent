@@ -2,7 +2,7 @@
 
 from unittest.mock import MagicMock, patch
 
-from kocor.message import FunctionCall, StreamChunk, ToolCall
+from kocor.llm_provider.message import FunctionCall, StreamChunk, ToolCall
 
 
 class TestCLIParseArgs:
@@ -228,7 +228,7 @@ class TestCLIFormattedOutput:
     def test_stream_prints_tool_result(self, mock_agent_cls):
         """测试工具结果格式化输出"""
         from kocor.__main__ import main
-        from kocor.message import ToolResult
+        from kocor.llm_provider.message import ToolResult
 
         mock_agent = MagicMock()
         mock_agent.stream.return_value = iter([

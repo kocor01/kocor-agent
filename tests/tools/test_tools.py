@@ -4,7 +4,7 @@ import os
 import tempfile
 from unittest.mock import mock_open, patch
 
-from kocor.message import FunctionCall, ToolCall, ToolResult
+from kocor.llm_provider.message import FunctionCall, ToolCall, ToolResult
 from kocor.tool_registry import ToolRegistry
 from kocor.tools import create_default_tools
 from kocor.tools.tool_utils import resolve_safe_path

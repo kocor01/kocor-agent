@@ -1,6 +1,6 @@
 """测试消息数据模型"""
 
-from kocor.message import FunctionCall, Message, ToolCall, ToolResult
+from kocor.llm_provider.message import FunctionCall, Message, ToolCall, ToolResult
 
 
 class TestMessage:
@@ -90,7 +90,7 @@ class TestStreamChunk:
 
     def test_stream_chunk_default_values(self):
         """测试默认值: content="" tool_calls=[] is_final=False"""
-        from kocor.message import StreamChunk
+        from kocor.llm_provider.message import StreamChunk
 
         chunk = StreamChunk()
         assert chunk.content == ""
@@ -99,7 +99,7 @@ class TestStreamChunk:
 
     def test_stream_chunk_with_content(self):
         """测试带增量文本的 chunk"""
-        from kocor.message import StreamChunk
+        from kocor.llm_provider.message import StreamChunk
 
         chunk = StreamChunk(content="你好")
         assert chunk.content == "你好"
@@ -107,14 +107,14 @@ class TestStreamChunk:
 
     def test_stream_chunk_is_final(self):
         """测试 is_final 标记"""
-        from kocor.message import StreamChunk
+        from kocor.llm_provider.message import StreamChunk
 
         chunk = StreamChunk(content="结束", is_final=True)
         assert chunk.is_final is True
 
     def test_stream_chunk_with_tool_calls(self):
         """测试带工具调用的 chunk"""
-        from kocor.message import FunctionCall, StreamChunk, ToolCall
+        from kocor.llm_provider.message import FunctionCall, StreamChunk, ToolCall
 
         chunk = StreamChunk(
             tool_calls=[

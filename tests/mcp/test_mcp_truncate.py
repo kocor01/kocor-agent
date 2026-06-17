@@ -1,6 +1,6 @@
 """测试输出截断模块"""
 
-from kocor.mcp_truncate import TruncateConfig, truncate_output
+from kocor.mcp import TruncateConfig, truncate_output
 
 
 class TestTruncateOutput:

@@ -10,7 +10,7 @@ from typing import Iterator, Protocol
 
 from kocor.config import Config
 from kocor.llm_provider.tool_definition import ToolDefinition
-from kocor.message import Message, StreamChunk
+from kocor.llm_provider.message import Message, StreamChunk
 
 
 class LLMClient(Protocol):

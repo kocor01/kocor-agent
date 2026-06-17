@@ -5,7 +5,7 @@ from unittest.mock import MagicMock
 from kocor.agent import DEFAULT_SYSTEM_PROMPT, Agent
 from kocor.llm_provider.llm_client import LLMClient
 from kocor.llm_provider.tool_definition import ToolDefinition
-from kocor.message import FunctionCall, Message, StreamChunk, ToolCall, ToolResult
+from kocor.llm_provider.message import FunctionCall, Message, StreamChunk, ToolCall, ToolResult
 
 
 class FakeLLMClient(LLMClient):

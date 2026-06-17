@@ -5,7 +5,7 @@ from kocor.config import Config
 from kocor.llm_client import create_llm_client, register_client
 from kocor.llm_provider.llm_client import LLMClient
 from kocor.llm_provider.tool_definition import ToolDefinition
-from kocor.message import Message, StreamChunk
+from kocor.llm_provider.message import Message, StreamChunk
 
 
 class TestLLMClientInterface:
@@ -49,7 +49,7 @@ class TestLLMClientInterface:
 
     def test_generate_with_tools_returns_message_with_tool_calls(self):
         """工具调用时返回含 tool_calls 的 Message"""
-        from kocor.message import FunctionCall, ToolCall
+        from kocor.llm_provider.message import FunctionCall, ToolCall
 
         class FakeClient(LLMClient):
             @property

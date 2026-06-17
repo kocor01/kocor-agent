@@ -17,8 +17,8 @@ from dotenv import load_dotenv
 from kocor.agent import Agent
 from kocor.config import load_config
 from kocor.llm_client import create_llm_client
-from kocor.mcp_client import register_mcp_tools, shutdown_mcp_clients
-from kocor.message import StreamChunk
+from kocor.mcp import register_mcp_tools, shutdown_mcp_clients
+from kocor.llm_provider.message import StreamChunk
 from kocor.tool_registry import ToolRegistry
 from kocor.tools import create_default_tools
 

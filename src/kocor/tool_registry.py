@@ -7,7 +7,7 @@ import os
 from typing import Callable
 
 from kocor.llm_provider.tool_definition import ToolDefinition
-from kocor.message import ToolCall, ToolResult
+from kocor.llm_provider.message import ToolCall, ToolResult
 
 
 class ToolRegistry:
@@ -87,13 +87,3 @@ class ToolRegistry:
                 tool_call_id=tool_call.id,
                 content=f"Error: {type(e).__name__}: {e}",
             )
-
-    def merge(self, other: ToolRegistry) -> None:
-        """合并另一个 ToolRegistry 的全部工具到当前实例。
-
-        Args:
-            other: 另一个 ToolRegistry（其工具和处理器将被导入）
-        """
-        for name in other._tools:
-            self._tools[name] = other._tools[name]
-            self._handlers[name] = other._handlers[name]

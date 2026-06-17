@@ -2,7 +2,7 @@
 
 import pytest
 
-from kocor.mcp_permission import PermissionManager, PermissionPolicy
+from kocor.mcp import PermissionManager, PermissionPolicy
 
 
 class TestPermissionPolicy:

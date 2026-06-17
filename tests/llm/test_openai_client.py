@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 from kocor.config import Config
 from kocor.llm_provider.tool_definition import ToolDefinition
 from kocor.llm_provider.openai_client import OpenAIClient
-from kocor.message import FunctionCall, Message, ToolCall
+from kocor.llm_provider.message import FunctionCall, Message, ToolCall
 
 
 class TestOpenAIClient:

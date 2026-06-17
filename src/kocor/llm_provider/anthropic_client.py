@@ -13,7 +13,7 @@ from anthropic import Anthropic
 from kocor.config import Config
 from kocor.llm_provider.llm_client import LLMClient
 from kocor.llm_provider.tool_definition import ToolDefinition
-from kocor.message import FunctionCall, Message, StreamChunk, ToolCall
+from kocor.llm_provider.message import FunctionCall, Message, StreamChunk, ToolCall
 
 
 class AnthropicClient(LLMClient):
