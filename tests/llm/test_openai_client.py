@@ -3,9 +3,9 @@
 from unittest.mock import MagicMock, patch
 
 from kocor.config import Config
-from kocor.llm_client import ToolDefinition
+from kocor.llm_provider.tool_definition import ToolDefinition
+from kocor.llm_provider.openai_client import OpenAIClient
 from kocor.message import FunctionCall, Message, ToolCall
-from kocor.openai_client import OpenAIClient
 
 
 class TestOpenAIClient:
@@ -21,7 +21,7 @@ class TestOpenAIClient:
         assert client.provider == "openai"
 
     
-    @patch("kocor.openai_client.OpenAI")
+    @patch("kocor.llm_provider.openai_client.OpenAI")
     def test_generate_text_response(self, mock_openai_cls):
         """测试纯文本响应"""
         mock_client = MagicMock()
@@ -42,7 +42,7 @@ class TestOpenAIClient:
         assert result.content == "你好，我是助手"
         assert result.tool_calls == []
 
-    @patch("kocor.openai_client.OpenAI")
+    @patch("kocor.llm_provider.openai_client.OpenAI")
     def test_generate_tool_call_response(self, mock_openai_cls):
         """测试工具调用响应"""
         mock_client = MagicMock()
@@ -75,7 +75,7 @@ class TestOpenAIClient:
         assert result.tool_calls[0].function.name == "read_file"
         assert result.tool_calls[0].function.arguments == '{"path": "test.txt"}'
 
-    @patch("kocor.openai_client.OpenAI")
+    @patch("kocor.llm_provider.openai_client.OpenAI")
     def test_generate_with_tools(self, mock_openai_cls):
         """测试传入工具定义"""
         mock_client = MagicMock()
@@ -103,7 +103,7 @@ class TestOpenAIClient:
         assert tools_arg[0]["type"] == "function"
         assert tools_arg[0]["function"]["name"] == "read_file"
 
-    @patch("kocor.openai_client.OpenAI")
+    @patch("kocor.llm_provider.openai_client.OpenAI")
     def test_generate_with_temperature(self, mock_openai_cls):
         """测试 temperature 参数传递"""
         mock_client = MagicMock()
@@ -148,7 +148,7 @@ class TestOpenAIClientStream:
         defaults.update(kwargs)
         return Config(**defaults)
 
-    @patch("kocor.openai_client.OpenAI")
+    @patch("kocor.llm_provider.openai_client.OpenAI")
     def test_stream_text_response(self, mock_openai_cls):
         """测试纯文本流式响应"""
         mock_client = MagicMock()
@@ -170,7 +170,7 @@ class TestOpenAIClientStream:
         assert chunks[1].content == " World"
         assert chunks[2].is_final is True
 
-    @patch("kocor.openai_client.OpenAI")
+    @patch("kocor.llm_provider.openai_client.OpenAI")
     def test_stream_tool_call(self, mock_openai_cls):
         """测试工具调用流式响应"""
         mock_client = MagicMock()
@@ -203,7 +203,7 @@ class TestOpenAIClientStream:
         assert len(chunks[1].tool_calls) == 1
         assert chunks[1].tool_calls[0].function.name == "read_file"
 
-    @patch("kocor.openai_client.OpenAI")
+    @patch("kocor.llm_provider.openai_client.OpenAI")
     def test_stream_empty_content(self, mock_openai_cls):
         """测试空内容 chunk 仍被 yield（携带 is_final 信号）"""
         mock_client = MagicMock()
@@ -224,7 +224,7 @@ class TestOpenAIClientStream:
         assert chunks[1].content == "hello"
         assert chunks[2].is_final is True
 
-    @patch("kocor.openai_client.OpenAI")
+    @patch("kocor.llm_provider.openai_client.OpenAI")
     def test_normalize_in_system_message(self, mock_openai_cls):
         """测试 _normalize_in 处理 system 消息"""
         mock_client = MagicMock()
@@ -248,7 +248,7 @@ class TestOpenAIClientStream:
         assert msgs[0]["role"] == "system"
         assert msgs[0]["content"] == "你是助手"
 
-    @patch("kocor.openai_client.OpenAI")
+    @patch("kocor.llm_provider.openai_client.OpenAI")
     def test_normalize_in_tool_result(self, mock_openai_cls):
         """测试 _normalize_in 处理 tool 消息"""
         mock_client = MagicMock()
@@ -276,7 +276,7 @@ class TestOpenAIClientStream:
         assert msgs[2]["content"] == "result"
         assert msgs[2]["tool_call_id"] == "call_1"
 
-    @patch("kocor.openai_client.OpenAI")
+    @patch("kocor.llm_provider.openai_client.OpenAI")
     def test_normalize_in_assistant_reasoning(self, mock_openai_cls):
         """测试 _normalize_in 传递 assistant reasoning"""
         mock_client = MagicMock()
@@ -300,7 +300,7 @@ class TestOpenAIClientStream:
         assert msgs[1]["role"] == "assistant"
         assert msgs[1]["reasoning"] == "让我想想..."
 
-    @patch("kocor.openai_client.OpenAI")
+    @patch("kocor.llm_provider.openai_client.OpenAI")
     def test_normalize_out_reasoning(self, mock_openai_cls):
         """测试 _normalize_out 提取 reasoning"""
         mock_client = MagicMock()
@@ -320,7 +320,7 @@ class TestOpenAIClientStream:
         assert result.content == "文件内容是 hello"
         assert result.reasoning == "让我先读取文件..."
 
-    @patch("kocor.openai_client.OpenAI")
+    @patch("kocor.llm_provider.openai_client.OpenAI")
     def test_stream_reasoning(self, mock_openai_cls):
         """测试流式输出提取 reasoning"""
         mock_client = MagicMock()

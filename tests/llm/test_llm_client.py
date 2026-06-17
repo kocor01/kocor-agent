@@ -2,7 +2,9 @@
 
 
 from kocor.config import Config
-from kocor.llm_client import LLMClient, ToolDefinition, create_llm_client, register_client
+from kocor.llm_client import create_llm_client, register_client
+from kocor.llm_provider.llm_client import LLMClient
+from kocor.llm_provider.tool_definition import ToolDefinition
 from kocor.message import Message, StreamChunk
 
 
@@ -111,7 +113,7 @@ class TestCreateLLMClient:
 
     def test_create_openai_client(self):
         """测试创建 OpenAI 客户端"""
-        from kocor.openai_client import OpenAIClient
+        from kocor.llm_provider.openai_client import OpenAIClient
 
         config = Config(provider="openai")
         client = create_llm_client(config)
@@ -120,7 +122,7 @@ class TestCreateLLMClient:
 
     def test_create_anthropic_client(self):
         """测试创建 Anthropic 客户端"""
-        from kocor.anthropic_client import AnthropicClient
+        from kocor.llm_provider.anthropic_client import AnthropicClient
 
         config = Config(provider="anthropic")
         client = create_llm_client(config)

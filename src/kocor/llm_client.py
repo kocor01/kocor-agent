@@ -1,95 +1,12 @@
-"""LLM 客户端抽象层。
+"""LLM 客户端工厂与注册。
 
-提供统一的 LLMClient 接口，具体实现由 OpenAI/Anthropic SDK 完成。
-只做格式归一化，不封装 LLM 的能力差异。
+从 base_client 导入 LLMClient/ToolDefinition，提供注册和工厂函数。
 """
 
 from __future__ import annotations
 
-from typing import Iterator, Protocol
-
 from kocor.config import Config
-from kocor.message import Message, StreamChunk
-
-
-class ToolDefinition:
-    """工具定义，用于 JSON Schema 描述。
-
-    Attributes:
-        name: 工具名称
-        description: 工具描述
-        parameters: JSON Schema 参数定义
-    """
-
-    def __init__(self, name: str, description: str, parameters: dict):
-        self.name = name
-        self.description = description
-        self.parameters = parameters
-
-    def to_dict(self) -> dict:
-        """转换为 OpenAI API 格式"""
-        return {
-            "type": "function",
-            "function": {
-                "name": self.name,
-                "description": self.description,
-                "parameters": self.parameters,
-            },
-        }
-
-
-class LLMClient(Protocol):
-    """LLM 客户端抽象接口。
-
-    所有 provider 实现必须遵循此接口。
-    """
-
-    @property
-    def provider(self) -> str:
-        """返回 provider 名称: 'openai' | 'anthropic'"""
-        ...
-
-    def generate(
-        self,
-        messages: list[Message],
-        tools: list[ToolDefinition] | None = None,
-        max_tokens: int = 4096,
-        temperature: float = 0.0,
-    ) -> Message:
-        """生成响应。
-
-        Args:
-            messages: 消息列表（含历史）
-            tools: 可用工具定义列表
-            max_tokens: 最大生成长度
-            temperature: 采样温度
-
-        Returns:
-            Message:
-            - 纯文本: Message(role="assistant", content="...")
-            - 工具调用: Message(role="assistant", content="", tool_calls=[...])
-        """
-        ...
-
-    def stream(
-        self,
-        messages: list[Message],
-        tools: list[ToolDefinition] | None = None,
-        max_tokens: int = 4096,
-        temperature: float = 0.0,
-    ) -> Iterator[StreamChunk]:
-        """流式生成响应。
-
-        Args:
-            messages: 消息列表（含历史）
-            tools: 可用工具定义列表
-            max_tokens: 最大生成长度
-            temperature: 采样温度
-
-        Yields:
-            StreamChunk: 流式数据块
-        """
-        ...
+from kocor.llm_provider.llm_client import LLMClient
 
 
 _clients: dict[str, type[LLMClient]] = {}
@@ -119,8 +36,8 @@ def create_llm_client(config: Config) -> LLMClient:
     """
     # 内置注册（惰性，仅在首次调用时执行）
     if not _clients:
-        from kocor.anthropic_client import AnthropicClient
-        from kocor.openai_client import OpenAIClient
+        from kocor.llm_provider.anthropic_client import AnthropicClient
+        from kocor.llm_provider.openai_client import OpenAIClient
 
         register_client("openai", OpenAIClient)
         register_client("anthropic", AnthropicClient)

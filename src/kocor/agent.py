@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from typing import Iterator
 
-from kocor.llm_client import LLMClient
+from kocor.llm_provider.llm_client import LLMClient
 from kocor.message import Message, StreamChunk, ToolCall
 from kocor.tool_registry import ToolRegistry
 

@@ -6,7 +6,7 @@ import json
 import os
 from typing import Callable
 
-from kocor.llm_client import ToolDefinition
+from kocor.llm_provider.tool_definition import ToolDefinition
 from kocor.message import ToolCall, ToolResult
 
 
