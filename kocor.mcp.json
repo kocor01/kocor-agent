@@ -1,0 +1,48 @@
+{
+  "mcpServers": {
+    "fs": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-filesystem",
+        "."
+      ],
+      "env": {}
+    },
+    "fetch": {
+      "command": "uvx",
+      "args": [
+        "mcp-server-fetch"
+      ]
+    },
+    "bing-search": {
+      "command": "cmd",
+      "args": [
+        "/c",
+        "npx",
+        "-y",
+        "bing-cn-mcp"
+      ]
+    }
+  },
+
+  "tool_output": {
+    "max_bytes": 50000,
+    "max_lines": 2000,
+    "max_line_length": 2000
+  },
+
+  "permissions": {
+    "fs": {
+      "policy": "always_ask",
+      "allowed_tools": ["mcp_fs_read_file"]
+    },
+    "fetch": {
+      "policy": "always_ask",
+      "allowed_tools": ["mcp_fetch_fetch"]
+    },
+    "bing-search": {
+      "policy": "always_ask"
+    }
+  }
+}

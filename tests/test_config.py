@@ -1,6 +1,10 @@
 """测试配置加载"""
 
+import json
 import os
+from unittest.mock import mock_open, patch
+
+import pytest
 
 from kocor.config import LLMConfig, load_config
 
@@ -121,3 +125,63 @@ class TestLoadConfigValidation:
             assert False, "应抛出 ValueError"
         except ValueError:
             pass
+
+
+class TestMCPConfigValidation:
+    """测试 MCP 配置文件校验"""
+
+    def test_validate_valid_json(self):
+        from kocor.config import _validate_mcp_config_json
+
+        data = json.dumps({"mcpServers": {"fs": {"command": "npx"}}})
+        with patch("builtins.open", mock_open(read_data=data)):
+            _validate_mcp_config_json("valid.json")  # 不应抛出
+
+    def test_validate_invalid_json_raises(self):
+        from kocor.config import _validate_mcp_config_json
+
+        with patch("builtins.open", mock_open(read_data="not json")):
+            with pytest.raises(ValueError, match="JSON"):
+                _validate_mcp_config_json("bad.json")
+
+    def test_validate_missing_servers_field_raises(self):
+        from kocor.config import _validate_mcp_config_json
+
+        data = json.dumps({"other": "value"})
+        with patch("builtins.open", mock_open(read_data=data)):
+            with pytest.raises(ValueError, match="mcpServers"):
+                _validate_mcp_config_json("no_servers.json")
+
+    def test_validate_servers_not_dict_raises(self):
+        from kocor.config import _validate_mcp_config_json
+
+        data = json.dumps({"mcpServers": "not_a_dict"})
+        with patch("builtins.open", mock_open(read_data=data)):
+            with pytest.raises(ValueError, match="mcpServers"):
+                _validate_mcp_config_json("bad_servers.json")
+
+    def test_env_var_invalid_path_raises(self):
+        os.environ["KOCOR_MCP_CONFIG"] = "/nonexistent/path.json"
+        os.environ["KOCOR_PROVIDER"] = "openai"
+        try:
+            load_config()
+            assert False, "应抛出 ValueError"
+        except ValueError as e:
+            assert "不存在" in str(e) or "not exist" in str(e)
+        finally:
+            os.environ.pop("KOCOR_MCP_CONFIG", None)
+            os.environ.pop("KOCOR_PROVIDER", None)
+
+    def test_env_var_invalid_json_raises(self):
+        os.environ["KOCOR_MCP_CONFIG"] = "bad_mcp_config.json"
+        os.environ["KOCOR_PROVIDER"] = "openai"
+        try:
+            with patch("kocor.config.os.path.exists", return_value=True), \
+                 patch("builtins.open", mock_open(read_data="not json")):
+                load_config()
+                assert False, "应抛出 ValueError"
+        except ValueError as e:
+            assert "JSON" in str(e)
+        finally:
+            os.environ.pop("KOCOR_MCP_CONFIG", None)
+            os.environ.pop("KOCOR_PROVIDER", None)

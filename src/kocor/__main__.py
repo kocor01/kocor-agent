@@ -17,6 +17,7 @@ from dotenv import load_dotenv
 from kocor.agent import Agent
 from kocor.config import load_config
 from kocor.llm_client import create_llm_client
+from kocor.mcp_client import register_mcp_tools, shutdown_mcp_clients
 from kocor.message import StreamChunk
 from kocor.tools import create_default_tools
 
@@ -149,6 +150,10 @@ def main() -> None:
     config = load_config()
     llm = create_llm_client(config)
     tools = create_default_tools(config)
+
+    # 独立创建 MCP 工具集，再与内置工具合并
+    mcp_registry, mcp_clients = register_mcp_tools(config.mcp_config)
+    tools.merge(mcp_registry)
     agent = Agent(llm=llm, tools=tools, max_iterations=config.max_iterations)
 
     if user_args:
@@ -165,11 +170,14 @@ def main() -> None:
         print("   或: echo \"你的问题\" | python -m kocor")
         sys.exit(1)
 
-    if stream_enabled and hasattr(agent, "stream"):
-        _print_stream_formatted(agent.stream(user_input))
-    else:
-        result = agent.run(user_input)
-        print(result)
+    try:
+        if stream_enabled and hasattr(agent, "stream"):
+            _print_stream_formatted(agent.stream(user_input))
+        else:
+            result = agent.run(user_input)
+            print(result)
+    finally:
+        shutdown_mcp_clients(mcp_clients)
 
 
 if __name__ == "__main__":
