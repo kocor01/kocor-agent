@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Iterator, Protocol
 
-from kocor.config import LLMConfig
+from kocor.config import Config
 from kocor.message import Message, StreamChunk
 
 
@@ -105,7 +105,7 @@ def register_client(provider: str, client_class: type[LLMClient]) -> None:
     _clients[provider] = client_class
 
 
-def create_llm_client(config: LLMConfig) -> LLMClient:
+def create_llm_client(config: Config) -> LLMClient:
     """根据配置创建 LLM 客户端。
 
     Args:

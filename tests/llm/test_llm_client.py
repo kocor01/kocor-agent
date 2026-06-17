@@ -1,7 +1,7 @@
 """测试 LLMClient 抽象接口"""
 
 
-from kocor.config import LLMConfig
+from kocor.config import Config
 from kocor.llm_client import LLMClient, ToolDefinition, create_llm_client, register_client
 from kocor.message import Message, StreamChunk
 
@@ -113,7 +113,7 @@ class TestCreateLLMClient:
         """测试创建 OpenAI 客户端"""
         from kocor.openai_client import OpenAIClient
 
-        config = LLMConfig(provider="openai")
+        config = Config(provider="openai")
         client = create_llm_client(config)
         assert isinstance(client, OpenAIClient)
         assert client.provider == "openai"
@@ -122,14 +122,14 @@ class TestCreateLLMClient:
         """测试创建 Anthropic 客户端"""
         from kocor.anthropic_client import AnthropicClient
 
-        config = LLMConfig(provider="anthropic")
+        config = Config(provider="anthropic")
         client = create_llm_client(config)
         assert isinstance(client, AnthropicClient)
         assert client.provider == "anthropic"
 
     def test_create_unsupported_provider(self):
         """测试不支持的 provider 抛出异常"""
-        config = LLMConfig(provider="unknown")
+        config = Config(provider="unknown")
         try:
             create_llm_client(config)
             assert False, "Should have raised ValueError"
@@ -139,7 +139,7 @@ class TestCreateLLMClient:
     def test_register_client(self):
         """测试 register_client 注册新 provider"""
         class FakeClient(LLMClient):
-            def __init__(self, config: LLMConfig = None):
+            def __init__(self, config: Config = None):
                 pass
 
             @property
@@ -151,7 +151,7 @@ class TestCreateLLMClient:
 
         register_client("fake", FakeClient)
         try:
-            config = LLMConfig(provider="fake")
+            config = Config(provider="fake")
             client = create_llm_client(config)
             assert isinstance(client, FakeClient)
             assert client.provider == "fake"

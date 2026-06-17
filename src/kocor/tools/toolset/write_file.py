@@ -27,8 +27,8 @@ def handler(path: str, content: str) -> str:
     return f"Success: wrote {len(content)} bytes to {path}"
 
 
-def register_to(registry) -> None:
-    registry.register(
+def toolRegistry_to(toolRegistry) -> None:
+    toolRegistry.register(
         name=NAME,
         description=DESCRIPTION,
         parameters=PARAMETERS,

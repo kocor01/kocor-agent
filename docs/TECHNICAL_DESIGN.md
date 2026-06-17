@@ -197,7 +197,7 @@ API Key 读取：
 ### 4.5 工厂函数
 
 ```python
-def create_llm_client(config: LLMConfig) -> LLMClient:
+def create_llm_client(config: Config) -> LLMClient:
     """根据配置创建对应的 LLM 客户端"""
     match config.provider:
         case "openai":

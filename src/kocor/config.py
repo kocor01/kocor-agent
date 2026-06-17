@@ -10,20 +10,28 @@ from dataclasses import dataclass
 
 
 @dataclass
-class LLMConfig:
-    """LLM 客户端配置。
-
-    只保留 provider 选择，model 和 base_url 下放到各 client 实例化时读取。
-    """
+class Config:
+    """系统配置。"""
 
     provider: str = "openai"
     max_iterations: int = 20
     timeout: int = 30
     mcp_config: str = "kocor.mcp.json"
 
+    # OpenAI
+    openai_api_key: str = ""
+    openai_model: str = "gpt-4o"
+    openai_base_url: str = ""
 
-def load_config() -> LLMConfig:
-    """从环境变量加载配置，未设置的字段使用 LLMConfig 字段默认值。
+    # Anthropic
+    anthropic_api_key: str = ""
+    anthropic_model: str = "claude-sonnet-4-20250514"
+    anthropic_base_url: str = ""
+
+
+
+def load_config() -> Config:
+    """从环境变量加载配置，未设置的字段使用 Config 字段默认值。
 
     环境变量:
         KOCOR_PROVIDER: provider 选择（支持 openai / OpenAI / anthropic / Anthropic）
@@ -76,9 +84,15 @@ def load_config() -> LLMConfig:
     else:
         mcp_config = "kocor.mcp.json"
 
-    return LLMConfig(
+    return Config(
         provider=provider,
         max_iterations=max_iterations,
         timeout=timeout,
         mcp_config=mcp_config,
+        openai_api_key=os.environ.get("OPENAI_API_KEY", ""),
+        openai_model=os.environ.get("OPENAI_MODEL", "gpt-4o"),
+        openai_base_url=os.environ.get("OPENAI_BASE_URL", ""),
+        anthropic_api_key=os.environ.get("ANTHROPIC_API_KEY", ""),
+        anthropic_model=os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-4-20250514"),
+        anthropic_base_url=os.environ.get("ANTHROPIC_BASE_URL", ""),
     )

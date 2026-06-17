@@ -135,7 +135,9 @@ class TestCreateDefaultTools:
     def test_read_file_not_found(self, mock_exists):
         """测试读取不存在的文件"""
         mock_exists.return_value = False
-        tools = create_default_tools()
+        registry = ToolRegistry()
+        create_default_tools(registry)
+        tools = registry
 
         tool_call = ToolCall(
             id="call_1",
@@ -149,7 +151,9 @@ class TestCreateDefaultTools:
     def test_read_file_success(self, mock_exists, mock_file):
         """测试读取文件成功"""
         mock_exists.return_value = True
-        tools = create_default_tools()
+        registry = ToolRegistry()
+        create_default_tools(registry)
+        tools = registry
 
         tool_call = ToolCall(
             id="call_1",
@@ -161,7 +165,9 @@ class TestCreateDefaultTools:
     @patch("kocor.tools.toolset.write_file.os.makedirs")
     def test_write_file(self, mock_makedirs):
         """测试写入文件"""
-        tools = create_default_tools()
+        registry = ToolRegistry()
+        create_default_tools(registry)
+        tools = registry
 
         tool_call = ToolCall(
             id="call_1",
@@ -174,7 +180,9 @@ class TestCreateDefaultTools:
         """读取文件路径遍历被拒绝"""
         with tempfile.TemporaryDirectory() as tmpdir:
             with patch("kocor.tools.toolset.read_file.os.getcwd", return_value=tmpdir):
-                tools = create_default_tools()
+                registry = ToolRegistry()
+                create_default_tools(registry)
+                tools = registry
 
                 tool_call = ToolCall(
                     id="call_1",
@@ -190,7 +198,9 @@ class TestCreateDefaultTools:
         """写入文件路径遍历被拒绝"""
         with tempfile.TemporaryDirectory() as tmpdir:
             with patch("kocor.tools.toolset.write_file.os.getcwd", return_value=tmpdir):
-                tools = create_default_tools()
+                registry = ToolRegistry()
+                create_default_tools(registry)
+                tools = registry
 
                 tool_call = ToolCall(
                     id="call_1",
@@ -210,7 +220,9 @@ class TestCreateDefaultTools:
             "stderr": "",
         })()
 
-        tools = create_default_tools()
+        registry = ToolRegistry()
+        create_default_tools(registry)
+        tools = registry
         tool_call = ToolCall(
             id="call_1",
             function=FunctionCall(name="run_python", arguments='{"code": "print(42)"}'),
@@ -227,7 +239,9 @@ class TestCreateDefaultTools:
             "stderr": "",
         })()
 
-        tools = create_default_tools()
+        registry = ToolRegistry()
+        create_default_tools(registry)
+        tools = registry
         tool_call = ToolCall(
             id="call_1",
             function=FunctionCall(
@@ -269,7 +283,9 @@ class TestCreateDefaultTools:
             "stderr": "NameError: name 'x' is not defined",
         })()
 
-        tools = create_default_tools()
+        registry = ToolRegistry()
+        create_default_tools(registry)
+        tools = registry
         tool_call = ToolCall(
             id="call_1",
             function=FunctionCall(name="run_python", arguments='{"code": "print(x)"}'),

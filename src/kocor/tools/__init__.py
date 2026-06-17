@@ -5,25 +5,16 @@
 
 from __future__ import annotations
 
-from kocor.config import LLMConfig
 from kocor.tool_registry import ToolRegistry
 from kocor.tools.toolset import read_file, run_python, write_file
 
 
-def create_default_tools(config: LLMConfig | None = None) -> ToolRegistry:
-    """创建默认工具集（读文件、写文件、沙盒执行 Python）。
+def create_default_tools(toolRegistry: ToolRegistry) -> None:
+    """向指定 toolRegistry 注册内部工具（读文件、写文件、沙盒执行 Python）。
 
     Args:
-        config: 可选配置
-
-    Returns:
-        已注册内置工具的 ToolRegistry
+        toolRegistry: 目标 ToolRegistry 实例
     """
-    timeout = config.timeout if config else 30
-    registry = ToolRegistry(timeout=timeout)
-
-    read_file.register_to(registry)
-    write_file.register_to(registry)
-    run_python.register_to(registry)
-
-    return registry
+    read_file.toolRegistry_to(toolRegistry)
+    write_file.toolRegistry_to(toolRegistry)
+    run_python.toolRegistry_to(toolRegistry)

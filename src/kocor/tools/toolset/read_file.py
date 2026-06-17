@@ -24,8 +24,8 @@ def handler(path: str) -> str:
     with open(safe_path, "r", encoding="utf-8") as f:
         return f.read()
 
-def register_to(registry) -> None:
-    registry.register(
+def toolRegistry_to(toolRegistry) -> None:
+    toolRegistry.register(
         name=NAME,
         description=DESCRIPTION,
         parameters=PARAMETERS,

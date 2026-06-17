@@ -5,12 +5,11 @@
 
 from __future__ import annotations
 
-import os
 from typing import Iterator
 
 from openai import OpenAI
 
-from kocor.config import LLMConfig
+from kocor.config import Config
 from kocor.llm_client import LLMClient, ToolDefinition
 from kocor.message import FunctionCall, Message, StreamChunk, ToolCall
 
@@ -19,16 +18,11 @@ class OpenAIClient(LLMClient):
     """OpenAI LLM 客户端。
 
     Attributes:
-        config: LLM 配置
-        _model: 模型名称（从环境变量读取）
-        _base_url: 兼容端点（从环境变量读取）
+        config: 系统配置
     """
 
-    def __init__(self, config: LLMConfig):
+    def __init__(self, config: Config):
         self.config = config
-        self._api_key = os.environ.get("OPENAI_API_KEY", "")
-        self._model = os.environ.get("OPENAI_MODEL", "GPT-5.5")
-        self._base_url = os.environ.get("OPENAI_BASE_URL") or None
 
     @property
     def provider(self) -> str:
@@ -53,8 +47,8 @@ class OpenAIClient(LLMClient):
             Message: 响应消息
         """
         client = OpenAI(
-            api_key=self._api_key,
-            base_url=self._base_url,
+            api_key=self.config.openai_api_key,
+            base_url=self.config.openai_base_url or None,
         )
 
         # 内部格式 → OpenAI 格式
@@ -63,7 +57,7 @@ class OpenAIClient(LLMClient):
 
         # 调用 API
         response = client.chat.completions.create(
-            model=self._model,
+            model=self.config.openai_model,
             messages=openai_messages,
             max_tokens=max_tokens,
             temperature=temperature,
@@ -92,8 +86,8 @@ class OpenAIClient(LLMClient):
             StreamChunk: 流式数据块
         """
         client = OpenAI(
-            api_key=self._api_key,
-            base_url=self._base_url,
+            api_key=self.config.openai_api_key,
+            base_url=self.config.openai_base_url or None,
         )
 
         openai_messages = self._normalize_in(messages)
@@ -102,7 +96,7 @@ class OpenAIClient(LLMClient):
         accumulated_tool_calls: dict[int, ToolCall] = {}
 
         for chunk in client.chat.completions.create(
-            model=self._model,
+            model=self.config.openai_model,
             messages=openai_messages,
             max_tokens=max_tokens,
             temperature=temperature,

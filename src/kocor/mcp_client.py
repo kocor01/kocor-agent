@@ -327,24 +327,16 @@ def _build_handler(client, tool_name, prefix, server_name,
     return handler
 
 
-def register_mcp_tools(config_path: str = "") -> tuple[list, list]:
-    """连接所有 MCP 服务器，创建独立的 MCP ToolRegistry 并注册工具。
-
-    与 `create_default_tools()` 独立 — 调用者需手动合并：
-        tools = create_default_tools(config)
-        mcp_registry, mcp_clients = register_mcp_tools(config.mcp_config)
-        tools.merge(mcp_registry)
+def register_mcp_tools(toolRegistry, config_path: str = "") -> list:
+    """将 MCP 服务器工具注册到指定 ToolRegistry。
 
     Args:
+        toolRegistry: 目标 ToolRegistry 实例
         config_path: MCP 配置文件路径
 
     Returns:
-        (mcp_tool_registry, connected_clients)
-        - mcp_tool_registry: 包含所有 MCP 工具的 ToolRegistry
-        - connected_clients: 用于关闭的客户端列表
+        connected_clients: 用于关闭的客户端列表
     """
-    from kocor.tool_registry import ToolRegistry
-
     servers = load_mcp_servers(config_path)
 
     # 全局配置
@@ -367,7 +359,6 @@ def register_mcp_tools(config_path: str = "") -> tuple[list, list]:
         )
     permission_manager = PermissionManager(server_policies)
 
-    mcp_registry = ToolRegistry()
     clients: list = []
 
     for name, cfg in servers.items():
@@ -383,7 +374,7 @@ def register_mcp_tools(config_path: str = "") -> tuple[list, list]:
                     client, t["name"], prefix, name,
                     permission_manager, truncate_cfg,
                 )
-                mcp_registry.register(
+                toolRegistry.register(
                     name=f"mcp_{prefix}_{tname}",
                     description=t.get("description", ""),
                     parameters=t.get("inputSchema", {"type": "object"}),
@@ -397,7 +388,7 @@ def register_mcp_tools(config_path: str = "") -> tuple[list, list]:
             except Exception:
                 pass
 
-    return mcp_registry, clients
+    return clients
 
 
 def shutdown_mcp_clients(clients: list) -> None:

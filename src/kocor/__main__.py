@@ -19,6 +19,7 @@ from kocor.config import load_config
 from kocor.llm_client import create_llm_client
 from kocor.mcp_client import register_mcp_tools, shutdown_mcp_clients
 from kocor.message import StreamChunk
+from kocor.tool_registry import ToolRegistry
 from kocor.tools import create_default_tools
 
 W = 58
@@ -149,12 +150,12 @@ def main() -> None:
     load_dotenv()
     config = load_config()
     llm = create_llm_client(config)
-    tools = create_default_tools(config)
 
-    # 独立创建 MCP 工具集，再与内置工具合并
-    mcp_registry, mcp_clients = register_mcp_tools(config.mcp_config)
-    tools.merge(mcp_registry)
-    agent = Agent(llm=llm, tools=tools, max_iterations=config.max_iterations)
+    toolRegistry = ToolRegistry()
+    create_default_tools(toolRegistry)
+    mcp_clients = register_mcp_tools(toolRegistry, config.mcp_config)
+
+    agent = Agent(llm=llm, tools=toolRegistry, max_iterations=config.max_iterations)
 
     if user_args:
         user_input = " ".join(user_args)

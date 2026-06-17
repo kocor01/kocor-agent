@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from unittest.mock import MagicMock, patch
 
 from kocor.anthropic_client import AnthropicClient
-from kocor.config import LLMConfig
+from kocor.config import Config
 from kocor.llm_client import ToolDefinition
 from kocor.message import FunctionCall, Message, ToolCall
 
@@ -30,10 +30,10 @@ class MockToolBlock:
 class TestAnthropicClient:
     """测试 Anthropic 客户端"""
 
-    def _make_config(self, **kwargs) -> LLMConfig:
+    def _make_config(self, **kwargs) -> Config:
         defaults = {"provider": "anthropic"}
         defaults.update(kwargs)
-        return LLMConfig(**defaults)
+        return Config(**defaults)
 
     def test_provider(self):
         client = AnthropicClient(self._make_config())
@@ -250,10 +250,10 @@ class MockMessageStop:
 class TestAnthropicClientStream:
     """测试 Anthropic 客户端流式"""
 
-    def _make_config(self, **kwargs) -> LLMConfig:
+    def _make_config(self, **kwargs) -> Config:
         defaults = {"provider": "anthropic"}
         defaults.update(kwargs)
-        return LLMConfig(**defaults)
+        return Config(**defaults)
 
     @patch("kocor.anthropic_client.Anthropic")
     def test_stream_text_response(self, mock_anthropic_cls):
@@ -346,10 +346,10 @@ class MockThinkingBlock:
 class TestAnthropicClientReasoning:
     """测试 Anthropic 客户端思维链 (thinking → reasoning)"""
 
-    def _make_config(self, **kwargs) -> LLMConfig:
+    def _make_config(self, **kwargs) -> Config:
         defaults = {"provider": "anthropic"}
         defaults.update(kwargs)
-        return LLMConfig(**defaults)
+        return Config(**defaults)
 
     @patch("kocor.anthropic_client.Anthropic")
     def test_normalize_out_thinking_to_reasoning(self, mock_anthropic_cls):

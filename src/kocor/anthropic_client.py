@@ -6,12 +6,11 @@
 from __future__ import annotations
 
 import json
-import os
 from typing import Iterator
 
 from anthropic import Anthropic
 
-from kocor.config import LLMConfig
+from kocor.config import Config
 from kocor.llm_client import LLMClient, ToolDefinition
 from kocor.message import FunctionCall, Message, StreamChunk, ToolCall
 
@@ -20,16 +19,11 @@ class AnthropicClient(LLMClient):
     """Anthropic LLM 客户端。
 
     Attributes:
-        config: LLM 配置
-        _model: 模型名称（从环境变量读取）
-        _base_url: 兼容端点（从环境变量读取）
+        config: 系统配置
     """
 
-    def __init__(self, config: LLMConfig):
+    def __init__(self, config: Config):
         self.config = config
-        self._api_key = os.environ.get("ANTHROPIC_API_KEY", "")
-        self._model = os.environ.get("ANTHROPIC_MODEL", "Opus 4.8")
-        self._base_url = os.environ.get("ANTHROPIC_BASE_URL") or None
 
     @property
     def provider(self) -> str:
@@ -54,9 +48,9 @@ class AnthropicClient(LLMClient):
             Message: 响应消息
         """
         client = Anthropic(
-            api_key=self._api_key,
-            auth_token=self._api_key,
-            base_url=self._base_url,
+            api_key=self.config.anthropic_api_key,
+            auth_token=self.config.anthropic_api_key,
+            base_url=self.config.anthropic_base_url or None,
         )
 
         # 提取 system 消息（Anthropic 用顶层参数）
@@ -73,7 +67,7 @@ class AnthropicClient(LLMClient):
 
         # 调用 API
         response = client.messages.create(
-            model=self._model,
+            model=self.config.anthropic_model,
             system=system_content or None,
             messages=anthropic_messages,
             max_tokens=max_tokens,
@@ -103,9 +97,9 @@ class AnthropicClient(LLMClient):
             StreamChunk: 流式数据块
         """
         client = Anthropic(
-            api_key=self._api_key,
-            auth_token=self._api_key,
-            base_url=self._base_url,
+            api_key=self.config.anthropic_api_key,
+            auth_token=self.config.anthropic_api_key,
+            base_url=self.config.anthropic_base_url or None,
         )
 
         # 提取 system 消息
@@ -125,7 +119,7 @@ class AnthropicClient(LLMClient):
         tool_block_starts: dict[int, dict] = {}  # index → block metadata
 
         for event in client.messages.create(
-            model=self._model,
+            model=self.config.anthropic_model,
             system=system_content or None,
             messages=anthropic_messages,
             max_tokens=max_tokens,

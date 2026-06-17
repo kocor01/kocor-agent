@@ -40,8 +40,8 @@ def handler(code: str) -> str:
         return f"Error: {type(e).__name__}: {e}"
 
 
-def register_to(registry) -> None:
-    registry.register(
+def toolRegistry_to(toolRegistry) -> None:
+    toolRegistry.register(
         name=NAME,
         description=DESCRIPTION,
         parameters=PARAMETERS,

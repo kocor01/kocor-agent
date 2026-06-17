@@ -40,11 +40,12 @@ class TestCLIMain:
     @patch("kocor.__main__.load_dotenv")
     @patch("kocor.__main__.load_config")
     @patch("kocor.__main__.create_llm_client")
-    @patch("kocor.__main__.create_default_tools")
+    @patch("kocor.__main__.ToolRegistry")
+    @patch("kocor.__main__.register_mcp_tools")
     @patch("kocor.__main__.Agent")
     @patch("sys.argv", ["kocor", "--stream", "你好"])
-    def test_main_with_stream(self, mock_agent_cls, mock_tools, mock_llm,
-                              mock_config, mock_dotenv):
+    def test_main_with_stream(self, mock_agent_cls, mock_mcp, mock_tools,
+                              mock_llm, mock_config, mock_dotenv):
         """测试 --stream 模式"""
         from kocor.__main__ import main
 
@@ -65,11 +66,12 @@ class TestCLIMain:
     @patch("kocor.__main__.load_dotenv")
     @patch("kocor.__main__.load_config")
     @patch("kocor.__main__.create_llm_client")
-    @patch("kocor.__main__.create_default_tools")
+    @patch("kocor.__main__.ToolRegistry")
+    @patch("kocor.__main__.register_mcp_tools")
     @patch("kocor.__main__.Agent")
     @patch("sys.argv", ["kocor", "你好"])
-    def test_main_without_stream(self, mock_agent_cls, mock_tools, mock_llm,
-                                 mock_config, mock_dotenv):
+    def test_main_without_stream(self, mock_agent_cls, mock_mcp, mock_tools,
+                                 mock_llm, mock_config, mock_dotenv):
         """测试非流式模式"""
         from kocor.__main__ import main
 
@@ -86,11 +88,12 @@ class TestCLIMain:
     @patch("kocor.__main__.load_dotenv")
     @patch("kocor.__main__.load_config")
     @patch("kocor.__main__.create_llm_client")
-    @patch("kocor.__main__.create_default_tools")
+    @patch("kocor.__main__.ToolRegistry")
+    @patch("kocor.__main__.register_mcp_tools")
     @patch("kocor.__main__.Agent")
     @patch("sys.argv", ["kocor"])
-    def test_main_no_input(self, mock_agent_cls, mock_tools, mock_llm,
-                           mock_config, mock_dotenv):
+    def test_main_no_input(self, mock_agent_cls, mock_mcp, mock_tools,
+                           mock_llm, mock_config, mock_dotenv):
         """测试无输入时打印用法"""
         from kocor.__main__ import main
 
@@ -107,11 +110,12 @@ class TestCLIMain:
     @patch("kocor.__main__.load_dotenv")
     @patch("kocor.__main__.load_config")
     @patch("kocor.__main__.create_llm_client")
-    @patch("kocor.__main__.create_default_tools")
+    @patch("kocor.__main__.ToolRegistry")
+    @patch("kocor.__main__.register_mcp_tools")
     @patch("kocor.__main__.Agent")
     @patch("sys.argv", ["kocor", "--stream", "你好"])
-    def test_stream_prints_tool_calls(self, mock_agent_cls, mock_tools, mock_llm,
-                                      mock_config, mock_dotenv):
+    def test_stream_prints_tool_calls(self, mock_agent_cls, mock_mcp, mock_tools,
+                                      mock_llm, mock_config, mock_dotenv):
         """测试流式模式下工具调用输出"""
         from kocor.__main__ import main
 

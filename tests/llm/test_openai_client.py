@@ -2,7 +2,7 @@
 
 from unittest.mock import MagicMock, patch
 
-from kocor.config import LLMConfig
+from kocor.config import Config
 from kocor.llm_client import ToolDefinition
 from kocor.message import FunctionCall, Message, ToolCall
 from kocor.openai_client import OpenAIClient
@@ -11,10 +11,10 @@ from kocor.openai_client import OpenAIClient
 class TestOpenAIClient:
     """测试 OpenAI 客户端"""
 
-    def _make_config(self, **kwargs) -> LLMConfig:
+    def _make_config(self, **kwargs) -> Config:
         defaults = {"provider": "openai"}
         defaults.update(kwargs)
-        return LLMConfig(**defaults)
+        return Config(**defaults)
 
     def test_provider(self):
         client = OpenAIClient(self._make_config())
@@ -143,10 +143,10 @@ class MockOpenAIChunk:
 class TestOpenAIClientStream:
     """测试 OpenAI 客户端流式"""
 
-    def _make_config(self, **kwargs) -> LLMConfig:
+    def _make_config(self, **kwargs) -> Config:
         defaults = {"provider": "openai"}
         defaults.update(kwargs)
-        return LLMConfig(**defaults)
+        return Config(**defaults)
 
     @patch("kocor.openai_client.OpenAI")
     def test_stream_text_response(self, mock_openai_cls):

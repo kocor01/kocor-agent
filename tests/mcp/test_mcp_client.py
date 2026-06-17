@@ -381,10 +381,11 @@ class TestRegisterMCPTools:
             ))
             mock_session_cls.return_value = mock_session
 
-            mcp_registry, clients = register_mcp_tools("mcp.json")
+            registry = ToolRegistry()
+            clients = register_mcp_tools(registry, "mcp.json")
 
         assert len(clients) == 1
-        defs = mcp_registry.get_definitions()
+        defs = registry.get_definitions()
         assert len(defs) == 1
         assert defs[0].name == "mcp_fs_read"
         assert defs[0].description == "Read file"
@@ -428,10 +429,11 @@ class TestRegisterMCPTools:
             mock_write.__aenter__.return_value = mock_write
             mock_stdio.return_value = _make_async_cm((mock_read, mock_write))
 
-            mcp_registry, clients = register_mcp_tools("mcp.json")
+            registry = ToolRegistry()
+            clients = register_mcp_tools(registry, "mcp.json")
 
         assert len(clients) == 1
-        defs = mcp_registry.get_definitions()
+        defs = registry.get_definitions()
         assert len(defs) == 1
         assert defs[0].name == "mcp_good_tool1"
 
@@ -470,16 +472,14 @@ class TestRegisterMCPTools:
             ))
             mock_session_cls.return_value = mock_session
 
-            mcp_registry, clients = register_mcp_tools("mcp.json")
+            registry = ToolRegistry()
+            clients = register_mcp_tools(registry, "mcp.json")
 
-        # Execute via ToolRegistry (合并到完整的 registry 中)
-        full_registry = ToolRegistry()
-        full_registry.merge(mcp_registry)
         tool_call = ToolCall(
             id="call_1",
             function=FunctionCall(name="mcp_demo_echo", arguments='{"msg": "hello"}'),
         )
-        result = full_registry.execute(tool_call)
+        result = registry.execute(tool_call)
 
         assert result.content == "Hello from MCP"
 
