@@ -173,8 +173,12 @@ class TestCreateDefaultTools:
             id="call_1",
             function=FunctionCall(name="write_file", arguments='{"path": "out.txt", "content": "test content"}'),
         )
-        result = tools.execute(tool_call)
-        assert "success" in result.content.lower() or "成功" in result.content
+        try:
+            result = tools.execute(tool_call)
+            assert "success" in result.content.lower() or "成功" in result.content
+        finally:
+            if os.path.exists("out.txt"):
+                os.remove("out.txt")
 
     def test_read_file_path_traversal_rejected(self):
         """读取文件路径遍历被拒绝"""
