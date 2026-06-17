@@ -9,7 +9,7 @@ from typing import Iterator
 
 from kocor.llm_client import LLMClient
 from kocor.message import Message, StreamChunk, ToolCall
-from kocor.tools import ToolRegistry
+from kocor.tool_registry import ToolRegistry
 
 DEFAULT_SYSTEM_PROMPT = """\
 你是一个名为 Kocor 的 AI 助手，擅长通过调用工具来完成任务。

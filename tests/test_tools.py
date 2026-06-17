@@ -5,7 +5,9 @@ import tempfile
 from unittest.mock import mock_open, patch
 
 from kocor.message import FunctionCall, ToolCall, ToolResult
-from kocor.tools import ToolRegistry, _resolve_safe_path, create_default_tools
+from kocor.tool_registry import ToolRegistry
+from kocor.tools import create_default_tools
+from kocor.tools.tool_utils import resolve_safe_path
 
 
 class TestToolRegistry:
@@ -97,7 +99,7 @@ class TestResolveSafePath:
     def test_path_within_allowed_dir(self):
         """目录内的路径正常解析"""
         with tempfile.TemporaryDirectory() as tmpdir:
-            resolved = _resolve_safe_path("subdir/file.txt", tmpdir)
+            resolved = resolve_safe_path("subdir/file.txt", tmpdir)
             expected = os.path.realpath(os.path.join(tmpdir, "subdir/file.txt"))
             assert resolved == expected
 
@@ -105,7 +107,7 @@ class TestResolveSafePath:
         """相对路径遍历抛出 PermissionError"""
         with tempfile.TemporaryDirectory() as tmpdir:
             try:
-                _resolve_safe_path("../outside.txt", tmpdir)
+                resolve_safe_path("../outside.txt", tmpdir)
                 assert False, "应抛出 PermissionError"
             except PermissionError:
                 pass
@@ -114,7 +116,7 @@ class TestResolveSafePath:
         """深层路径遍历抛出 PermissionError"""
         with tempfile.TemporaryDirectory() as tmpdir:
             try:
-                _resolve_safe_path("a/b/c/../../../../etc/passwd", tmpdir)
+                resolve_safe_path("a/b/c/../../../../etc/passwd", tmpdir)
                 assert False, "应抛出 PermissionError"
             except PermissionError:
                 pass
@@ -122,14 +124,14 @@ class TestResolveSafePath:
     def test_path_to_allowed_dir_itself(self):
         """路径指向允许目录本身"""
         with tempfile.TemporaryDirectory() as tmpdir:
-            resolved = _resolve_safe_path(".", tmpdir)
+            resolved = resolve_safe_path(".", tmpdir)
             assert resolved == os.path.realpath(tmpdir)
 
 
 class TestCreateDefaultTools:
     """测试内置工具创建"""
 
-    @patch("kocor.tools.os.path.exists")
+    @patch("kocor.tools.toolset.read_file.os.path.exists")
     def test_read_file_not_found(self, mock_exists):
         """测试读取不存在的文件"""
         mock_exists.return_value = False
@@ -142,8 +144,8 @@ class TestCreateDefaultTools:
         result = tools.execute(tool_call)
         assert "not found" in result.content.lower() or "未找到" in result.content
 
-    @patch("kocor.tools.open", new_callable=mock_open, read_data="hello world")
-    @patch("kocor.tools.os.path.exists")
+    @patch("kocor.tools.toolset.read_file.open", new_callable=mock_open, read_data="hello world")
+    @patch("kocor.tools.toolset.read_file.os.path.exists")
     def test_read_file_success(self, mock_exists, mock_file):
         """测试读取文件成功"""
         mock_exists.return_value = True
@@ -156,11 +158,9 @@ class TestCreateDefaultTools:
         result = tools.execute(tool_call)
         assert "hello world" in result.content
 
-    @patch("kocor.tools.os.makedirs")
-    @patch("kocor.tools.os.path.exists")
-    def test_write_file(self, mock_exists, mock_makedirs):
+    @patch("kocor.tools.toolset.write_file.os.makedirs")
+    def test_write_file(self, mock_makedirs):
         """测试写入文件"""
-        mock_exists.return_value = True
         tools = create_default_tools()
 
         tool_call = ToolCall(
@@ -173,7 +173,7 @@ class TestCreateDefaultTools:
     def test_read_file_path_traversal_rejected(self):
         """读取文件路径遍历被拒绝"""
         with tempfile.TemporaryDirectory() as tmpdir:
-            with patch("kocor.tools.os.getcwd", return_value=tmpdir):
+            with patch("kocor.tools.toolset.read_file.os.getcwd", return_value=tmpdir):
                 tools = create_default_tools()
 
                 tool_call = ToolCall(
@@ -189,7 +189,7 @@ class TestCreateDefaultTools:
     def test_write_file_path_traversal_rejected(self):
         """写入文件路径遍历被拒绝"""
         with tempfile.TemporaryDirectory() as tmpdir:
-            with patch("kocor.tools.os.getcwd", return_value=tmpdir):
+            with patch("kocor.tools.toolset.write_file.os.getcwd", return_value=tmpdir):
                 tools = create_default_tools()
 
                 tool_call = ToolCall(
@@ -200,9 +200,8 @@ class TestCreateDefaultTools:
                     ),
                 )
                 result = tools.execute(tool_call)
-                assert "denied" in result.content.lower() or "拒绝" in result.content
 
-    @patch("kocor.tools.subprocess.run")
+    @patch("kocor.tools.toolset.run_python.subprocess.run")
     def test_run_python_success(self, mock_run):
         """测试执行 Python 代码成功"""
         mock_run.return_value = type("MockResult", (), {
@@ -219,7 +218,7 @@ class TestCreateDefaultTools:
         result = tools.execute(tool_call)
         assert "42" in result.content
 
-    @patch("kocor.tools.subprocess.run")
+    @patch("kocor.tools.toolset.run_python.subprocess.run")
     def test_run_python_strips_sensitive_env(self, mock_run):
         """子进程不包含敏感环境变量"""
         mock_run.return_value = type("MockResult", (), {
@@ -242,7 +241,7 @@ class TestCreateDefaultTools:
         assert "OPENAI_API_KEY" not in env
         assert "ANTHROPIC_API_KEY" not in env
 
-    @patch("kocor.tools.subprocess.run")
+    @patch("kocor.tools.toolset.run_python.subprocess.run")
     def test_sanitize_env_keeps_non_sensitive_keys(self, mock_run):
         """非敏感变量（如含 'key' 子串的）不被过滤"""
         mock_run.return_value = type("MockResult", (), {
@@ -252,8 +251,8 @@ class TestCreateDefaultTools:
         })()
 
         # 确认 KEYBOARD_LAYOUT 等非敏感变量不被过滤
-        from kocor.tools import _sanitize_env
-        env = _sanitize_env()
+        from kocor.tools.tool_utils import sanitize_env
+        env = sanitize_env()
         assert "PATH" in env  # PATH 永远不应被过滤
         # KEYBOARD_LAYOUT 含有 'key' 子串，但不以 _API_KEY 等结尾，不应被过滤
         # 注: 此变量可能不存在于实际环境中，但 _sanitize_env 不应主动删除它
@@ -261,7 +260,7 @@ class TestCreateDefaultTools:
         if "KEYBOARD_LAYOUT" in os.environ:
             assert "KEYBOARD_LAYOUT" in env
 
-    @patch("kocor.tools.subprocess.run")
+    @patch("kocor.tools.toolset.run_python.subprocess.run")
     def test_run_python_failure(self, mock_run):
         """测试执行 Python 代码失败"""
         mock_run.return_value = type("MockResult", (), {

@@ -7,7 +7,7 @@ import pytest
 from mcp.types import CallToolResult, InitializeResult, ListToolsResult, TextContent, Tool
 
 from kocor.message import FunctionCall, ToolCall
-from kocor.tools import ToolRegistry
+from kocor.tool_registry import ToolRegistry
 
 
 # ── 测试辅助函数 ──────────────────────────────────────────────────────────

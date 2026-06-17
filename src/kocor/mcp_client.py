@@ -343,7 +343,7 @@ def register_mcp_tools(config_path: str = "") -> tuple[list, list]:
         - mcp_tool_registry: 包含所有 MCP 工具的 ToolRegistry
         - connected_clients: 用于关闭的客户端列表
     """
-    from kocor.tools import ToolRegistry
+    from kocor.tool_registry import ToolRegistry
 
     servers = load_mcp_servers(config_path)
 
