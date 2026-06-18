@@ -1,2 +1,26 @@
 {
+  "skills": {
+    "summarize": {
+      "type": "prompt",
+      "invoke": "both",
+      "description": "总结用户输入的文本，提取核心要点",
+      "prompt_template": "请总结以下内容，提取核心要点（50 字以内）：\n\n{user_input}",
+      "prompt_role": "user",
+      "category": "utility",
+      "enabled": true,
+      "version": "1.0.0",
+      "author": ""
+    },
+    "uuid-gen": {
+      "type": "code",
+      "invoke": "both",
+      "description": "生成一个 UUID v4",
+      "module": "kocor.skill.script.uuid_gen.handler",
+      "function": "handler",
+      "category": "utility",
+      "enabled": true,
+      "version": "1.0.0",
+      "author": ""
+    }
+  }
 }
