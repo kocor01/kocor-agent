@@ -17,6 +17,8 @@ class Config:
     max_iterations: int = 20
     timeout: int = 30
     mcp_config: str = "kocor.mcp.json"
+    skills_config: str = "kocor.skills.json"
+    skills_dir: str = "skills"
 
     # OpenAI
     openai_api_key: str = ""
@@ -84,11 +86,25 @@ def load_config() -> Config:
     else:
         mcp_config = "kocor.mcp.json"
 
+    skills_config_raw = os.environ.get("KOCOR_SKILLS_CONFIG")
+    if skills_config_raw is not None:
+        skills_config = skills_config_raw
+    else:
+        skills_config = "kocor.skills.json"
+
+    skills_dir_raw = os.environ.get("KOCOR_SKILLS_DIR")
+    if skills_dir_raw is not None:
+        skills_dir = skills_dir_raw
+    else:
+        skills_dir = "skills"
+
     return Config(
         provider=provider,
         max_iterations=max_iterations,
         timeout=timeout,
         mcp_config=mcp_config,
+        skills_config=skills_config,
+        skills_dir=skills_dir,
         openai_api_key=os.environ.get("OPENAI_API_KEY", ""),
         openai_model=os.environ.get("OPENAI_MODEL", "gpt-4o"),
         openai_base_url=os.environ.get("OPENAI_BASE_URL", ""),

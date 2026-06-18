@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "skills": {
+    "weather": {
+      "source": "modelscope.cn",
+      "sourceType": "well-known",
+      "computedHash": "5dbcf0c09506e36e58fee76c7a8852453b39161878859eea797d8309fa27b159"
+    }
+  }
+}

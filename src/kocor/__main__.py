@@ -19,6 +19,7 @@ from kocor.config import load_config
 from kocor.llm_client import create_llm_client
 from kocor.mcp import register_mcp_tools, shutdown_mcp_clients
 from kocor.llm_provider.message import StreamChunk
+from kocor.skill import SkillRegistry
 from kocor.tool_registry import ToolRegistry
 from kocor.tools import create_default_tools
 
@@ -155,7 +156,18 @@ def main() -> None:
     create_default_tools(toolRegistry)
     mcp_clients = register_mcp_tools(toolRegistry, config.mcp_config)
 
-    agent = Agent(llm=llm, tools=toolRegistry, max_iterations=config.max_iterations)
+    skillRegistry = SkillRegistry(toolRegistry)
+    skillRegistry.load_from_config(config.skills_config)
+    skillRegistry.discover_skills(config.skills_dir)
+    skillRegistry.discover_cline_skills(config.skills_dir)
+    skillRegistry.register_as_tools(toolRegistry)
+
+    agent = Agent(
+        llm=llm,
+        tools=toolRegistry,
+        skills=skillRegistry,
+        max_iterations=config.max_iterations,
+    )
 
     if user_args:
         user_input = " ".join(user_args)

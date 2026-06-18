@@ -9,6 +9,8 @@ from typing import Iterator
 
 from kocor.llm_provider.llm_client import LLMClient
 from kocor.llm_provider.message import Message, StreamChunk, ToolCall
+from kocor.skill.models import InvokeStrategy, SkillContext, SkillType
+from kocor.skill.registry import SkillRegistry
 from kocor.tool_registry import ToolRegistry
 
 DEFAULT_SYSTEM_PROMPT = """\
@@ -48,11 +50,13 @@ class Agent:
         tools: ToolRegistry | None = None,
         system_prompt: str | None = None,
         max_iterations: int = 20,
+        skills: SkillRegistry | None = None,
     ):
         self.llm = llm
         self.tools = tools or ToolRegistry()
         self.system_prompt = system_prompt or DEFAULT_SYSTEM_PROMPT
         self.max_iterations = max_iterations
+        self.skills = skills
 
     def run(self, user_input: str) -> str:
         """执行一次完整的 Agent 循环。
@@ -63,34 +67,15 @@ class Agent:
         Returns:
             最终文本答案
         """
+        # 检查 slash 命令
+        if self.skills and user_input.startswith("/"):
+            return self._handle_slash_command(user_input)
+
         messages: list[Message] = [
             Message(role="system", content=self.system_prompt),
             Message(role="user", content=user_input),
         ]
-
-        for _ in range(self.max_iterations):
-            # 1. 调用 LLM
-            response = self.llm.generate(
-                messages,
-                tools=self.tools.get_definitions(),
-            )
-            messages.append(response)
-
-            # 2. 检查是否有工具调用
-            if not response.tool_calls:
-                return response.content  # 最终答案
-
-            # 3. 执行工具
-            for tool_call in response.tool_calls:
-                result = self.tools.execute(tool_call)
-                messages.append(Message(
-                    role="tool",
-                    content=result.content,
-                    tool_call_id=result.tool_call_id,
-                ))
-
-       # 超时
-        return f"Agent 在 {self.max_iterations} 次迭代后仍未完成，可能任务过于复杂。"
+        return self._run_with_messages(messages)
 
     def stream(self, user_input: str) -> Iterator[StreamChunk]:
         """流式执行 Agent 循环。
@@ -101,6 +86,12 @@ class Agent:
         Yields:
             StreamChunk: 流式数据块
         """
+        # 检查 slash 命令
+        if self.skills and user_input.startswith("/"):
+            result = self._handle_slash_command(user_input)
+            yield StreamChunk(content=result, is_final=True)
+            return
+
         messages: list[Message] = [
             Message(role="system", content=self.system_prompt),
             Message(role="user", content=user_input),
@@ -158,3 +149,77 @@ class Agent:
             content=f"Agent 在 {self.max_iterations} 次迭代后仍未完成，可能任务过于复杂。",
             is_final=True,
         )
+
+    def _run_with_messages(self, messages: list[Message]) -> str:
+        """核心 ReAct 循环，提取为独立方法供 slash 命令复用。"""
+        for _ in range(self.max_iterations):
+            response = self.llm.generate(
+                messages,
+                tools=self.tools.get_definitions(),
+            )
+            messages.append(response)
+
+            if not response.tool_calls:
+                return response.content
+
+            for tool_call in response.tool_calls:
+                result = self.tools.execute(tool_call)
+                messages.append(Message(
+                    role="tool",
+                    content=result.content,
+                    tool_call_id=result.tool_call_id,
+                ))
+
+        return f"Agent 在 {self.max_iterations} 次迭代后仍未完成，可能任务过于复杂。"
+
+    def _handle_slash_command(self, user_input: str) -> str:
+        """处理 /name [args] 格式的 slash 命令。
+
+        Args:
+            user_input: 以 / 开头的用户输入
+
+        Returns:
+            执行结果
+        """
+        parts = user_input[1:].strip().split(maxsplit=1)
+        skill_name = parts[0]
+        skill_args = parts[1] if len(parts) > 1 else ""
+
+        skill_def = self.skills.get(skill_name)
+        if skill_def is None:
+            available = self._list_slash_skills()
+            return f"Unknown skill: '{skill_name}'. Available: {available}"
+
+        if skill_def.invoke_strategy not in (InvokeStrategy.SLASH, InvokeStrategy.BOTH):
+            return f"Skill '{skill_name}' cannot be invoked via slash command."
+
+        context = SkillContext(
+            user_input=skill_args,
+            tool_registry=self.tools,
+        )
+
+        result = self.skills.execute(skill_name, context)
+
+        if not result.success:
+            return result.content
+
+        if skill_def.skill_type == SkillType.PROMPT:
+            messages = [
+                Message(role="system", content=self.system_prompt),
+            ]
+            if skill_def.prompt_role == "system":
+                messages.append(Message(role="system", content=result.content))
+            else:
+                messages.append(Message(role="user", content=result.content))
+            return self._run_with_messages(messages)
+        else:
+            return result.content
+
+    def _list_slash_skills(self) -> str:
+        """列出可用的 slash 命令。"""
+        names = [
+            f"/{s.name}"
+            for s in self.skills.list_skills(enabled_only=True)
+            if s.invoke_strategy in (InvokeStrategy.SLASH, InvokeStrategy.BOTH)
+        ]
+        return ", ".join(sorted(names))

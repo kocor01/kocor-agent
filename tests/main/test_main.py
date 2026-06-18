@@ -49,6 +49,7 @@ class TestCLIMain:
         """测试 --stream 模式"""
         from kocor.__main__ import main
 
+        mock_config.return_value = MagicMock(skills_config="")
         mock_agent = MagicMock()
         mock_agent.stream.return_value = iter([
             StreamChunk(content="你"),
@@ -75,6 +76,7 @@ class TestCLIMain:
         """测试非流式模式"""
         from kocor.__main__ import main
 
+        mock_config.return_value = MagicMock(skills_config="")
         mock_agent = MagicMock()
         mock_agent.run.return_value = "非流式结果"
         mock_agent_cls.return_value = mock_agent
@@ -97,6 +99,7 @@ class TestCLIMain:
         """测试无输入时打印用法"""
         from kocor.__main__ import main
 
+        mock_config.return_value = MagicMock(skills_config="")
         mock_agent_cls.return_value = MagicMock()
 
         with patch("sys.stdout", new_callable=MagicMock), \
@@ -119,6 +122,7 @@ class TestCLIMain:
         """测试流式模式下工具调用输出"""
         from kocor.__main__ import main
 
+        mock_config.return_value = MagicMock(skills_config="")
         mock_agent = MagicMock()
         mock_agent.stream.return_value = iter([
             StreamChunk(

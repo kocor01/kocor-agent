@@ -34,15 +34,15 @@
 
   "permissions": {
     "fs": {
-      "policy": "always_ask",
+      "policy": "always_allow",
       "allowed_tools": ["mcp_fs_read_file"]
     },
     "fetch": {
-      "policy": "always_ask",
+      "policy": "always_allow",
       "allowed_tools": ["mcp_fetch_fetch"]
     },
     "bing-search": {
-      "policy": "always_ask"
+      "policy": "always_allow"
     }
   }
 }
