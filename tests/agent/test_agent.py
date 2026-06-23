@@ -4,7 +4,7 @@ from unittest.mock import MagicMock
 
 from kocor.agent import DEFAULT_SYSTEM_PROMPT, Agent
 from kocor.llm_provider.llm_client import LLMClient
-from kocor.llm_provider.tool_definition import ToolDefinition
+from kocor.tools.definitions import ToolDefinition
 from kocor.llm_provider.message import FunctionCall, Message, StreamChunk, ToolCall, ToolResult
 
 
@@ -76,7 +76,7 @@ class TestAgentToolCall:
             content="hello",
         )
 
-        agent = Agent(llm=llm, tools=mock_tools, max_iterations=20)
+        agent = Agent(llm=llm, tool_manager=mock_tools, max_iterations=20)
         result = agent.run("读 a.txt")
         assert result == "文件内容是: hello"
         mock_tools.execute.assert_called_once()
@@ -114,7 +114,7 @@ class TestAgentToolCall:
 
         mock_tools.execute.side_effect = side_effect
 
-        agent = Agent(llm=llm, tools=mock_tools, max_iterations=20)
+        agent = Agent(llm=llm, tool_manager=mock_tools, max_iterations=20)
         result = agent.run("读 a.txt 和 b.txt")
         assert result == "两个文件都读完了"
         assert mock_tools.execute.call_count == 2
@@ -144,9 +144,9 @@ class TestAgentTimeout:
             content="content",
         )
 
-        agent = Agent(llm=llm, tools=mock_tools, max_iterations=3)
+        agent = Agent(llm=llm, tool_manager=mock_tools, max_iterations=3)
         result = agent.run("持续调用工具")
-        assert "迭代" in result and "仍未完成" in result
+        assert "迭代" in result and "未完成" in result
 
 
 class TestAgentSystemPrompt:
@@ -245,7 +245,7 @@ class TestAgentStream:
 
         mock_tools.execute.side_effect = side_effect
 
-        agent = Agent(llm=llm, tools=mock_tools, max_iterations=20)
+        agent = Agent(llm=llm, tool_manager=mock_tools, max_iterations=20)
         chunks = list(agent.stream("读 a.txt"))
 
         # 文本 chunk + 工具调用 chunk + 文本 chunk + is_final
@@ -276,7 +276,7 @@ class TestAgentStream:
             content="content",
         )
 
-        agent = Agent(llm=llm, tools=mock_tools, max_iterations=2)
+        agent = Agent(llm=llm, tool_manager=mock_tools, max_iterations=2)
         chunks = list(agent.stream("持续调用工具"))
 
         # 最后应该有超时信息

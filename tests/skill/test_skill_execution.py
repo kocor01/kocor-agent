@@ -1,15 +1,15 @@
 """测试技能执行。"""
 
 from kocor.skill.models import InvokeStrategy, SkillContext, SkillDefinition, SkillResult, SkillType
-from kocor.skill.registry import SkillRegistry
-from kocor.tool_registry import ToolRegistry
+from kocor.skill.skill_manager import SkillManager
+from kocor.tools.tool_manager import ToolManager
 
 
 class TestExecutePromptSkill:
     """测试 PROMPT 类型技能执行"""
 
     def test_render_prompt_template(self):
-        registry = SkillRegistry()
+        registry = SkillManager()
         skill = SkillDefinition(
             name="review",
             description="Review code",
@@ -26,7 +26,7 @@ class TestExecutePromptSkill:
         assert result.skill_name == "review"
 
     def test_prompt_with_system_role(self):
-        registry = SkillRegistry()
+        registry = SkillManager()
         skill = SkillDefinition(
             name="expert",
             description="Expert mode",
@@ -43,7 +43,7 @@ class TestExecutePromptSkill:
         assert result.content == "You are an expert in Python"
 
     def test_prompt_with_extra_context(self):
-        registry = SkillRegistry()
+        registry = SkillManager()
         skill = SkillDefinition(
             name="format",
             description="Format with context",
@@ -58,7 +58,7 @@ class TestExecutePromptSkill:
         assert result.content == "Hello, world!"
 
     def test_prompt_skill_name_in_template(self):
-        registry = SkillRegistry()
+        registry = SkillManager()
         skill = SkillDefinition(
             name="test",
             description="Test",
@@ -77,7 +77,7 @@ class TestExecuteCodeSkill:
     """测试 CODE 类型技能执行"""
 
     def test_code_skill_calls_handler(self):
-        registry = SkillRegistry()
+        registry = SkillManager()
 
         def greet_handler(user_input: str) -> str:
             return f"Hello, {user_input}!"
@@ -97,9 +97,9 @@ class TestExecuteCodeSkill:
         assert result.content == "Hello, world!"
 
     def test_code_skill_with_tools_param(self):
-        registry = SkillRegistry()
+        registry = SkillManager()
 
-        def tools_handler(user_input: str, tools: ToolRegistry) -> str:
+        def tools_handler(user_input: str, tools: ToolManager) -> str:
             return f"tools: {len(tools.get_definitions())}"
 
         skill = SkillDefinition(
@@ -110,15 +110,15 @@ class TestExecuteCodeSkill:
         )
         registry.register(skill)
 
-        tr = ToolRegistry()
+        tr = ToolManager()
         tr.register("dummy", "Dummy", {"type": "object"}, lambda **kw: "ok")
-        ctx = SkillContext(user_input="x", tool_registry=tr)
+        ctx = SkillContext(user_input="x", tool_manager=tr)
         result = registry.execute("check_tools", ctx)
 
         assert result.content == "tools: 1"
 
     def test_code_skill_with_context_param(self):
-        registry = SkillRegistry()
+        registry = SkillManager()
 
         def ctx_handler(context: SkillContext) -> str:
             return f"input: {context.user_input}"
@@ -137,7 +137,7 @@ class TestExecuteCodeSkill:
         assert result.content == "input: test"
 
     def test_code_skill_no_handler(self):
-        registry = SkillRegistry()
+        registry = SkillManager()
 
         skill = SkillDefinition(
             name="no_handler",
@@ -154,7 +154,7 @@ class TestExecuteCodeSkill:
         assert "no handler" in result.content.lower()
 
     def test_code_skill_handler_exception(self):
-        registry = SkillRegistry()
+        registry = SkillManager()
 
         def broken_handler(user_input: str) -> str:
             raise RuntimeError("something broke")
@@ -178,7 +178,7 @@ class TestExecuteErrors:
     """测试执行错误情况"""
 
     def test_unknown_skill(self):
-        registry = SkillRegistry()
+        registry = SkillManager()
         ctx = SkillContext(user_input="x")
         result = registry.execute("nonexistent", ctx)
 
@@ -186,7 +186,7 @@ class TestExecuteErrors:
         assert "not found" in result.content.lower()
 
     def test_disabled_skill(self):
-        registry = SkillRegistry()
+        registry = SkillManager()
         skill = SkillDefinition(
             name="old",
             description="Old skill",

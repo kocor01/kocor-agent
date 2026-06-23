@@ -5,17 +5,16 @@ import tempfile
 from unittest.mock import mock_open, patch
 
 from kocor.llm_provider.message import FunctionCall, ToolCall, ToolResult
-from kocor.tool_registry import ToolRegistry
-from kocor.tools import create_default_tools
+from kocor.tools.tool_manager import ToolManager
 from kocor.tools.tool_utils import resolve_safe_path
 
 
 class TestToolRegistry:
-    """测试 ToolRegistry"""
+    """测试 ToolManager"""
 
     def test_register_and_get_definitions(self):
         """测试注册工具并获取定义"""
-        registry = ToolRegistry()
+        registry = ToolManager()
 
         def handler(**kwargs):
             return "result"
@@ -34,7 +33,7 @@ class TestToolRegistry:
 
     def test_execute_registered_tool(self):
         """测试执行已注册工具"""
-        registry = ToolRegistry()
+        registry = ToolManager()
 
         def add_numbers(**kwargs):
             a = kwargs.get("a", 0)
@@ -60,7 +59,7 @@ class TestToolRegistry:
 
     def test_execute_unknown_tool(self):
         """测试执行未注册工具"""
-        registry = ToolRegistry()
+        registry = ToolManager()
 
         tool_call = ToolCall(
             id="call_1",
@@ -72,7 +71,7 @@ class TestToolRegistry:
 
     def test_multiple_tools(self):
         """测试多个工具注册"""
-        registry = ToolRegistry()
+        registry = ToolManager()
 
         registry.register(
             name="tool_a",
@@ -135,8 +134,8 @@ class TestCreateDefaultTools:
     def test_read_file_not_found(self, mock_exists):
         """测试读取不存在的文件"""
         mock_exists.return_value = False
-        registry = ToolRegistry()
-        create_default_tools(registry)
+        registry = ToolManager()
+        registry.register_defaults()
         tools = registry
 
         tool_call = ToolCall(
@@ -151,8 +150,8 @@ class TestCreateDefaultTools:
     def test_read_file_success(self, mock_exists, mock_file):
         """测试读取文件成功"""
         mock_exists.return_value = True
-        registry = ToolRegistry()
-        create_default_tools(registry)
+        registry = ToolManager()
+        registry.register_defaults()
         tools = registry
 
         tool_call = ToolCall(
@@ -165,8 +164,8 @@ class TestCreateDefaultTools:
     @patch("kocor.tools.toolset.write_file.os.makedirs")
     def test_write_file(self, mock_makedirs):
         """测试写入文件"""
-        registry = ToolRegistry()
-        create_default_tools(registry)
+        registry = ToolManager()
+        registry.register_defaults()
         tools = registry
 
         tool_call = ToolCall(
@@ -184,8 +183,8 @@ class TestCreateDefaultTools:
         """读取文件路径遍历被拒绝"""
         with tempfile.TemporaryDirectory() as tmpdir:
             with patch("kocor.tools.toolset.read_file.os.getcwd", return_value=tmpdir):
-                registry = ToolRegistry()
-                create_default_tools(registry)
+                registry = ToolManager()
+                registry.register_defaults()
                 tools = registry
 
                 tool_call = ToolCall(
@@ -202,8 +201,8 @@ class TestCreateDefaultTools:
         """写入文件路径遍历被拒绝"""
         with tempfile.TemporaryDirectory() as tmpdir:
             with patch("kocor.tools.toolset.write_file.os.getcwd", return_value=tmpdir):
-                registry = ToolRegistry()
-                create_default_tools(registry)
+                registry = ToolManager()
+                registry.register_defaults()
                 tools = registry
 
                 tool_call = ToolCall(
@@ -224,8 +223,8 @@ class TestCreateDefaultTools:
             "stderr": "",
         })()
 
-        registry = ToolRegistry()
-        create_default_tools(registry)
+        registry = ToolManager()
+        registry.register_defaults()
         tools = registry
         tool_call = ToolCall(
             id="call_1",
@@ -243,8 +242,8 @@ class TestCreateDefaultTools:
             "stderr": "",
         })()
 
-        registry = ToolRegistry()
-        create_default_tools(registry)
+        registry = ToolManager()
+        registry.register_defaults()
         tools = registry
         tool_call = ToolCall(
             id="call_1",
@@ -287,8 +286,8 @@ class TestCreateDefaultTools:
             "stderr": "NameError: name 'x' is not defined",
         })()
 
-        registry = ToolRegistry()
-        create_default_tools(registry)
+        registry = ToolManager()
+        registry.register_defaults()
         tools = registry
         tool_call = ToolCall(
             id="call_1",

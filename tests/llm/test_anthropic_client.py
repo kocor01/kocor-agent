@@ -4,8 +4,8 @@ from dataclasses import dataclass
 from unittest.mock import MagicMock, patch
 
 from kocor.config import Config
-from kocor.llm_provider.anthropic_client import AnthropicClient
-from kocor.llm_provider.tool_definition import ToolDefinition
+from kocor.llm_provider.providers import AnthropicClient
+from kocor.tools.definitions import ToolDefinition
 from kocor.llm_provider.message import FunctionCall, Message, ToolCall
 
 
@@ -40,7 +40,7 @@ class TestAnthropicClient:
         assert client.provider == "anthropic"
 
     
-    @patch("kocor.llm_provider.anthropic_client.Anthropic")
+    @patch("kocor.llm_provider.providers.anthropic_client.Anthropic")
     def test_generate_text_response(self, mock_anthropic_cls):
         """测试纯文本响应"""
         mock_client = MagicMock()
@@ -58,7 +58,7 @@ class TestAnthropicClient:
         assert result.content == "你好，我是助手"
         assert result.tool_calls == []
 
-    @patch("kocor.llm_provider.anthropic_client.Anthropic")
+    @patch("kocor.llm_provider.providers.anthropic_client.Anthropic")
     def test_generate_tool_call_response(self, mock_anthropic_cls):
         """测试工具调用响应"""
         mock_client = MagicMock()
@@ -83,7 +83,7 @@ class TestAnthropicClient:
         import json
         assert json.loads(result.tool_calls[0].function.arguments) == {"path": "test.txt"}
 
-    @patch("kocor.llm_provider.anthropic_client.Anthropic")
+    @patch("kocor.llm_provider.providers.anthropic_client.Anthropic")
     def test_generate_with_tools(self, mock_anthropic_cls):
         """测试传入工具定义"""
         mock_client = MagicMock()
@@ -106,7 +106,7 @@ class TestAnthropicClient:
         call_args = mock_client.messages.create.call_args
         assert "tools" in call_args.kwargs
 
-    @patch("kocor.llm_provider.anthropic_client.Anthropic")
+    @patch("kocor.llm_provider.providers.anthropic_client.Anthropic")
     def test_generate_system_message(self, mock_anthropic_cls):
         """测试 system 消息传递"""
         mock_client = MagicMock()
@@ -126,7 +126,7 @@ class TestAnthropicClient:
         call_args = mock_client.messages.create.call_args
         assert call_args.kwargs["system"] == "你是助手"
 
-    @patch("kocor.llm_provider.anthropic_client.Anthropic")
+    @patch("kocor.llm_provider.providers.anthropic_client.Anthropic")
     def test_normalize_tool_result(self, mock_anthropic_cls):
         """测试工具结果格式归一化"""
         mock_client = MagicMock()
@@ -147,7 +147,7 @@ class TestAnthropicClient:
         result = client.generate(messages)
         assert result.content == "done"
 
-    @patch("kocor.llm_provider.anthropic_client.Anthropic")
+    @patch("kocor.llm_provider.providers.anthropic_client.Anthropic")
     def test_normalize_multiple_tool_results(self, mock_anthropic_cls):
         """测试多个 tool_result 被合并到同一条 user 消息"""
         mock_client = MagicMock()
@@ -255,7 +255,7 @@ class TestAnthropicClientStream:
         defaults.update(kwargs)
         return Config(**defaults)
 
-    @patch("kocor.llm_provider.anthropic_client.Anthropic")
+    @patch("kocor.llm_provider.providers.anthropic_client.Anthropic")
     def test_stream_text_response(self, mock_anthropic_cls):
         """测试纯文本流式响应"""
         mock_client = MagicMock()
@@ -277,7 +277,7 @@ class TestAnthropicClientStream:
         assert chunks[1].content == " World"
         assert chunks[2].is_final is True
 
-    @patch("kocor.llm_provider.anthropic_client.Anthropic")
+    @patch("kocor.llm_provider.providers.anthropic_client.Anthropic")
     def test_stream_tool_call(self, mock_anthropic_cls):
         """测试工具调用流式响应"""
         mock_client = MagicMock()
@@ -313,7 +313,7 @@ class TestAnthropicClientStream:
         assert len(last_tool_chunk.tool_calls) == 1
         assert last_tool_chunk.tool_calls[0].function.name == "read_file"
 
-    @patch("kocor.llm_provider.anthropic_client.Anthropic")
+    @patch("kocor.llm_provider.providers.anthropic_client.Anthropic")
     def test_stream_is_final(self, mock_anthropic_cls):
         """测试 is_final 标记"""
         mock_client = MagicMock()
@@ -351,7 +351,7 @@ class TestAnthropicClientReasoning:
         defaults.update(kwargs)
         return Config(**defaults)
 
-    @patch("kocor.llm_provider.anthropic_client.Anthropic")
+    @patch("kocor.llm_provider.providers.anthropic_client.Anthropic")
     def test_normalize_out_thinking_to_reasoning(self, mock_anthropic_cls):
         """测试 thinking block 映射到 reasoning 字段"""
         mock_client = MagicMock()
@@ -368,7 +368,7 @@ class TestAnthropicClientReasoning:
         assert result.content == "文件内容是 hello"
         assert result.reasoning == "让我先思考..."
 
-    @patch("kocor.llm_provider.anthropic_client.Anthropic")
+    @patch("kocor.llm_provider.providers.anthropic_client.Anthropic")
     def test_normalize_out_thinking_with_tool_use(self, mock_anthropic_cls):
         """测试 thinking + tool_use 时 reasoning 也提取"""
         mock_client = MagicMock()
@@ -386,7 +386,7 @@ class TestAnthropicClientReasoning:
         assert len(result.tool_calls) == 1
         assert result.tool_calls[0].function.name == "read_file"
 
-    @patch("kocor.llm_provider.anthropic_client.Anthropic")
+    @patch("kocor.llm_provider.providers.anthropic_client.Anthropic")
     def test_stream_thinking(self, mock_anthropic_cls):
         """测试流式 thinking delta 映射到 reasoning"""
         mock_client = MagicMock()

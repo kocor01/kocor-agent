@@ -9,13 +9,13 @@ from kocor.skill.models import (
     SkillResult,
     SkillType,
 )
-from kocor.skill.registry import SkillRegistry, skill
+from kocor.skill.skill_manager import SkillManager, skill
 
 __all__ = [
     "InvokeStrategy",
     "SkillContext",
     "SkillDefinition",
-    "SkillRegistry",
+    "SkillManager",
     "SkillResult",
     "SkillType",
     "skill",

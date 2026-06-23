@@ -3,14 +3,14 @@
 import pytest
 
 from kocor.skill.models import InvokeStrategy, SkillDefinition, SkillType
-from kocor.skill.registry import SkillRegistry
+from kocor.skill.skill_manager import SkillManager
 
 
 class TestSkillRegistryRegister:
     """测试 register / get / list_skills"""
 
     def test_register_and_get(self):
-        registry = SkillRegistry()
+        registry = SkillManager()
         skill = SkillDefinition(
             name="review",
             description="Review code",
@@ -21,7 +21,7 @@ class TestSkillRegistryRegister:
         assert registry.get("review") is skill
 
     def test_register_duplicate_raises(self):
-        registry = SkillRegistry()
+        registry = SkillManager()
         skill = SkillDefinition(
             name="review",
             description="Review code",
@@ -32,11 +32,11 @@ class TestSkillRegistryRegister:
             registry.register(skill)
 
     def test_get_unknown_returns_none(self):
-        registry = SkillRegistry()
+        registry = SkillManager()
         assert registry.get("nonexistent") is None
 
     def test_list_skills_all(self):
-        registry = SkillRegistry()
+        registry = SkillManager()
         s1 = SkillDefinition(name="a", description="A", skill_type=SkillType.PROMPT)
         s2 = SkillDefinition(name="b", description="B", skill_type=SkillType.CODE)
         registry.register(s1)
@@ -45,7 +45,7 @@ class TestSkillRegistryRegister:
         assert len(skills) == 2
 
     def test_list_skills_enabled_only(self):
-        registry = SkillRegistry()
+        registry = SkillManager()
         s1 = SkillDefinition(name="a", description="A", skill_type=SkillType.PROMPT, enabled=True)
         s2 = SkillDefinition(name="b", description="B", skill_type=SkillType.CODE, enabled=False)
         registry.register(s1)
@@ -55,7 +55,7 @@ class TestSkillRegistryRegister:
         assert skills[0].name == "a"
 
     def test_list_skills_by_category(self):
-        registry = SkillRegistry()
+        registry = SkillManager()
         s1 = SkillDefinition(
             name="a", description="A", skill_type=SkillType.PROMPT, category="dev",
         )
@@ -69,7 +69,7 @@ class TestSkillRegistryRegister:
         assert dev_skills[0].name == "a"
 
     def test_list_with_category_and_enabled(self):
-        registry = SkillRegistry()
+        registry = SkillManager()
         s1 = SkillDefinition(
             name="a", description="A", skill_type=SkillType.PROMPT, category="dev", enabled=True,
         )
@@ -83,7 +83,7 @@ class TestSkillRegistryRegister:
         assert skills[0].name == "a"
 
     def test_empty_registry_lists(self):
-        registry = SkillRegistry()
+        registry = SkillManager()
         assert registry.list_skills(enabled_only=False) == []
         assert registry.get("anything") is None
 
@@ -92,11 +92,11 @@ class TestSkillRegistryInit:
     """测试 SkillRegistry 初始化"""
 
     def test_default_skills_empty(self):
-        registry = SkillRegistry()
+        registry = SkillManager()
         assert registry.list_skills(enabled_only=False) == []
 
-    def test_accepts_tool_registry(self):
-        from kocor.tool_registry import ToolRegistry
-        tr = ToolRegistry()
-        registry = SkillRegistry(tool_registry=tr)
-        assert registry._tool_registry is tr
+    def test_accepts_tool_manager(self):
+        from kocor.tools.tool_manager import ToolManager
+        tr = ToolManager()
+        registry = SkillManager(tool_manager=tr)
+        assert registry._tool_manager is tr

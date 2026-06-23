@@ -9,7 +9,7 @@ from __future__ import annotations
 from typing import Iterator, Protocol
 
 from kocor.config import Config
-from kocor.llm_provider.tool_definition import ToolDefinition
+from kocor.tools.definitions import ToolDefinition
 from kocor.llm_provider.message import Message, StreamChunk
 
 

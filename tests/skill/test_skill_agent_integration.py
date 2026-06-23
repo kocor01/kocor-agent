@@ -5,8 +5,8 @@ from unittest.mock import MagicMock, patch
 from kocor.agent import Agent
 from kocor.llm_provider.message import Message, StreamChunk
 from kocor.skill.models import InvokeStrategy, SkillDefinition, SkillType
-from kocor.skill.registry import SkillRegistry
-from kocor.tool_registry import ToolRegistry
+from kocor.skill.skill_manager import SkillManager
+from kocor.tools.tool_manager import ToolManager
 
 
 def _make_mock_llm(content: str = "final answer"):
@@ -22,18 +22,18 @@ class TestSlashCommandRun:
     """测试 run() 中的 slash 命令处理"""
 
     def test_slash_unknown_skill(self):
-        skill_registry = SkillRegistry()
+        skill_registry = SkillManager()
         agent = Agent(
             llm=_make_mock_llm(),
-            skills=skill_registry,
+            skill_manager=skill_registry,
         )
         result = agent.run("/nonexistent")
         assert "Unknown skill" in result
         assert "nonexistent" in result
 
     def test_slash_code_skill(self):
-        skill_registry = SkillRegistry()
-        tool_registry = ToolRegistry()
+        skill_registry = SkillManager()
+        tool_manager = ToolManager()
 
         def greet_handler(user_input: str) -> str:
             return f"Hello, {user_input}!"
@@ -49,14 +49,14 @@ class TestSlashCommandRun:
 
         agent = Agent(
             llm=_make_mock_llm(),
-            tools=tool_registry,
-            skills=skill_registry,
+            tool_manager=tool_manager,
+            skill_manager=skill_registry,
         )
         result = agent.run("/greet world")
         assert result == "Hello, world!"
 
     def test_slash_code_skill_no_args(self):
-        skill_registry = SkillRegistry()
+        skill_registry = SkillManager()
 
         def no_args_handler(user_input: str) -> str:
             return f"input: '{user_input}'"
@@ -72,13 +72,13 @@ class TestSlashCommandRun:
 
         agent = Agent(
             llm=_make_mock_llm(),
-            skills=skill_registry,
+            skill_manager=skill_registry,
         )
         result = agent.run("/ping")
         assert result == "input: ''"
 
     def test_slash_prompt_skill(self):
-        skill_registry = SkillRegistry()
+        skill_registry = SkillManager()
         llm = _make_mock_llm("Reviewed!")
 
         skill = SkillDefinition(
@@ -92,7 +92,7 @@ class TestSlashCommandRun:
 
         agent = Agent(
             llm=llm,
-            skills=skill_registry,
+            skill_manager=skill_registry,
         )
         result = agent.run("/review def foo(): pass")
         assert result == "Reviewed!"
@@ -102,7 +102,7 @@ class TestSlashCommandRun:
         assert any("Review this: def foo(): pass" in m.content for m in messages)
 
     def test_slash_llm_only_skill_rejected(self):
-        skill_registry = SkillRegistry()
+        skill_registry = SkillManager()
 
         skill = SkillDefinition(
             name="internal",
@@ -115,13 +115,13 @@ class TestSlashCommandRun:
 
         agent = Agent(
             llm=_make_mock_llm(),
-            skills=skill_registry,
+            skill_manager=skill_registry,
         )
         result = agent.run("/internal")
         assert "cannot be invoked" in result.lower()
 
     def test_slash_for_disabled_skill(self):
-        skill_registry = SkillRegistry()
+        skill_registry = SkillManager()
 
         skill = SkillDefinition(
             name="old",
@@ -135,13 +135,13 @@ class TestSlashCommandRun:
 
         agent = Agent(
             llm=_make_mock_llm(),
-            skills=skill_registry,
+            skill_manager=skill_registry,
         )
         result = agent.run("/old")
         assert "disabled" in result.lower() or "old" in result.lower()
 
     def test_slash_prompt_with_system_role(self):
-        skill_registry = SkillRegistry()
+        skill_registry = SkillManager()
         llm = _make_mock_llm("Done")
 
         skill = SkillDefinition(
@@ -156,17 +156,17 @@ class TestSlashCommandRun:
 
         agent = Agent(
             llm=llm,
-            skills=skill_registry,
+            skill_manager=skill_registry,
         )
         result = agent.run("/expert Python")
         assert result == "Done"
 
     def test_regular_input_not_intercepted(self):
-        skill_registry = SkillRegistry()
+        skill_registry = SkillManager()
         llm = _make_mock_llm("normal answer")
         agent = Agent(
             llm=llm,
-            skills=skill_registry,
+            skill_manager=skill_registry,
         )
         result = agent.run("hello")
         assert result == "normal answer"
@@ -176,7 +176,7 @@ class TestSlashCommandStream:
     """测试 stream() 中的 slash 命令处理"""
 
     def test_slash_code_skill_stream(self):
-        skill_registry = SkillRegistry()
+        skill_registry = SkillManager()
 
         def greet_handler(user_input: str) -> str:
             return f"Hello, {user_input}!"
@@ -192,7 +192,7 @@ class TestSlashCommandStream:
 
         agent = Agent(
             llm=_make_mock_llm(),
-            skills=skill_registry,
+            skill_manager=skill_registry,
         )
         chunks = list(agent.stream("/greet world"))
         assert len(chunks) == 1
@@ -200,16 +200,16 @@ class TestSlashCommandStream:
         assert chunks[0].is_final is True
 
     def test_slash_unknown_skill_stream(self):
-        skill_registry = SkillRegistry()
+        skill_registry = SkillManager()
         agent = Agent(
             llm=_make_mock_llm(),
-            skills=skill_registry,
+            skill_manager=skill_registry,
         )
         chunks = list(agent.stream("/nonexistent"))
         assert "Unknown skill" in chunks[0].content
 
     def test_regular_input_not_intercepted_stream(self):
-        skill_registry = SkillRegistry()
+        skill_registry = SkillManager()
         llm = MagicMock()
         llm.stream.return_value = iter([
             StreamChunk(content="answer", is_final=True),
@@ -217,7 +217,7 @@ class TestSlashCommandStream:
 
         agent = Agent(
             llm=llm,
-            skills=skill_registry,
+            skill_manager=skill_registry,
         )
         chunks = list(agent.stream("hello"))
         assert any("answer" in c.content for c in chunks)

@@ -35,7 +35,7 @@ def load_mcp_servers(config_path: str) -> dict[str, MCPConfig]:
         return {}
 
     try:
-        with open(config_path, "r") as f:
+        with open(config_path, "r", encoding="utf-8") as f:
             data = json.load(f)
     except (json.JSONDecodeError, OSError):
         return {}

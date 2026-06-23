@@ -10,6 +10,14 @@ from typing import Literal
 
 
 @dataclass
+class Usage:
+    """LLM API token 用量。"""
+
+    input: int = 0
+    output: int = 0
+
+
+@dataclass
 class Message:
     """单条消息。
 
@@ -17,7 +25,9 @@ class Message:
         role: 消息角色 (system / user / assistant / tool)
         content: 消息内容
         tool_call_id: tool 消息关联的工具调用 ID
-        reasoning: 思维链内容（用于支持推理模型的 assistant 消息，如 OpenAI o-series 的 reasoning 字段）
+        reasoning: 思维链内容（用于支持推理模型的 assistant 消息）
+        tool_calls: 工具调用列表
+        usage: LLM API token 用量（仅在 assistant 消息中填充）
     """
 
     role: Literal["system", "user", "assistant", "tool"]
@@ -25,6 +35,7 @@ class Message:
     tool_call_id: str | None = None
     reasoning: str = ""
     tool_calls: list[ToolCall] = field(default_factory=list)
+    usage: Usage | None = None
 
 
 @dataclass
@@ -78,6 +89,7 @@ class StreamChunk:
         tool_calls: 本轮新增的工具调用列表
         tool_result: 工具执行结果（Agent 内部使用）
         is_final: 是否为最后一个 chunk（本次 LLM 响应结束）
+        usage: LLM API token 用量（is_final=True 时填充）
     """
 
     content: str = ""
@@ -85,3 +97,4 @@ class StreamChunk:
     tool_calls: list[ToolCall] = field(default_factory=list)
     tool_result: ToolResult | None = None
     is_final: bool = False
+    usage: Usage | None = None

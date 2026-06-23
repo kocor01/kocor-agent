@@ -19,14 +19,3 @@ class ToolDefinition:
         self.name = name
         self.description = description
         self.parameters = parameters
-
-    def to_dict(self) -> dict:
-        """转换为 OpenAI API 格式"""
-        return {
-            "type": "function",
-            "function": {
-                "name": self.name,
-                "description": self.description,
-                "parameters": self.parameters,
-            },
-        }

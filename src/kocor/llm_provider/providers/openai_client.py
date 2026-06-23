@@ -11,8 +11,8 @@ from openai import OpenAI
 
 from kocor.config import Config
 from kocor.llm_provider.llm_client import LLMClient
-from kocor.llm_provider.tool_definition import ToolDefinition
-from kocor.llm_provider.message import FunctionCall, Message, StreamChunk, ToolCall
+from kocor.tools.definitions import ToolDefinition
+from kocor.llm_provider.message import FunctionCall, Message, StreamChunk, ToolCall, Usage
 
 
 class OpenAIClient(LLMClient):
@@ -54,7 +54,7 @@ class OpenAIClient(LLMClient):
 
         # 内部格式 → OpenAI 格式
         openai_messages = self._normalize_in(messages)
-        openai_tools = [t.to_dict() for t in tools] if tools else None
+        openai_tools = [self._to_openai_tool(t) for t in tools] if tools else None
 
         # 调用 API
         response = client.chat.completions.create(
@@ -66,7 +66,11 @@ class OpenAIClient(LLMClient):
         )
 
         # OpenAI 格式 → 内部格式
-        return self._normalize_out(response.choices[0])
+        usage = Usage(
+            input=getattr(response.usage, "prompt_tokens", 0) if response.usage else 0,
+            output=getattr(response.usage, "completion_tokens", 0) if response.usage else 0,
+        )
+        return self._normalize_out(response.choices[0], usage=usage)
 
     def stream(
         self,
@@ -92,7 +96,7 @@ class OpenAIClient(LLMClient):
         )
 
         openai_messages = self._normalize_in(messages)
-        openai_tools = [t.to_dict() for t in tools] if tools else None
+        openai_tools = [self._to_openai_tool(t) for t in tools] if tools else None
 
         accumulated_tool_calls: dict[int, ToolCall] = {}
 
@@ -103,9 +107,20 @@ class OpenAIClient(LLMClient):
             temperature=temperature,
             tools=openai_tools,
             stream=True,
+            stream_options={"include_usage": True},
         ):
-            if not chunk.choices:
+            # 捕获 token 用量（独立 chunk，无 choices，不 yield）
+            if not chunk.choices and chunk.usage:
+                usage_chunk = StreamChunk(
+                    is_final=True,
+                    usage=Usage(
+                        input=getattr(chunk.usage, "prompt_tokens", 0),
+                        output=getattr(chunk.usage, "completion_tokens", 0),
+                    ),
+                )
+                yield usage_chunk
                 continue
+
             delta = chunk.choices[0].delta
             finish_reason = chunk.choices[0].finish_reason
             is_final = finish_reason is not None and finish_reason != ""
@@ -176,7 +191,7 @@ class OpenAIClient(LLMClient):
                     })
         return result
 
-    def _normalize_out(self, choice) -> Message:
+    def _normalize_out(self, choice, usage: Usage | None = None) -> Message:
         """OpenAI choice 格式 → 内部消息格式"""
         message = choice.message
 
@@ -196,10 +211,24 @@ class OpenAIClient(LLMClient):
                 content=message.content or "",
                 reasoning=getattr(message, "reasoning", None) or "",
                 tool_calls=tool_calls,
+                usage=usage,
             )
 
         return Message(
             role="assistant",
             content=message.content or "",
             reasoning=getattr(message, "reasoning", None) or "",
+            usage=usage,
         )
+
+    @staticmethod
+    def _to_openai_tool(tool: ToolDefinition) -> dict:
+        """ToolDefinition → OpenAI API 工具格式"""
+        return {
+            "type": "function",
+            "function": {
+                "name": tool.name,
+                "description": tool.description,
+                "parameters": tool.parameters,
+            },
+        }

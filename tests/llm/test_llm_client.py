@@ -2,9 +2,9 @@
 
 
 from kocor.config import Config
-from kocor.llm_client import create_llm_client, register_client
+from kocor.llm_provider.llm_manager import LlmManager
 from kocor.llm_provider.llm_client import LLMClient
-from kocor.llm_provider.tool_definition import ToolDefinition
+from kocor.tools.definitions import ToolDefinition
 from kocor.llm_provider.message import Message, StreamChunk
 
 
@@ -113,19 +113,19 @@ class TestCreateLLMClient:
 
     def test_create_openai_client(self):
         """测试创建 OpenAI 客户端"""
-        from kocor.llm_provider.openai_client import OpenAIClient
+        from kocor.llm_provider.providers import OpenAIClient
 
         config = Config(provider="openai")
-        client = create_llm_client(config)
+        client = LlmManager.create_llm_client(config)
         assert isinstance(client, OpenAIClient)
         assert client.provider == "openai"
 
     def test_create_anthropic_client(self):
         """测试创建 Anthropic 客户端"""
-        from kocor.llm_provider.anthropic_client import AnthropicClient
+        from kocor.llm_provider.providers import AnthropicClient
 
         config = Config(provider="anthropic")
-        client = create_llm_client(config)
+        client = LlmManager.create_llm_client(config)
         assert isinstance(client, AnthropicClient)
         assert client.provider == "anthropic"
 
@@ -133,7 +133,7 @@ class TestCreateLLMClient:
         """测试不支持的 provider 抛出异常"""
         config = Config(provider="unknown")
         try:
-            create_llm_client(config)
+            LlmManager.create_llm_client(config)
             assert False, "Should have raised ValueError"
         except ValueError as e:
             assert "不支持的 provider" in str(e)
@@ -151,13 +151,12 @@ class TestCreateLLMClient:
             def generate(self, messages, tools=None, max_tokens=4096, temperature=0.0) -> Message:
                 return Message(role="assistant", content="fake")
 
-        register_client("fake", FakeClient)
+        LlmManager.register_client("fake", FakeClient)
         try:
             config = Config(provider="fake")
-            client = create_llm_client(config)
+            client = LlmManager.create_llm_client(config)
             assert isinstance(client, FakeClient)
             assert client.provider == "fake"
         finally:
             # 清理注册表
-            from kocor.llm_client import _clients
-            _clients.pop("fake", None)
+            LlmManager._clients.pop("fake", None)

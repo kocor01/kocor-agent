@@ -5,7 +5,7 @@ from __future__ import annotations
 from kocor.context.models import SummaryNode
 from kocor.context.summarizer import HistorySummarizer
 from kocor.llm_provider.message import FunctionCall, Message, ToolCall
-from kocor.llm_provider.tool_definition import ToolDefinition
+from kocor.tools.definitions import ToolDefinition
 
 
 class FakeLLMForSummary:

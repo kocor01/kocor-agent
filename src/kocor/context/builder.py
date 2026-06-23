@@ -14,7 +14,7 @@ from kocor.context.strategies import apply_context_strategy
 from kocor.context.summarizer import HistorySummarizer
 from kocor.context.token_counter import TokenCounter
 from kocor.llm_provider.message import Message
-from kocor.llm_provider.tool_definition import ToolDefinition
+from kocor.tools.definitions import ToolDefinition
 
 
 class ContextBuilder:

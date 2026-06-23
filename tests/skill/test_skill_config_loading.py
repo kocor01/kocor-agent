@@ -7,19 +7,19 @@ import tempfile
 import pytest
 
 from kocor.skill.models import InvokeStrategy, SkillType
-from kocor.skill.registry import SkillRegistry
+from kocor.skill.skill_manager import SkillManager
 
 
 class TestLoadFromConfig:
     """测试 load_from_config()"""
 
     def test_missing_file_is_noop(self):
-        registry = SkillRegistry()
+        registry = SkillManager()
         registry.load_from_config("nonexistent_file.json")
         assert registry.list_skills(enabled_only=False) == []
 
     def test_empty_config(self):
-        registry = SkillRegistry()
+        registry = SkillManager()
         with tempfile.NamedTemporaryFile(
             mode="w", suffix=".json", delete=False, encoding="utf-8",
         ) as f:
@@ -32,7 +32,7 @@ class TestLoadFromConfig:
             os.unlink(path)
 
     def test_empty_skills(self):
-        registry = SkillRegistry()
+        registry = SkillManager()
         with tempfile.NamedTemporaryFile(
             mode="w", suffix=".json", delete=False, encoding="utf-8",
         ) as f:
@@ -45,7 +45,7 @@ class TestLoadFromConfig:
             os.unlink(path)
 
     def test_load_prompt_skill(self):
-        registry = SkillRegistry()
+        registry = SkillManager()
         config = {
             "skills": {
                 "review": {
@@ -80,7 +80,7 @@ class TestLoadFromConfig:
             os.unlink(path)
 
     def test_load_code_skill(self):
-        registry = SkillRegistry()
+        registry = SkillManager()
         config = {
             "skills": {
                 "greet": {
@@ -118,7 +118,7 @@ class TestLoadFromConfig:
             os.unlink(path)
 
     def test_load_llm_only_skill(self):
-        registry = SkillRegistry()
+        registry = SkillManager()
         config = {
             "skills": {
                 "format": {
@@ -143,7 +143,7 @@ class TestLoadFromConfig:
             os.unlink(path)
 
     def test_load_disabled_skill(self):
-        registry = SkillRegistry()
+        registry = SkillManager()
         config = {
             "skills": {
                 "old": {
@@ -168,7 +168,7 @@ class TestLoadFromConfig:
             os.unlink(path)
 
     def test_load_code_skill_missing_module(self):
-        registry = SkillRegistry()
+        registry = SkillManager()
         config = {
             "skills": {
                 "bad": {
@@ -191,7 +191,7 @@ class TestLoadFromConfig:
             os.unlink(path)
 
     def test_load_multiple_skills(self):
-        registry = SkillRegistry()
+        registry = SkillManager()
         config = {
             "skills": {
                 "a": {

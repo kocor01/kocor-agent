@@ -16,10 +16,10 @@ from kocor.skill.models import (
     SkillResult,
     SkillType,
 )
-from kocor.tool_registry import ToolRegistry
+from kocor.tools.tool_manager import ToolManager
 
 
-class SkillRegistry:
+class SkillManager:
     """技能注册与执行中心。
 
     负责:
@@ -27,12 +27,12 @@ class SkillRegistry:
     - 从 JSON 配置文件加载技能
     - 从 skills/ 目录自动发现技能
     - 按名称执行技能
-    - 将可 LLM 触发的技能暴露为 ToolRegistry 中的工具
+    - 将可 LLM 触发的技能暴露为 ToolManager 中的工具
     """
 
-    def __init__(self, tool_registry: ToolRegistry | None = None):
+    def __init__(self, tool_manager: ToolManager | None = None):
         self._skills: dict[str, SkillDefinition] = {}
-        self._tool_registry = tool_registry
+        self._tool_manager = tool_manager
 
     # -- 注册与查询 ---------------------------------------------------------------
 
@@ -96,7 +96,7 @@ class SkillRegistry:
 
         import json
 
-        with open(config_path, "r") as f:
+        with open(config_path, "r", encoding="utf-8") as f:
             data = json.load(f)
 
         raw_skills: dict = data.get("skills", {})
@@ -392,7 +392,7 @@ class SkillRegistry:
         if any(p.name == "user_input" for p in sig.parameters.values()):
             kwargs["user_input"] = context.user_input
         if any(p.name == "tools" for p in sig.parameters.values()):
-            kwargs["tools"] = context.tool_registry
+            kwargs["tools"] = context.tool_manager
         if any(p.name == "context" for p in sig.parameters.values()):
             kwargs["context"] = context
 
@@ -405,14 +405,14 @@ class SkillRegistry:
 
     # -- 暴露为 Tool --------------------------------------------------------------
 
-    def register_as_tools(self, tool_registry: ToolRegistry | None = None) -> None:
-        """将可 LLM 触发的技能注册为 ToolRegistry 中的工具。
+    def register_as_tools(self, tool_manager: ToolManager | None = None) -> None:
+        """将可 LLM 触发的技能注册为 ToolManager 中的工具。
 
         SLASH 类型的技能不会被注册为工具。
         LLM 和 BOTH 类型的技能会注册为 skill_<name>。
         """
-        registry = tool_registry or self._tool_registry
-        if registry is None:
+        tm = tool_manager if tool_manager is not None else self._tool_manager
+        if tm is None:
             return
 
         for skill in self._skills.values():
@@ -421,7 +421,7 @@ class SkillRegistry:
             if not skill.enabled:
                 continue
 
-            registry.register(
+            tm.register(
                 name=f"skill_{skill.name}",
                 description=skill.description,
                 parameters=self._build_tool_parameters(skill),
@@ -447,7 +447,7 @@ class SkillRegistry:
         """Tool handler wrapper：执行 skill 并返回结果内容。"""
         context = SkillContext(
             user_input=user_input,
-            tool_registry=self._tool_registry,
+            tool_manager=self._tool_manager,
         )
         result = self.execute(skill.name, context)
         return result.content

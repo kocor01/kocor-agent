@@ -7,7 +7,7 @@ import tempfile
 
 from kocor.agent import Agent
 from kocor.llm_provider.llm_client import LLMClient
-from kocor.llm_provider.tool_definition import ToolDefinition
+from kocor.tools.definitions import ToolDefinition
 from kocor.llm_provider.message import Message
 
 

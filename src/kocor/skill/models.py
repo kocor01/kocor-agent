@@ -9,7 +9,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Callable
 
-from kocor.tool_registry import ToolRegistry
+from kocor.tools.tool_manager import ToolManager
 
 
 class SkillType(Enum):
@@ -69,7 +69,7 @@ class SkillContext:
     """技能执行上下文，由调用方在调用时构造传入。"""
 
     user_input: str
-    tool_registry: ToolRegistry | None = None
+    tool_manager: ToolManager | None = None
     extra: dict = field(default_factory=dict)
 
 

@@ -6,11 +6,11 @@ import json
 import os
 from typing import Callable
 
-from kocor.llm_provider.tool_definition import ToolDefinition
+from kocor.tools.definitions import ToolDefinition
 from kocor.llm_provider.message import ToolCall, ToolResult
 
 
-class ToolRegistry:
+class ToolManager:
     """工具注册与执行中心。
 
     Attributes:
@@ -23,6 +23,14 @@ class ToolRegistry:
         self._tools: dict[str, ToolDefinition] = {}
         self._handlers: dict[str, Callable] = {}
         self._timeout = timeout
+
+    def register_defaults(self) -> None:
+        """向当前 ToolManager 注册内置工具（读文件、写文件、沙盒执行 Python）。"""
+        from kocor.tools.toolset import read_file, write_file, run_python
+
+        read_file.toolRegistry_to(self)
+        write_file.toolRegistry_to(self)
+        run_python.toolRegistry_to(self)
 
     def register(
         self,

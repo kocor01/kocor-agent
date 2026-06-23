@@ -7,7 +7,7 @@ from kocor.skill.models import (
     SkillResult,
     SkillType,
 )
-from kocor.tool_registry import ToolRegistry
+from kocor.tools.tool_manager import ToolManager
 
 
 class TestSkillType:
@@ -140,13 +140,13 @@ class TestSkillContext:
     def test_minimal_context(self):
         ctx = SkillContext(user_input="hello")
         assert ctx.user_input == "hello"
-        assert ctx.tool_registry is None
+        assert ctx.tool_manager is None
         assert ctx.extra == {}
 
-    def test_with_tool_registry(self):
-        registry = ToolRegistry()
-        ctx = SkillContext(user_input="hello", tool_registry=registry)
-        assert ctx.tool_registry is registry
+    def test_with_tool_manager(self):
+        registry = ToolManager()
+        ctx = SkillContext(user_input="hello", tool_manager=registry)
+        assert ctx.tool_manager is registry
 
     def test_with_extra(self):
         ctx = SkillContext(user_input="hello", extra={"key": "value"})

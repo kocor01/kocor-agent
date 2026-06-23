@@ -7,7 +7,7 @@ import tempfile
 
 from kocor.context.builder import ContextBuilder
 from kocor.context.models import AgentContext
-from kocor.llm_provider.tool_definition import ToolDefinition
+from kocor.tools.definitions import ToolDefinition
 
 
 # 简单的 ToolRegistry stub（不依赖真实实现）

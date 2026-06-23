@@ -8,3 +8,5 @@ build/
 .coverage
 coverage.xml
 htmlcov/
+log/
+*.log

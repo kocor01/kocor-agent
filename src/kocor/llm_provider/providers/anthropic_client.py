@@ -12,8 +12,8 @@ from anthropic import Anthropic
 
 from kocor.config import Config
 from kocor.llm_provider.llm_client import LLMClient
-from kocor.llm_provider.tool_definition import ToolDefinition
-from kocor.llm_provider.message import FunctionCall, Message, StreamChunk, ToolCall
+from kocor.tools.definitions import ToolDefinition
+from kocor.llm_provider.message import FunctionCall, Message, StreamChunk, ToolCall, Usage
 
 
 class AnthropicClient(LLMClient):
@@ -118,6 +118,7 @@ class AnthropicClient(LLMClient):
         accumulated_text = ""
         accumulated_tool_calls: dict[int, ToolCall] = {}
         tool_block_starts: dict[int, dict] = {}  # index → block metadata
+        input_tokens = 0
 
         for event in client.messages.create(
             model=self.config.anthropic_model,
@@ -131,6 +132,11 @@ class AnthropicClient(LLMClient):
             stream_chunk = StreamChunk()
 
             match event.type:
+                case "message_start":
+                    usage_attr = getattr(event, "message", None)
+                    if usage_attr and hasattr(usage_attr, "usage"):
+                        input_tokens = getattr(usage_attr.usage, "input_tokens", 0)
+
                 case "content_block_delta":
                     if event.delta.type == "text_delta":
                         text = event.delta.text
@@ -173,6 +179,12 @@ class AnthropicClient(LLMClient):
                 case "message_delta":
                     if event.delta.stop_reason:
                         stream_chunk.is_final = True
+                    usage_attr = getattr(event, "usage", None)
+                    if usage_attr:
+                        stream_chunk.usage = Usage(
+                            input=input_tokens,
+                            output=getattr(usage_attr, "output_tokens", 0),
+                        )
 
             # 有内容时才 yield
             if stream_chunk.content or stream_chunk.reasoning or stream_chunk.tool_calls or stream_chunk.is_final:
@@ -231,6 +243,10 @@ class AnthropicClient(LLMClient):
     def _normalize_out(self, response) -> Message:
         """Anthropic response 格式 → 内部消息格式"""
         content_blocks = response.content
+        usage = Usage(
+            input=getattr(response.usage, "input_tokens", 0),
+            output=getattr(response.usage, "output_tokens", 0),
+        )
 
         # 提取 thinking（思维链）
         reasoning = ""
@@ -261,12 +277,13 @@ class AnthropicClient(LLMClient):
                 content="",
                 reasoning=reasoning,
                 tool_calls=tool_calls,
+                usage=usage,
             )
 
         # 纯文本响应
         text_blocks = [b for b in content_blocks if b.type == "text"]
         content = " ".join(b.text for b in text_blocks) if text_blocks else ""
-        return Message(role="assistant", content=content, reasoning=reasoning)
+        return Message(role="assistant", content=content, reasoning=reasoning, usage=usage)
 
     def _normalize_tool(self, tool: ToolDefinition) -> dict:
         """内部工具定义 → Anthropic 工具格式"""

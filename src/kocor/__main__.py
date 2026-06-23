@@ -17,13 +17,21 @@ from dotenv import load_dotenv
 
 from kocor.agent import Agent
 from kocor.config import load_config
-from kocor.llm_client import create_llm_client
-from kocor.mcp import register_mcp_tools, shutdown_mcp_clients
+from kocor.llm_provider.llm_manager import LlmManager
+from kocor.mcp import McpManager
 from kocor.llm_provider.message import StreamChunk
-from kocor.skill import SkillRegistry
+from kocor.skill import SkillManager
 from kocor.skill.models import InvokeStrategy
-from kocor.tool_registry import ToolRegistry
-from kocor.tools import create_default_tools
+from kocor.tools.tool_manager import ToolManager
+
+# Harness imports
+from kocor.harness import IterationBudget, HarnessConfig
+from kocor.harness.permission import PermissionManager
+from kocor.hook.hook_manager import HookManager
+from kocor.hook.hooks import AuditLogHook
+from kocor.harness.events import EventEmitter
+from kocor.harness.debug import DebugManager
+from kocor.harness.logger import HarnessLogger
 
 W = 58
 
@@ -40,6 +48,7 @@ class _StreamFormatter:
         self.has_content = False
         self.has_tool_section = False
         self.tool_result_idx = 0
+        self.content_emitted = False
 
     def _round_header(self, n: int) -> None:
         title = f"⚡ 第 {n} 次请求"
@@ -74,13 +83,18 @@ class _StreamFormatter:
         print(chunk.reasoning, end="", flush=True)
 
     def _handle_content(self, chunk) -> None:
-        if not chunk.content:
+        if not chunk.content or not chunk.content.strip():
             return
         if not self.has_content:
-            print("\n\n\U0001f4ac 回答")
+            print("\n\U0001f4ac 回答")
             print(f"{'─' * self.width}")
             self.has_content = True
-        print(chunk.content, end="", flush=True)
+            self.content_emitted = False
+        if not self.content_emitted:
+            self.content_emitted = True
+            print(chunk.content.lstrip("\n"), end="", flush=True)
+        else:
+            print(chunk.content, end="", flush=True)
 
     def _handle_tool_calls(self, chunk) -> None:
         if not chunk.tool_calls:
@@ -116,6 +130,7 @@ class _StreamFormatter:
         self.has_reasoning = False
         self.has_content = False
         self.has_tool_section = False
+        self.content_emitted = False
         if chunk.tool_result and self.tool_result_idx >= len(self.tool_calls) and self.tool_calls:
             self.tool_calls.clear()
             self.tool_result_idx = 0
@@ -145,12 +160,33 @@ def parse_args():
         help="交互式 REPL 模式",
     )
     parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="调试模式（详细运行时信息）",
+    )
+    parser.add_argument(
+        "--dangerous",
+        action="store_true",
+        help="允许危险操作（不确认）",
+    )
+    parser.add_argument(
+        "--strict",
+        action="store_true",
+        help="严格模式（每次工具调用都确认）",
+    )
+    parser.add_argument(
+        "--max-iterations",
+        type=int,
+        default=None,
+        help="最大迭代次数",
+    )
+    parser.add_argument(
         "user_input",
         nargs="*",
         help="用户问题",
     )
     args = parser.parse_args()
-    return args.stream, args.repl, args.user_input
+    return args
 
 
 def _repl_loop(agent: Agent, stream_enabled: bool) -> None:
@@ -177,30 +213,68 @@ def _repl_loop(agent: Agent, stream_enabled: bool) -> None:
 
 
 def main() -> None:
-    stream_enabled, repl_enabled, user_args = parse_args()
+    args = parse_args()
+    stream_enabled = args.stream
+    repl_enabled = args.repl
+    user_args = args.user_input
+
     load_dotenv()
     config = load_config()
-    llm = create_llm_client(config)
 
-    toolRegistry = ToolRegistry()
-    create_default_tools(toolRegistry)
-    mcp_clients = register_mcp_tools(toolRegistry, config.mcp_config)
+    # Determine permission policy from CLI flags
+    permission_policy = "default"
+    if args.strict:
+        permission_policy = "strict"
+    elif args.dangerous:
+        permission_policy = "permissive"
 
-    skillRegistry = SkillRegistry(toolRegistry)
-    skillRegistry.load_from_config(config.skills_config)
-    skillRegistry.discover_skills(config.skills_dir)
-    skillRegistry.discover_cline_skills(config.skills_dir)
-    skillRegistry.register_as_tools(toolRegistry)
+    llm = LlmManager.create_llm_client(config)
+
+    toolManager = ToolManager()
+    toolManager.register_defaults()
+    mcp_manager = McpManager(toolManager, config.mcp_config)
+    mcp_manager.register_all()
+
+    skillManager = SkillManager(toolManager)
+    skillManager.load_from_config(config.skills_config)
+    skillManager.discover_skills(config.skills_dir)
+    skillManager.discover_cline_skills(config.skills_dir)
+    skillManager.register_as_tools(toolManager)
+
+    # Build Harness components
+    max_iterations = args.max_iterations or config.max_iterations
+    harness_config = HarnessConfig(
+        max_iterations=max_iterations,
+        permission_policy=permission_policy,
+        debug=args.debug or False,
+        log_level="DEBUG" if args.debug else "INFO",
+        context_max_tokens=config.context_max_tokens,
+    )
+
+    permission_mgr = PermissionManager(
+        policy=permission_policy,
+    )
+    hook_manager = HookManager()
+    hook_manager.register(AuditLogHook(log_path="./log/audit.log"))
+    event_emitter = EventEmitter()
+    debug_mgr = DebugManager(enabled=harness_config.debug)
+    harness_logger = HarnessLogger(level=harness_config.log_level, log_path="./log/kocor.log")
+    budget = IterationBudget(iterations_limit=max_iterations)
 
     agent = Agent(
         llm=llm,
-        tools=toolRegistry,
-        skills=skillRegistry,
-        max_iterations=config.max_iterations,
+        tool_manager=toolManager,
+        skill_manager=skillManager,
+        max_iterations=max_iterations,
         memory_dir=config.memory_dir or None,
         context_strategy=config.context_strategy,
         project_instructions_path=config.project_instructions_path,
         context_max_tokens=config.context_max_tokens,
+        permission_mgr=permission_mgr,
+        hook_manager=hook_manager,
+        event_emitter=event_emitter,
+        budget=budget,
+        harness_logger=harness_logger,
     )
 
     # 检测 REPL 模式：--repl 标志，或无参数且 stdin 是终端时默认进入
@@ -211,8 +285,8 @@ def main() -> None:
         except ImportError:
             pass
         print("Kocor Agent — 输入 exit 或 Ctrl+C 退出")
-        if skillRegistry:
-            skills = skillRegistry.list_skills(enabled_only=True)
+        if skillManager:
+            skills = skillManager.list_skills(enabled_only=True)
             slash_names = [f"/{s.name}" for s in skills
                            if s.invoke_strategy in (InvokeStrategy.SLASH, InvokeStrategy.BOTH)]
             print(f"Slash 命令: {', '.join(sorted(slash_names))}")
@@ -242,7 +316,7 @@ def main() -> None:
             result = agent.run(user_input)
             print(result)
     finally:
-        shutdown_mcp_clients(mcp_clients)
+        mcp_manager.shutdown_all()
 
 
 if __name__ == "__main__":

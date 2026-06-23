@@ -12,10 +12,10 @@ def _mock_cli_main_stack(argv: list[str]) -> ExitStack:
     stack.enter_context(patch("kocor.__main__.load_dotenv"))
     mock_cfg = MagicMock(skills_config="", mcp_config="")
     stack.enter_context(patch("kocor.__main__.load_config", return_value=mock_cfg))
-    stack.enter_context(patch("kocor.__main__.create_llm_client"))
-    stack.enter_context(patch("kocor.__main__.ToolRegistry"))
-    stack.enter_context(patch("kocor.__main__.SkillRegistry"))
-    stack.enter_context(patch("kocor.__main__.register_mcp_tools"))
+    stack.enter_context(patch("kocor.__main__.LlmManager"))
+    stack.enter_context(patch("kocor.__main__.ToolManager"))
+    stack.enter_context(patch("kocor.__main__.SkillManager"))
+    stack.enter_context(patch("kocor.__main__.McpManager"))
     stack.enter_context(patch("sys.argv", argv))
     return stack
 
@@ -34,10 +34,10 @@ class TestCLIParseArgs:
             stream=True, repl=False, user_input=["hello"],
         )
 
-        stream_enabled, repl_enabled, user_args = parse_args()
-        assert stream_enabled is True
-        assert repl_enabled is False
-        assert user_args == ["hello"]
+        args = parse_args()
+        assert args.stream is True
+        assert args.repl is False
+        assert args.user_input == ["hello"]
 
     @patch("kocor.__main__.argparse.ArgumentParser")
     def test_parse_no_stream(self, mock_parser_cls):
@@ -50,9 +50,9 @@ class TestCLIParseArgs:
             stream=False, repl=False, user_input=["hello"],
         )
 
-        stream_enabled, repl_enabled, user_args = parse_args()
-        assert stream_enabled is False
-        assert repl_enabled is False
+        args = parse_args()
+        assert args.stream is False
+        assert args.repl is False
 
 
 class TestCLIMain:
@@ -60,9 +60,9 @@ class TestCLIMain:
 
     @patch("kocor.__main__.load_dotenv")
     @patch("kocor.__main__.load_config")
-    @patch("kocor.__main__.create_llm_client")
-    @patch("kocor.__main__.ToolRegistry")
-    @patch("kocor.__main__.register_mcp_tools")
+    @patch("kocor.__main__.LlmManager")
+    @patch("kocor.__main__.ToolManager")
+    @patch("kocor.__main__.McpManager")
     @patch("kocor.__main__.Agent")
     @patch("sys.argv", ["kocor", "--stream", "你好"])
     def test_main_with_stream(self, mock_agent_cls, mock_mcp, mock_tools,
@@ -87,9 +87,9 @@ class TestCLIMain:
 
     @patch("kocor.__main__.load_dotenv")
     @patch("kocor.__main__.load_config")
-    @patch("kocor.__main__.create_llm_client")
-    @patch("kocor.__main__.ToolRegistry")
-    @patch("kocor.__main__.register_mcp_tools")
+    @patch("kocor.__main__.LlmManager")
+    @patch("kocor.__main__.ToolManager")
+    @patch("kocor.__main__.McpManager")
     @patch("kocor.__main__.Agent")
     @patch("sys.argv", ["kocor", "你好"])
     def test_main_without_stream(self, mock_agent_cls, mock_mcp, mock_tools,
@@ -110,10 +110,10 @@ class TestCLIMain:
 
     @patch("kocor.__main__.load_dotenv")
     @patch("kocor.__main__.load_config")
-    @patch("kocor.__main__.create_llm_client")
-    @patch("kocor.__main__.ToolRegistry")
-    @patch("kocor.__main__.SkillRegistry")
-    @patch("kocor.__main__.register_mcp_tools")
+    @patch("kocor.__main__.LlmManager")
+    @patch("kocor.__main__.ToolManager")
+    @patch("kocor.__main__.SkillManager")
+    @patch("kocor.__main__.McpManager")
     @patch("kocor.__main__.Agent")
     @patch("sys.argv", ["kocor"])
     def test_main_no_input(self, mock_agent_cls, mock_mcp, mock_skills,
@@ -138,9 +138,9 @@ class TestCLIMain:
 
     @patch("kocor.__main__.load_dotenv")
     @patch("kocor.__main__.load_config")
-    @patch("kocor.__main__.create_llm_client")
-    @patch("kocor.__main__.ToolRegistry")
-    @patch("kocor.__main__.register_mcp_tools")
+    @patch("kocor.__main__.LlmManager")
+    @patch("kocor.__main__.ToolManager")
+    @patch("kocor.__main__.McpManager")
     @patch("kocor.__main__.Agent")
     @patch("sys.argv", ["kocor", "--stream", "你好"])
     def test_stream_prints_tool_calls(self, mock_agent_cls, mock_mcp, mock_tools,
@@ -215,10 +215,10 @@ class TestCLIReasoning:
 
     @patch("kocor.__main__.load_dotenv")
     @patch("kocor.__main__.load_config")
-    @patch("kocor.__main__.create_llm_client")
-    @patch("kocor.__main__.ToolRegistry")
-    @patch("kocor.__main__.SkillRegistry")
-    @patch("kocor.__main__.register_mcp_tools")
+    @patch("kocor.__main__.LlmManager")
+    @patch("kocor.__main__.ToolManager")
+    @patch("kocor.__main__.SkillManager")
+    @patch("kocor.__main__.McpManager")
     @patch("kocor.__main__.Agent")
     @patch("sys.argv", ["kocor", "--stream", "你好"])
     def test_stream_prints_reasoning(self, mock_agent_cls, mock_mcp,
@@ -259,10 +259,10 @@ class TestCLIReasoning:
 _CLI_MAIN_MOCKS = [
     patch("kocor.__main__.load_dotenv"),
     patch("kocor.__main__.load_config"),
-    patch("kocor.__main__.create_llm_client"),
-    patch("kocor.__main__.ToolRegistry"),
-    patch("kocor.__main__.SkillRegistry"),
-    patch("kocor.__main__.register_mcp_tools"),
+    patch("kocor.__main__.LlmManager"),
+    patch("kocor.__main__.ToolManager"),
+    patch("kocor.__main__.SkillManager"),
+    patch("kocor.__main__.McpManager"),
     patch("kocor.__main__.Agent"),
 ]
 

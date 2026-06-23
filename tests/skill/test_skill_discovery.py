@@ -4,19 +4,19 @@ import os
 import tempfile
 
 from kocor.skill.models import InvokeStrategy, SkillType
-from kocor.skill.registry import SkillRegistry
+from kocor.skill.skill_manager import SkillManager
 
 
 class TestDiscoverSkills:
     """测试 discover_skills()"""
 
     def test_nonexistent_directory_is_noop(self):
-        registry = SkillRegistry()
+        registry = SkillManager()
         registry.discover_skills("/nonexistent_skill_dir_xyz")
         assert registry.list_skills(enabled_only=False) == []
 
     def test_discover_prompt_skill_file(self):
-        registry = SkillRegistry()
+        registry = SkillManager()
         with tempfile.TemporaryDirectory() as tmpdir:
             skill_code = (
                 'NAME = "review"\n'
@@ -43,7 +43,7 @@ class TestDiscoverSkills:
             assert skill.enabled is True
 
     def test_discover_code_skill_file(self):
-        registry = SkillRegistry()
+        registry = SkillManager()
         with tempfile.TemporaryDirectory() as tmpdir:
             skill_code = (
                 'NAME = "greet"\n'
@@ -71,7 +71,7 @@ class TestDiscoverSkills:
             assert skill.category == "utility"
 
     def test_skip_private_files(self):
-        registry = SkillRegistry()
+        registry = SkillManager()
         with tempfile.TemporaryDirectory() as tmpdir:
             skill_code = (
                 'NAME = "hidden"\n'
@@ -86,7 +86,7 @@ class TestDiscoverSkills:
             assert registry.get("hidden") is None
 
     def test_skip_file_without_name(self):
-        registry = SkillRegistry()
+        registry = SkillManager()
         with tempfile.TemporaryDirectory() as tmpdir:
             with open(os.path.join(tmpdir, "no_name.py"), "w", encoding="utf-8") as f:
                 f.write('DESCRIPTION = "No name"\n')
@@ -95,7 +95,7 @@ class TestDiscoverSkills:
             assert registry.list_skills(enabled_only=False) == []
 
     def test_discover_multiple_files(self):
-        registry = SkillRegistry()
+        registry = SkillManager()
         with tempfile.TemporaryDirectory() as tmpdir:
             for fname, content in [
                 ("a.py", 'NAME = "a"\nDESCRIPTION = "A"\nSKILL_TYPE = "prompt"\nPROMPT_TEMPLATE = "a"\n'),
@@ -110,7 +110,7 @@ class TestDiscoverSkills:
             assert registry.get("b") is not None
 
     def test_discover_with_defaults(self):
-        registry = SkillRegistry()
+        registry = SkillManager()
         with tempfile.TemporaryDirectory() as tmpdir:
             skill_code = (
                 'NAME = "minimal"\n'
@@ -130,7 +130,7 @@ class TestDiscoverSkills:
 
     def test_config_overrides_discovered(self):
         """配置文件优先于目录发现：同名时配置文件的 wins"""
-        registry = SkillRegistry()
+        registry = SkillManager()
         with tempfile.TemporaryDirectory() as tmpdir:
             skill_code = (
                 'NAME = "greet"\n'
@@ -171,12 +171,12 @@ class TestDiscoverClineSkills:
     """测试 discover_cline_skills() — Cline 格式 (SKILL.md + _meta.json)"""
 
     def test_nonexistent_directory_is_noop(self):
-        registry = SkillRegistry()
+        registry = SkillManager()
         registry.discover_cline_skills("/nonexistent_xyz")
         assert registry.list_skills(enabled_only=False) == []
 
     def test_discover_skill_from_skill_md(self):
-        registry = SkillRegistry()
+        registry = SkillManager()
         with tempfile.TemporaryDirectory() as tmpdir:
             skill_dir = os.path.join(tmpdir, "weather")
             os.makedirs(skill_dir)
@@ -206,7 +206,7 @@ class TestDiscoverClineSkills:
             assert "Use `curl` to get weather." in skill.prompt_template
 
     def test_skip_if_no_skilli_md(self):
-        registry = SkillRegistry()
+        registry = SkillManager()
         with tempfile.TemporaryDirectory() as tmpdir:
             skill_dir = os.path.join(tmpdir, "empty_skill")
             os.makedirs(skill_dir)
@@ -215,7 +215,7 @@ class TestDiscoverClineSkills:
             assert registry.list_skills(enabled_only=False) == []
 
     def test_skip_if_no_frontmatter(self):
-        registry = SkillRegistry()
+        registry = SkillManager()
         with tempfile.TemporaryDirectory() as tmpdir:
             skill_dir = os.path.join(tmpdir, "bad_skill")
             os.makedirs(skill_dir)
@@ -225,7 +225,7 @@ class TestDiscoverClineSkills:
             assert registry.list_skills(enabled_only=False) == []
 
     def test_parse_full_frontmatter(self):
-        registry = SkillRegistry()
+        registry = SkillManager()
         with tempfile.TemporaryDirectory() as tmpdir:
             skill_dir = os.path.join(tmpdir, "full_skill")
             os.makedirs(skill_dir)
@@ -249,7 +249,7 @@ class TestDiscoverClineSkills:
 
     def test_config_overrides_cline_skill(self):
         """配置文件中的同名 skill 优先于 Cline 格式发现的"""
-        registry = SkillRegistry()
+        registry = SkillManager()
         with tempfile.TemporaryDirectory() as tmpdir:
             import json
 

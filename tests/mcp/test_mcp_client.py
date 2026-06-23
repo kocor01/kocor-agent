@@ -7,7 +7,7 @@ import pytest
 from mcp.types import CallToolResult, InitializeResult, ListToolsResult, TextContent, Tool
 
 from kocor.llm_provider.message import FunctionCall, ToolCall
-from kocor.tool_registry import ToolRegistry
+from kocor.tools.tool_manager import ToolManager
 
 
 # ── 测试辅助函数 ──────────────────────────────────────────────────────────
@@ -351,7 +351,7 @@ class TestMCPClient:
 
 class TestRegisterMCPTools:
     def test_stdio_tools_registered_with_mcp_prefix(self):
-        from kocor.mcp import register_mcp_tools
+        from kocor.mcp import McpManager
 
         config_data = json.dumps({
             "mcpServers": {
@@ -381,8 +381,9 @@ class TestRegisterMCPTools:
             ))
             mock_session_cls.return_value = mock_session
 
-            registry = ToolRegistry()
-            clients = register_mcp_tools(registry, "mcp.json")
+            registry = ToolManager()
+            manager = McpManager(registry, "mcp.json")
+            clients = manager.register_all()
 
         assert len(clients) == 1
         defs = registry.get_definitions()
@@ -391,7 +392,7 @@ class TestRegisterMCPTools:
         assert defs[0].description == "Read file"
 
     def test_one_server_fails_others_still_register(self):
-        from kocor.mcp import register_mcp_tools
+        from kocor.mcp import McpManager
 
         config_data = json.dumps({
             "mcpServers": {
@@ -429,8 +430,9 @@ class TestRegisterMCPTools:
             mock_write.__aenter__.return_value = mock_write
             mock_stdio.return_value = _make_async_cm((mock_read, mock_write))
 
-            registry = ToolRegistry()
-            clients = register_mcp_tools(registry, "mcp.json")
+            registry = ToolManager()
+            manager = McpManager(registry, "mcp.json")
+            clients = manager.register_all()
 
         assert len(clients) == 1
         defs = registry.get_definitions()
@@ -438,7 +440,7 @@ class TestRegisterMCPTools:
         assert defs[0].name == "mcp_good_tool1"
 
     def test_execute_mcp_tool_via_registry(self):
-        from kocor.mcp import register_mcp_tools
+        from kocor.mcp import McpManager
 
         config_data = json.dumps({
             "mcpServers": {
@@ -472,8 +474,9 @@ class TestRegisterMCPTools:
             ))
             mock_session_cls.return_value = mock_session
 
-            registry = ToolRegistry()
-            clients = register_mcp_tools(registry, "mcp.json")
+            registry = ToolManager()
+            manager = McpManager(registry, "mcp.json")
+            clients = manager.register_all()
 
         tool_call = ToolCall(
             id="call_1",
@@ -483,32 +486,38 @@ class TestRegisterMCPTools:
 
         assert result.content == "Hello from MCP"
 
-        from kocor.mcp import shutdown_mcp_clients
-        shutdown_mcp_clients(clients)
+        manager.shutdown_all()
 
 
-# ── ShutdownMCPClients ────────────────────────────────────────────────────
+# ── McpManager ──────────────────────────────────────────────────────────────
 
 
-class TestShutdownMCPClients:
-    def test_shutdown_multiple(self):
-        from kocor.mcp import MCPClient, shutdown_mcp_clients
+class TestMcpManager:
+    def test_shutdown_all_calls_client_shutdown(self):
+        from kocor.mcp import McpManager
 
-        c1 = MagicMock(spec=MCPClient)
-        c2 = MagicMock(spec=MCPClient)
-        shutdown_mcp_clients([c1, c2])
+        manager = McpManager(ToolManager())
+        c1 = MagicMock()
+        c2 = MagicMock()
+        manager._clients = [c1, c2]
+        manager.shutdown_all()
         c1.shutdown.assert_called_once()
         c2.shutdown.assert_called_once()
 
-    def test_shutdown_one_fails(self):
-        from kocor.mcp import MCPClient, shutdown_mcp_clients
+    def test_shutdown_all_with_one_failure(self):
+        from kocor.mcp import McpManager
 
-        c1 = MagicMock(spec=MCPClient)
+        manager = McpManager(ToolManager())
+        c1 = MagicMock()
         c1.shutdown.side_effect = Exception("fail")
-        c2 = MagicMock(spec=MCPClient)
-        shutdown_mcp_clients([c1, c2])
+        c2 = MagicMock()
+        manager._clients = [c1, c2]
+        manager.shutdown_all()  # should not raise
         c2.shutdown.assert_called_once()
 
-    def test_shutdown_empty(self):
-        from kocor.mcp import shutdown_mcp_clients
-        shutdown_mcp_clients([])
+    def test_shutdown_all_empty(self):
+        from kocor.mcp import McpManager
+
+        manager = McpManager(ToolManager())
+        manager._clients = []
+        manager.shutdown_all()  # should not raise

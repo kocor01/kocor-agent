@@ -7,7 +7,7 @@ from enum import Enum
 from typing import Literal
 
 from kocor.llm_provider.message import Message
-from kocor.llm_provider.tool_definition import ToolDefinition
+from kocor.tools.definitions import ToolDefinition
 
 
 @dataclass
