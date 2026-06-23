@@ -3,6 +3,7 @@
 使用:
     python -m kocor "你的问题"
     python -m kocor --stream "你的问题"
+    python -m kocor --repl           # 交互模式
     echo "你的问题" | python -m kocor
 """
 
@@ -20,6 +21,7 @@ from kocor.llm_client import create_llm_client
 from kocor.mcp import register_mcp_tools, shutdown_mcp_clients
 from kocor.llm_provider.message import StreamChunk
 from kocor.skill import SkillRegistry
+from kocor.skill.models import InvokeStrategy
 from kocor.tool_registry import ToolRegistry
 from kocor.tools import create_default_tools
 
@@ -138,16 +140,44 @@ def parse_args():
         help="启用流式输出",
     )
     parser.add_argument(
+        "--repl",
+        action="store_true",
+        help="交互式 REPL 模式",
+    )
+    parser.add_argument(
         "user_input",
         nargs="*",
         help="用户问题",
     )
     args = parser.parse_args()
-    return args.stream, args.user_input
+    return args.stream, args.repl, args.user_input
+
+
+def _repl_loop(agent: Agent, stream_enabled: bool) -> None:
+    """交互式 REPL 循环。"""
+    while True:
+        try:
+            user_input = input(">>> ").strip()
+        except (EOFError, KeyboardInterrupt):
+            print()
+            break
+
+        if not user_input:
+            continue
+        if user_input.lower() in ("exit", "quit"):
+            break
+
+        print()
+        if stream_enabled:
+            _print_stream_formatted(agent.stream(user_input))
+        else:
+            result = agent.run(user_input)
+            print(result)
+        print()
 
 
 def main() -> None:
-    stream_enabled, user_args = parse_args()
+    stream_enabled, repl_enabled, user_args = parse_args()
     load_dotenv()
     config = load_config()
     llm = create_llm_client(config)
@@ -167,7 +197,28 @@ def main() -> None:
         tools=toolRegistry,
         skills=skillRegistry,
         max_iterations=config.max_iterations,
+        memory_dir=config.memory_dir or None,
+        context_strategy=config.context_strategy,
+        project_instructions_path=config.project_instructions_path,
+        context_max_tokens=config.context_max_tokens,
     )
+
+    # 检测 REPL 模式：--repl 标志，或无参数且 stdin 是终端时默认进入
+    is_repl = repl_enabled or (not user_args and sys.stdin.isatty())
+    if is_repl:
+        try:
+            import readline  # 提供行编辑和上下键历史
+        except ImportError:
+            pass
+        print("Kocor Agent — 输入 exit 或 Ctrl+C 退出")
+        if skillRegistry:
+            skills = skillRegistry.list_skills(enabled_only=True)
+            slash_names = [f"/{s.name}" for s in skills
+                           if s.invoke_strategy in (InvokeStrategy.SLASH, InvokeStrategy.BOTH)]
+            print(f"Slash 命令: {', '.join(sorted(slash_names))}")
+        print()
+        _repl_loop(agent, stream_enabled)
+        return
 
     if user_args:
         user_input = " ".join(user_args)
@@ -180,6 +231,7 @@ def main() -> None:
     if not user_input:
         print("用法: python -m kocor \"你的问题\"")
         print("   或: python -m kocor --stream \"你的问题\"")
+        print("   或: python -m kocor --repl")
         print("   或: echo \"你的问题\" | python -m kocor")
         sys.exit(1)
 

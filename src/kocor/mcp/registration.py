@@ -17,7 +17,7 @@ def _load_global_config(config_path: str) -> tuple[dict, dict]:
         return {}, {}
 
     try:
-        with open(config_path, "r", encoding="utf-8") as f:
+        with open(config_path, "r") as f:
             data = json.load(f)
     except (json.JSONDecodeError, OSError):
         return {}, {}

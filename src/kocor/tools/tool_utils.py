@@ -34,4 +34,5 @@ def sanitize_env() -> dict[str, str]:
     ]
     for key in _sensitive_keys:
         env.pop(key, None)
+    env["PYTHONIOENCODING"] = "utf-8"
     return env

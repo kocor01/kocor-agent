@@ -30,6 +30,15 @@ class Config:
     anthropic_model: str = "claude-sonnet-4-20250514"
     anthropic_base_url: str = ""
 
+    # 上下文管理
+    context_strategy: str = "default"
+    memory_dir: str = ""
+    project_instructions_path: str = "KOCOR.md"
+    context_max_tokens: int = 200_000
+    context_summary_threshold: float = 0.70
+    context_truncate_threshold: float = 0.90
+    preserve_rounds: int = 3
+
 
 
 def load_config() -> Config:
@@ -98,6 +107,42 @@ def load_config() -> Config:
     else:
         skills_dir = "skills"
 
+    context_max_tokens_raw = os.environ.get("KOCOR_CONTEXT_MAX_TOKENS")
+    if context_max_tokens_raw is not None:
+        try:
+            context_max_tokens = int(context_max_tokens_raw)
+        except ValueError:
+            context_max_tokens = 200_000
+    else:
+        context_max_tokens = 200_000
+
+    preserve_rounds_raw = os.environ.get("KOCOR_PRESERVE_ROUNDS")
+    if preserve_rounds_raw is not None:
+        try:
+            preserve_rounds = int(preserve_rounds_raw)
+        except ValueError:
+            preserve_rounds = 3
+    else:
+        preserve_rounds = 3
+
+    context_summary_threshold_raw = os.environ.get("KOCOR_CONTEXT_SUMMARY_THRESHOLD")
+    if context_summary_threshold_raw is not None:
+        try:
+            context_summary_threshold = float(context_summary_threshold_raw)
+        except ValueError:
+            context_summary_threshold = 0.70
+    else:
+        context_summary_threshold = 0.70
+
+    context_truncate_threshold_raw = os.environ.get("KOCOR_CONTEXT_TRUNCATE_THRESHOLD")
+    if context_truncate_threshold_raw is not None:
+        try:
+            context_truncate_threshold = float(context_truncate_threshold_raw)
+        except ValueError:
+            context_truncate_threshold = 0.90
+    else:
+        context_truncate_threshold = 0.90
+
     return Config(
         provider=provider,
         max_iterations=max_iterations,
@@ -111,4 +156,11 @@ def load_config() -> Config:
         anthropic_api_key=os.environ.get("ANTHROPIC_API_KEY", ""),
         anthropic_model=os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-4-20250514"),
         anthropic_base_url=os.environ.get("ANTHROPIC_BASE_URL", ""),
+        context_strategy=os.environ.get("KOCOR_CONTEXT_STRATEGY", "default"),
+        memory_dir=os.environ.get("KOCOR_MEMORY_DIR", ""),
+        project_instructions_path=os.environ.get("KOCOR_PROJECT_INSTRUCTIONS_PATH", "KOCOR.md"),
+        context_max_tokens=context_max_tokens,
+        context_summary_threshold=context_summary_threshold,
+        context_truncate_threshold=context_truncate_threshold,
+        preserve_rounds=preserve_rounds,
     )

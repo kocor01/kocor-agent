@@ -96,7 +96,7 @@ class SkillRegistry:
 
         import json
 
-        with open(config_path, "r", encoding="utf-8") as f:
+        with open(config_path, "r") as f:
             data = json.load(f)
 
         raw_skills: dict = data.get("skills", {})
@@ -210,7 +210,7 @@ class SkillRegistry:
             (name, description, body) 三元组，无法解析时 name=None
         """
         try:
-            text = path.read_text("utf-8")
+            text = path.read_text()
         except Exception:
             return None, "", ""
 

@@ -1,5 +1,7 @@
 """测试配置加载"""
 
+from __future__ import annotations
+
 import os
 
 from kocor.config import Config, load_config
@@ -121,5 +123,64 @@ class TestLoadConfigValidation:
             assert False, "应抛出 ValueError"
         except ValueError:
             pass
+
+
+class TestContextConfig:
+    """测试上下文管理配置"""
+
+    def setup_method(self):
+        for key in [
+            "KOCOR_CONTEXT_STRATEGY",
+            "KOCOR_MEMORY_DIR",
+            "KOCOR_PROJECT_INSTRUCTIONS_PATH",
+            "KOCOR_CONTEXT_MAX_TOKENS",
+            "KOCOR_PRESERVE_ROUNDS",
+        ]:
+            os.environ.pop(key, None)
+
+    def test_default_context_strategy(self):
+        cfg = Config()
+        assert cfg.context_strategy == "default"
+
+    def test_default_memory_dir(self):
+        cfg = Config()
+        assert cfg.memory_dir == ""
+
+    def test_default_project_instructions(self):
+        cfg = Config()
+        assert cfg.project_instructions_path == "KOCOR.md"
+
+    def test_default_context_max_tokens(self):
+        cfg = Config()
+        assert cfg.context_max_tokens == 200_000
+
+    def test_default_preserve_rounds(self):
+        cfg = Config()
+        assert cfg.preserve_rounds == 3
+
+    def test_load_context_strategy_from_env(self):
+        os.environ["KOCOR_CONTEXT_STRATEGY"] = "sliding"
+        cfg = load_config()
+        assert cfg.context_strategy == "sliding"
+
+    def test_load_memory_dir_from_env(self):
+        os.environ["KOCOR_MEMORY_DIR"] = ".kocor/memories"
+        cfg = load_config()
+        assert cfg.memory_dir == ".kocor/memories"
+
+    def test_load_project_instructions_from_env(self):
+        os.environ["KOCOR_PROJECT_INSTRUCTIONS_PATH"] = "CUSTOM.md"
+        cfg = load_config()
+        assert cfg.project_instructions_path == "CUSTOM.md"
+
+    def test_load_context_max_tokens_from_env(self):
+        os.environ["KOCOR_CONTEXT_MAX_TOKENS"] = "100000"
+        cfg = load_config()
+        assert cfg.context_max_tokens == 100_000
+
+    def test_load_preserve_rounds_from_env(self):
+        os.environ["KOCOR_PRESERVE_ROUNDS"] = "5"
+        cfg = load_config()
+        assert cfg.preserve_rounds == 5
 
 

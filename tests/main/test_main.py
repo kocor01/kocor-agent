@@ -1,8 +1,23 @@
 """测试 CLI 入口"""
 
+from contextlib import ExitStack
 from unittest.mock import MagicMock, patch
 
 from kocor.llm_provider.message import FunctionCall, StreamChunk, ToolCall
+
+
+def _mock_cli_main_stack(argv: list[str]) -> ExitStack:
+    """创建 main() 所需的通用 mock 上下文栈。"""
+    stack = ExitStack()
+    stack.enter_context(patch("kocor.__main__.load_dotenv"))
+    mock_cfg = MagicMock(skills_config="", mcp_config="")
+    stack.enter_context(patch("kocor.__main__.load_config", return_value=mock_cfg))
+    stack.enter_context(patch("kocor.__main__.create_llm_client"))
+    stack.enter_context(patch("kocor.__main__.ToolRegistry"))
+    stack.enter_context(patch("kocor.__main__.SkillRegistry"))
+    stack.enter_context(patch("kocor.__main__.register_mcp_tools"))
+    stack.enter_context(patch("sys.argv", argv))
+    return stack
 
 
 class TestCLIParseArgs:
@@ -15,10 +30,13 @@ class TestCLIParseArgs:
 
         mock_parser = MagicMock()
         mock_parser_cls.return_value = mock_parser
-        mock_parser.parse_args.return_value = MagicMock(stream=True, user_input=["hello"])
+        mock_parser.parse_args.return_value = MagicMock(
+            stream=True, repl=False, user_input=["hello"],
+        )
 
-        stream_enabled, user_args = parse_args()
+        stream_enabled, repl_enabled, user_args = parse_args()
         assert stream_enabled is True
+        assert repl_enabled is False
         assert user_args == ["hello"]
 
     @patch("kocor.__main__.argparse.ArgumentParser")
@@ -28,10 +46,13 @@ class TestCLIParseArgs:
 
         mock_parser = MagicMock()
         mock_parser_cls.return_value = mock_parser
-        mock_parser.parse_args.return_value = MagicMock(stream=False, user_input=["hello"])
+        mock_parser.parse_args.return_value = MagicMock(
+            stream=False, repl=False, user_input=["hello"],
+        )
 
-        stream_enabled, user_args = parse_args()
+        stream_enabled, repl_enabled, user_args = parse_args()
         assert stream_enabled is False
+        assert repl_enabled is False
 
 
 class TestCLIMain:
@@ -91,19 +112,24 @@ class TestCLIMain:
     @patch("kocor.__main__.load_config")
     @patch("kocor.__main__.create_llm_client")
     @patch("kocor.__main__.ToolRegistry")
+    @patch("kocor.__main__.SkillRegistry")
     @patch("kocor.__main__.register_mcp_tools")
     @patch("kocor.__main__.Agent")
     @patch("sys.argv", ["kocor"])
-    def test_main_no_input(self, mock_agent_cls, mock_mcp, mock_tools,
-                           mock_llm, mock_config, mock_dotenv):
+    def test_main_no_input(self, mock_agent_cls, mock_mcp, mock_skills,
+                           mock_tools, mock_llm, mock_config, mock_dotenv):
         """测试无输入时打印用法"""
         from kocor.__main__ import main
 
         mock_config.return_value = MagicMock(skills_config="")
         mock_agent_cls.return_value = MagicMock()
 
+        mock_stdin = MagicMock()
+        mock_stdin.read.return_value = ""
+        mock_stdin.isatty.return_value = False
+
         with patch("sys.stdout", new_callable=MagicMock), \
-             patch("sys.stdin", MagicMock(read=lambda: "")), \
+             patch("sys.stdin", mock_stdin), \
              patch("sys.exit") as mock_exit:
             main()
 
@@ -147,15 +173,12 @@ class TestCLIMain:
         assert "工具调用" in output
         assert "read_file" in output
 
-    @patch("kocor.__main__.Agent")
-    @patch("sys.argv", ["kocor", "--stream", "你好"])
-    def test_stream_tool_call_then_final_answer(self, mock_agent_cls):
+    def test_stream_tool_call_then_final_answer(self):
         """测试工具调用后继续输出最终答案"""
         from kocor.__main__ import main
 
         mock_agent = MagicMock()
         mock_agent.stream.return_value = iter([
-            # 第一轮: 文本 + 工具调用
             StreamChunk(content="我来"),
             StreamChunk(content="读文件"),
             StreamChunk(
@@ -165,18 +188,18 @@ class TestCLIMain:
                 )],
                 is_final=True,
             ),
-            # 第二轮: 最终答案（无工具调用）
             StreamChunk(content="文件内容是: hello"),
             StreamChunk(is_final=True),
         ])
-        mock_agent_cls.return_value = mock_agent
 
         captured = []
 
         def fake_print(*args, **kwargs):
             captured.append("".join(str(a) for a in args))
 
-        with patch("kocor.__main__.print", side_effect=fake_print):
+        with _mock_cli_main_stack(["kocor", "--stream", "你好"]), \
+             patch("kocor.__main__.Agent", return_value=mock_agent), \
+             patch("kocor.__main__.print", side_effect=fake_print):
             main()
 
         output = "".join(captured)
@@ -190,12 +213,21 @@ class TestCLIMain:
 class TestCLIReasoning:
     """测试 CLI 流式模式下 reasoning 输出"""
 
+    @patch("kocor.__main__.load_dotenv")
+    @patch("kocor.__main__.load_config")
+    @patch("kocor.__main__.create_llm_client")
+    @patch("kocor.__main__.ToolRegistry")
+    @patch("kocor.__main__.SkillRegistry")
+    @patch("kocor.__main__.register_mcp_tools")
     @patch("kocor.__main__.Agent")
     @patch("sys.argv", ["kocor", "--stream", "你好"])
-    def test_stream_prints_reasoning(self, mock_agent_cls):
+    def test_stream_prints_reasoning(self, mock_agent_cls, mock_mcp,
+                                     mock_skills, mock_tools, mock_llm,
+                                     mock_config, mock_dotenv):
         """测试流式模式下 reasoning 内容输出"""
         from kocor.__main__ import main
 
+        mock_config.return_value = MagicMock(skills_config="")
         mock_agent = MagicMock()
         mock_agent.stream.return_value = iter([
             StreamChunk(content="让我"),
@@ -224,50 +256,54 @@ class TestCLIReasoning:
         assert "首先我需要分析问题..." in output
 
 
+_CLI_MAIN_MOCKS = [
+    patch("kocor.__main__.load_dotenv"),
+    patch("kocor.__main__.load_config"),
+    patch("kocor.__main__.create_llm_client"),
+    patch("kocor.__main__.ToolRegistry"),
+    patch("kocor.__main__.SkillRegistry"),
+    patch("kocor.__main__.register_mcp_tools"),
+    patch("kocor.__main__.Agent"),
+]
+
+
 class TestCLIFormattedOutput:
     """测试 CLI 格式化输出"""
 
-    @patch("kocor.__main__.Agent")
-    @patch("sys.argv", ["kocor", "--stream", "读文件"])
-    def test_stream_prints_tool_result(self, mock_agent_cls):
+    def test_stream_prints_tool_result(self):
         """测试工具结果格式化输出"""
         from kocor.__main__ import main
         from kocor.llm_provider.message import ToolResult
 
         mock_agent = MagicMock()
         mock_agent.stream.return_value = iter([
-            # 第 1 轮: 工具调用
             StreamChunk(tool_calls=[ToolCall(
                 id="call_1",
                 function=FunctionCall(name="read_file", arguments='{"path": ".env"}'),
             )], is_final=True),
-            # 工具结果（Agent 内部 yield）
             StreamChunk(tool_result=ToolResult(
                 tool_call_id="call_1",
                 content="KOCOR_PROVIDER=anthropic\nOPENAI_API_KEY=xxx",
             ), is_final=True),
-            # 第 2 轮: 最终答案
             StreamChunk(content="文件内容是: KOCOR_PROVIDER=anthropic", is_final=True),
         ])
-        mock_agent_cls.return_value = mock_agent
 
         captured = []
 
         def fake_print(*args, **kwargs):
             captured.append("".join(str(a) for a in args))
 
-        with patch("kocor.__main__.print", side_effect=fake_print):
+        with _mock_cli_main_stack(["kocor", "--stream", "读文件"]), \
+             patch("kocor.__main__.Agent", return_value=mock_agent), \
+             patch("kocor.__main__.print", side_effect=fake_print):
             main()
 
         output = "".join(captured)
-        # 工具结果现在在"🔧 工具调用"区块下方
         assert "工具调用" in output
         assert "KOCOR_PROVIDER=anthropic" in output
         assert "read_file" in output
 
-    @patch("kocor.__main__.Agent")
-    @patch("sys.argv", ["kocor", "--stream", "读文件"])
-    def test_stream_round_header(self, mock_agent_cls):
+    def test_stream_round_header(self):
         """测试轮次标题格式"""
         from kocor.__main__ import main
 
@@ -275,23 +311,22 @@ class TestCLIFormattedOutput:
         mock_agent.stream.return_value = iter([
             StreamChunk(content="答案是42", is_final=True),
         ])
-        mock_agent_cls.return_value = mock_agent
 
         captured = []
 
         def fake_print(*args, **kwargs):
             captured.append("".join(str(a) for a in args))
 
-        with patch("kocor.__main__.print", side_effect=fake_print):
+        with _mock_cli_main_stack(["kocor", "--stream", "读文件"]), \
+             patch("kocor.__main__.Agent", return_value=mock_agent), \
+             patch("kocor.__main__.print", side_effect=fake_print):
             main()
 
         output = "".join(captured)
         assert "第 1 次请求" in output
         assert "──" in output
 
-    @patch("kocor.__main__.Agent")
-    @patch("sys.argv", ["kocor", "--stream", "读文件"])
-    def test_stream_reasoning_section(self, mock_agent_cls):
+    def test_stream_reasoning_section(self):
         """测试思维链区块格式"""
         from kocor.__main__ import main
 
@@ -300,23 +335,22 @@ class TestCLIFormattedOutput:
             StreamChunk(reasoning="让我思考"),
             StreamChunk(content="答案是42", is_final=True),
         ])
-        mock_agent_cls.return_value = mock_agent
 
         captured = []
 
         def fake_print(*args, **kwargs):
             captured.append("".join(str(a) for a in args))
 
-        with patch("kocor.__main__.print", side_effect=fake_print):
+        with _mock_cli_main_stack(["kocor", "--stream", "读文件"]), \
+             patch("kocor.__main__.Agent", return_value=mock_agent), \
+             patch("kocor.__main__.print", side_effect=fake_print):
             main()
 
         output = "".join(captured)
         assert "思维过程" in output
         assert "让我思考" in output
 
-    @patch("kocor.__main__.Agent")
-    @patch("sys.argv", ["kocor", "--stream", "读文件"])
-    def test_stream_content_section(self, mock_agent_cls):
+    def test_stream_content_section(self):
         """测试结果输出区块格式"""
         from kocor.__main__ import main
 
@@ -324,23 +358,22 @@ class TestCLIFormattedOutput:
         mock_agent.stream.return_value = iter([
             StreamChunk(content="答案是42", is_final=True),
         ])
-        mock_agent_cls.return_value = mock_agent
 
         captured = []
 
         def fake_print(*args, **kwargs):
             captured.append("".join(str(a) for a in args))
 
-        with patch("kocor.__main__.print", side_effect=fake_print):
+        with _mock_cli_main_stack(["kocor", "--stream", "读文件"]), \
+             patch("kocor.__main__.Agent", return_value=mock_agent), \
+             patch("kocor.__main__.print", side_effect=fake_print):
             main()
 
         output = "".join(captured)
         assert "回答" in output
         assert "答案是42" in output
 
-    @patch("kocor.__main__.Agent")
-    @patch("sys.argv", ["kocor", "--stream", "读文件"])
-    def test_stream_tool_call_section(self, mock_agent_cls):
+    def test_stream_tool_call_section(self):
         """测试工具调用区块格式"""
         from kocor.__main__ import main
 
@@ -354,29 +387,27 @@ class TestCLIFormattedOutput:
                 is_final=True,
             ),
         ])
-        mock_agent_cls.return_value = mock_agent
 
         captured = []
 
         def fake_print(*args, **kwargs):
             captured.append("".join(str(a) for a in args))
 
-        with patch("kocor.__main__.print", side_effect=fake_print):
+        with _mock_cli_main_stack(["kocor", "--stream", "读文件"]), \
+             patch("kocor.__main__.Agent", return_value=mock_agent), \
+             patch("kocor.__main__.print", side_effect=fake_print):
             main()
 
         output = "".join(captured)
         assert "工具调用" in output
         assert "read_file" in output
 
-    @patch("kocor.__main__.Agent")
-    @patch("sys.argv", ["kocor", "--stream", "读文件"])
-    def test_stream_multiple_rounds(self, mock_agent_cls):
+    def test_stream_multiple_rounds(self):
         """测试多轮请求标题"""
         from kocor.__main__ import main
 
         mock_agent = MagicMock()
         mock_agent.stream.return_value = iter([
-            # 第 1 轮: 工具调用
             StreamChunk(content="我来"),
             StreamChunk(
                 tool_calls=[ToolCall(
@@ -385,18 +416,18 @@ class TestCLIFormattedOutput:
                 )],
                 is_final=True,
             ),
-            # 第 2 轮: 最终答案
             StreamChunk(content="文件内容是: hello"),
             StreamChunk(is_final=True),
         ])
-        mock_agent_cls.return_value = mock_agent
 
         captured = []
 
         def fake_print(*args, **kwargs):
             captured.append("".join(str(a) for a in args))
 
-        with patch("kocor.__main__.print", side_effect=fake_print):
+        with _mock_cli_main_stack(["kocor", "--stream", "读文件"]), \
+             patch("kocor.__main__.Agent", return_value=mock_agent), \
+             patch("kocor.__main__.print", side_effect=fake_print):
             main()
 
         output = "".join(captured)

@@ -7,6 +7,11 @@ from __future__ import annotations
 
 from typing import Iterator
 
+from kocor.context.builder import ContextBuilder
+from kocor.context.memory import MemoryManager
+from kocor.context.models import ContextStrategy
+from kocor.context.summarizer import HistorySummarizer
+from kocor.context.truncator import ToolOutputTruncator
 from kocor.llm_provider.llm_client import LLMClient
 from kocor.llm_provider.message import Message, StreamChunk, ToolCall
 from kocor.skill.models import InvokeStrategy, SkillContext, SkillType
@@ -42,6 +47,11 @@ class Agent:
         tools: 工具注册表
         system_prompt: 系统提示词
         max_iterations: 最大迭代次数
+        skills: 技能注册表（slash command 支持）
+        context_strategy: 上下文管理策略
+        context_max_tokens: 上下文最大 token 数
+        context_builder: 上下文构建器，负责组装多层级 system prompt 和会话消息
+        truncator: 工具输出截断器
     """
 
     def __init__(
@@ -51,12 +61,68 @@ class Agent:
         system_prompt: str | None = None,
         max_iterations: int = 20,
         skills: SkillRegistry | None = None,
+        # 上下文管理参数
+        memory_dir: str | None = None,
+        context_strategy: str = "default",
+        project_instructions_path: str = "KOCOR.md",
+        context_max_tokens: int = 200_000,
     ):
         self.llm = llm
         self.tools = tools or ToolRegistry()
         self.system_prompt = system_prompt or DEFAULT_SYSTEM_PROMPT
         self.max_iterations = max_iterations
         self.skills = skills
+
+        # 上下文管理
+        self.context_strategy = self._parse_strategy(context_strategy)
+        self.context_max_tokens = context_max_tokens
+        self.truncator = ToolOutputTruncator()
+
+        # 创建 MemoryManager（可选）
+        memory: MemoryManager | None = None
+        if memory_dir:
+            memory = MemoryManager(memory_dir=memory_dir)
+
+        # 创建 HistorySummarizer（可选，用于 SLIDING_WINDOW / AGGRESSIVE 策略）
+        summarizer: HistorySummarizer | None = None
+        if self.context_strategy != ContextStrategy.DEFAULT:
+            summarizer = HistorySummarizer(llm=llm)
+
+        # 创建 ContextBuilder
+        self.context_builder = ContextBuilder(
+            identity_prompt=self.system_prompt,
+            tools=self.tools,
+            memory=memory,
+            project_instructions_path=project_instructions_path,
+            max_tokens=context_max_tokens,
+            summarizer=summarizer,
+        )
+
+    @staticmethod
+    def _parse_strategy(value: str) -> ContextStrategy:
+        """将字符串策略名解析为 ContextStrategy 枚举。"""
+        mapping = {
+            "default": ContextStrategy.DEFAULT,
+            "sliding": ContextStrategy.SLIDING_WINDOW,
+            "aggressive": ContextStrategy.AGGRESSIVE,
+        }
+        return mapping.get(value.lower(), ContextStrategy.DEFAULT)
+
+    def _build_initial_messages(self, user_input: str) -> list[Message]:
+        """使用 ContextBuilder 构建初始消息列表。
+
+        Args:
+            user_input: 用户输入
+
+        Returns:
+            初始消息列表（含多层 system prompt + 策略处理后的历史 + 用户输入）
+        """
+        context = self.context_builder.build_context(
+            user_input=user_input,
+            session_history=[],
+            strategy=self.context_strategy,
+        )
+        return context.session_messages
 
     def run(self, user_input: str) -> str:
         """执行一次完整的 Agent 循环。
@@ -71,10 +137,7 @@ class Agent:
         if self.skills and user_input.startswith("/"):
             return self._handle_slash_command(user_input)
 
-        messages: list[Message] = [
-            Message(role="system", content=self.system_prompt),
-            Message(role="user", content=user_input),
-        ]
+        messages = self._build_initial_messages(user_input)
         return self._run_with_messages(messages)
 
     def stream(self, user_input: str) -> Iterator[StreamChunk]:
@@ -92,10 +155,7 @@ class Agent:
             yield StreamChunk(content=result, is_final=True)
             return
 
-        messages: list[Message] = [
-            Message(role="system", content=self.system_prompt),
-            Message(role="user", content=user_input),
-        ]
+        messages = self._build_initial_messages(user_input)
 
         for _ in range(self.max_iterations):
             # 1. 流式调用 LLM
@@ -137,9 +197,11 @@ class Agent:
                     # 3. 执行工具（阻塞，不 yield），执行后 yield 结果块
                     for tool_call in accumulated_tool_calls:
                         result = self.tools.execute(tool_call)
+                        # 截断过长的工具输出
+                        truncated_content = self.truncator.truncate(result.content)
                         messages.append(Message(
                             role="tool",
-                            content=result.content,
+                            content=truncated_content,
                             tool_call_id=result.tool_call_id,
                         ))
                         yield StreamChunk(tool_result=result, is_final=True)
@@ -164,9 +226,11 @@ class Agent:
 
             for tool_call in response.tool_calls:
                 result = self.tools.execute(tool_call)
+                # 截断过长的工具输出
+                truncated_content = self.truncator.truncate(result.content)
                 messages.append(Message(
                     role="tool",
-                    content=result.content,
+                    content=truncated_content,
                     tool_call_id=result.tool_call_id,
                 ))
 
