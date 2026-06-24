@@ -15,7 +15,7 @@ from kocor.context.models import (
 )
 from kocor.context.summarizer import HistorySummarizer
 from kocor.context.token_counter import TokenCounter
-from kocor.context.truncator import ToolOutputTruncator
+from kocor.tools.truncate import ToolOutputTruncator
 
 from kocor.context.sliding_window import SlidingWindowStrategy
 from kocor.context.strategies import apply_context_strategy

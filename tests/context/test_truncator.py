@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from kocor.context.truncator import ToolOutputTruncator
+from kocor.tools.truncate import ToolOutputTruncator
 from kocor.llm_provider.message import Message
 
 
@@ -76,10 +76,7 @@ class TestToolOutputTruncator:
 
     def test_custom_config(self):
         """自定义截断配置。"""
-        from kocor.mcp.truncate import TruncateConfig
-
-        strict = TruncateConfig(max_bytes=100, max_lines=10, max_line_length=20)
-        truncator = ToolOutputTruncator(config=strict)
+        truncator = ToolOutputTruncator(max_bytes=100, max_lines=10, max_line_length=20)
 
         long_text = "hello world this is a long line\n" * 20
         result = truncator.truncate(long_text)

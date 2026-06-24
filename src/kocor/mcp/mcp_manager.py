@@ -26,14 +26,7 @@ class McpManager:
             connected_clients: 用于关闭的客户端列表
         """
         servers = load_mcp_servers(self.config_path)
-        tool_output_cfg, permissions_cfg = self._load_global_config()
-
-        from kocor.mcp.truncate import TruncateConfig
-        truncate_cfg = TruncateConfig(
-            max_bytes=tool_output_cfg.get("max_bytes", 50_000),
-            max_lines=tool_output_cfg.get("max_lines", 2_000),
-            max_line_length=tool_output_cfg.get("max_line_length", 2_000),
-        )
+        permissions_cfg = self._load_permissions()
 
         for name, cfg in servers.items():
             try:
@@ -51,9 +44,10 @@ class McpManager:
 
                 for t in tool_list:
                     full_name = f"mcp_{prefix}_{sanitize_server_name(t['name'])}"
-                    handler = self._build_handler(
-                        client, t["name"], truncate_cfg,
-                    )
+
+                    def handler(_tool_name=t["name"], **kwargs):
+                        return client.call_tool(_tool_name, kwargs)
+
                     self.tool_manager.register(
                         name=full_name,
                         description=t.get("description", ""),
@@ -79,24 +73,16 @@ class McpManager:
             except Exception:
                 pass
 
-    def _load_global_config(self) -> tuple[dict, dict]:
+    def _load_permissions(self) -> dict:
         if not self.config_path or not os.path.exists(self.config_path):
-            return {}, {}
+            return {}
 
         try:
             with open(self.config_path, "r", encoding="utf-8") as f:
                 data = json.load(f)
         except (json.JSONDecodeError, OSError):
-            return {}, {}
+            return {}
 
-        return data.get("tool_output", {}), data.get("permissions", {})
+        return data.get("permissions", {})
 
-    @staticmethod
-    def _build_handler(client, tool_name, truncate_cfg):
-        from kocor.mcp.truncate import truncate_output
-
-        def handler(**kwargs):
-            raw = client.call_tool(tool_name, kwargs)
-            return truncate_output(raw, truncate_cfg)
-
-        return handler
+    

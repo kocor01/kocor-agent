@@ -26,12 +26,6 @@
     }
   },
 
-  "tool_output": {
-    "max_bytes": 50000,
-    "max_lines": 2000,
-    "max_line_length": 2000
-  },
-
   "permissions": {
     "fs": {
       "safe": ["mcp_fs_read_file", "mcp_fs_read_text_file"],

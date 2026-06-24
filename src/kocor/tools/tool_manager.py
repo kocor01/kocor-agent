@@ -7,6 +7,7 @@ import os
 from typing import Callable
 
 from kocor.tools.definitions import ToolDefinition
+from kocor.tools.truncate import ToolOutputTruncator
 from kocor.llm_provider.message import ToolCall, ToolResult
 from kocor.tools.permission import PermissionManager
 
@@ -109,7 +110,8 @@ class ToolManager:
 
         try:
             result = self._handlers[name](**args)
-            return ToolResult(tool_call_id=tool_call.id, content=str(result))
+            truncated = ToolOutputTruncator().truncate(str(result))
+            return ToolResult(tool_call_id=tool_call.id, content=truncated)
         except PermissionError as e:
             return ToolResult(
                 tool_call_id=tool_call.id,

@@ -4,15 +4,14 @@ from kocor.mcp.client import MCPClient
 from kocor.mcp.config import MCPConfig, load_mcp_servers, sanitize_server_name
 from kocor.mcp.event_loop import MCPError
 from kocor.mcp.mcp_manager import McpManager
-from kocor.mcp.truncate import TruncateConfig, truncate_output
+from kocor.tools.truncate import ToolOutputTruncator
 
 __all__ = [
     "MCPClient",
     "MCPConfig",
     "MCPError",
     "McpManager",
-    "TruncateConfig",
+    "ToolOutputTruncator",
     "load_mcp_servers",
     "sanitize_server_name",
-    "truncate_output",
 ]
