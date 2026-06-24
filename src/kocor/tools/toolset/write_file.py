@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 
+from kocor.harness.permission import PermissionManager
 from kocor.tools.tool_utils import resolve_safe_path
 
 
@@ -12,7 +13,7 @@ class WriteFile:
 
     NAME = "write_file"
     DESCRIPTION = "写入文件内容"
-    SAFETY_LEVEL = "dangerous"
+    SAFETY_LEVEL = PermissionManager.SAFETY_DANGEROUS
     PARAMETERS = {
         "type": "object",
         "properties": {

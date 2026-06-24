@@ -8,6 +8,7 @@ from typing import Callable
 
 from kocor.tools.definitions import ToolDefinition
 from kocor.llm_provider.message import ToolCall, ToolResult
+from kocor.harness.permission import PermissionManager
 
 
 class ToolManager:
@@ -59,7 +60,7 @@ class ToolManager:
         description: str,
         parameters: dict,
         handler: Callable[..., str],
-        safety_level: str = "caution",
+        safety_level: str = PermissionManager.SAFETY_CAUTION,
     ) -> None:
         """注册工具。
 

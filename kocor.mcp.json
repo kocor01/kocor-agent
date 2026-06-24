@@ -34,15 +34,14 @@
 
   "permissions": {
     "fs": {
-      "policy": "always_allow",
-      "allowed_tools": ["mcp_fs_read_file"]
+      "safe": ["mcp_fs_read_file", "mcp_fs_read_text_file"],
+      "dangerous": ["mcp_fs_write_file"]
     },
     "fetch": {
-      "policy": "always_allow",
-      "allowed_tools": ["mcp_fetch_fetch"]
+      "safe": ["mcp_fetch_fetch"]
     },
     "bing-search": {
-      "policy": "always_allow"
+      "safe": ["mcp_bing_search_bing_search", "mcp_bing_search_crawl_webpage"]
     }
   }
 }

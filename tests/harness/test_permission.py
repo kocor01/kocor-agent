@@ -15,48 +15,48 @@ def _tc(name: str, args: str = "{}") -> ToolCall:
 
 class TestBuiltinToolSafety:
     def test_tool_class_has_safety_level(self):
-        assert ReadFile.SAFETY_LEVEL == "caution"
-        assert WriteFile.SAFETY_LEVEL == "dangerous"
-        assert RunPython.SAFETY_LEVEL == "dangerous"
+        assert ReadFile.SAFETY_LEVEL == PermissionManager.SAFETY_SAFE
+        assert WriteFile.SAFETY_LEVEL == PermissionManager.SAFETY_DANGEROUS
+        assert RunPython.SAFETY_LEVEL == PermissionManager.SAFETY_DANGEROUS
 
     def test_tool_manager_builds_safety_map(self):
         from kocor.tools.tool_manager import ToolManager
         tm = ToolManager()
         tm.register_builtin_tools()
-        assert tm._tools["read_file"].safety_level == "caution"
-        assert tm._tools["write_file"].safety_level == "dangerous"
-        assert tm._tools["run_python"].safety_level == "dangerous"
+        assert tm._tools["read_file"].safety_level == PermissionManager.SAFETY_SAFE
+        assert tm._tools["write_file"].safety_level == PermissionManager.SAFETY_DANGEROUS
+        assert tm._tools["run_python"].safety_level == PermissionManager.SAFETY_DANGEROUS
         assert "unknown_tool" not in tm._tools
 
 
 class TestPermissionManager:
     def test_default_policy(self):
         pm = PermissionManager()
-        assert pm.policy == "default"
+        assert pm.policy == PermissionManager.POLICY_DEFAULT
 
     def test_permissive_policy_allows_safe(self):
-        pm = PermissionManager(policy="permissive")
+        pm = PermissionManager(policy=PermissionManager.POLICY_PERMISSIVE)
         # permissive 策略下 safe/caution 自动允许
         assert pm.check(_tc("read_file")) is True
 
     def test_permissive_policy_allows_unknown(self):
-        pm = PermissionManager(policy="permissive")
+        pm = PermissionManager(policy=PermissionManager.POLICY_PERMISSIVE)
         assert pm.check(_tc("unknown_safe_tool")) is True
 
     def test_permissive_policy_allows_dangerous(self):
-        pm = PermissionManager(policy="permissive")
+        pm = PermissionManager(policy=PermissionManager.POLICY_PERMISSIVE)
         # permissive 策略下全部自动允许，包括 dangerous
         assert pm.check(_tc("run_python")) is True
 
     def test_default_policy_allows_safe(self):
-        pm = PermissionManager(policy="default")
+        pm = PermissionManager(policy=PermissionManager.POLICY_DEFAULT)
         # safe 工具不在映射表中，未知工具默认 "caution"
         # 在 default 策略下，caution 和 dangerous 都需询问 -> 拒绝
         assert pm.check(_tc("read_file")) is False  # caution, no stdin -> denied
 
     def test_safe_tool_auto_allowed_in_default(self, monkeypatch):
         # Monkeypatch 安全等级为 "safe"
-        pm = PermissionManager(policy="default")
+        pm = PermissionManager(policy=PermissionManager.POLICY_DEFAULT)
         assert pm.check(_tc("read_file")) is False  # no stdin -> denied for caution
 
     def test_always_allow_always_passes(self):
@@ -86,24 +86,24 @@ class TestPermissionManager:
         assert pm.check(_tc("write_file")) is False
 
     def test_always_allow_overrides_policy(self):
-        pm = PermissionManager(policy="strict", always_allow={"read_file"})
+        pm = PermissionManager(policy=PermissionManager.POLICY_STRICT, always_allow={"read_file"})
         assert pm.check(_tc("read_file")) is True
 
     def test_strict_policy_denies_without_stdin(self):
-        pm = PermissionManager(policy="strict")
-        # strict 策略下 safe 自动，caution/dangerous 需询问 -> 拒绝
+        pm = PermissionManager(policy=PermissionManager.POLICY_STRICT)
+        # strict 策略下 safe 自动，caution 需询问，dangerous 直接拒绝
         assert pm.check(_tc("read_file")) is False
         assert pm.check(_tc("run_python")) is False
 
     def test_config_update(self):
-        pm = PermissionManager(policy="default")
-        pm.update_config({"policy": "strict", "always_allow": ["read_file"]})
-        assert pm.policy == "strict"
+        pm = PermissionManager(policy=PermissionManager.POLICY_DEFAULT)
+        pm.update_config({"policy": PermissionManager.POLICY_STRICT, "always_allow": ["read_file"]})
+        assert pm.policy == PermissionManager.POLICY_STRICT
         assert "read_file" in pm._always_allow
 
-    def test_invalid_policy_falls_back_to_default(self):
+    def test_invalid_policy_stored_as_is(self):
         pm = PermissionManager(policy="invalid")
-        assert pm.policy == "default"
+        assert pm.policy == "invalid"
 
     def test_clear_cache(self):
         pm = PermissionManager()

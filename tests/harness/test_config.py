@@ -3,6 +3,7 @@
 import dataclasses
 
 from kocor.harness.config import HarnessConfig
+from kocor.harness.permission import PermissionManager
 
 
 def _update_from_dict(config, data):
@@ -15,17 +16,17 @@ class TestHarnessConfig:
     def test_default_values(self):
         config = HarnessConfig()
         assert config.max_iterations == 20
-        assert config.permission_policy == "default"
+        assert config.permission_policy == PermissionManager.POLICY_DEFAULT
         assert config.context_max_tokens == 200_000
         assert config.sandbox_timeout == 30
 
     def test_custom_values(self):
         config = HarnessConfig(
             max_iterations=10,
-            permission_policy="strict",
+            permission_policy=PermissionManager.POLICY_STRICT,
         )
         assert config.max_iterations == 10
-        assert config.permission_policy == "strict"
+        assert config.permission_policy == PermissionManager.POLICY_STRICT
 
     def test_sandbox_defaults(self):
         config = HarnessConfig()
@@ -55,4 +56,4 @@ class TestHarnessConfig:
         config = HarnessConfig(max_iterations=15)
         d = dataclasses.asdict(config)
         assert d["max_iterations"] == 15
-        assert d["permission_policy"] == "default"
+        assert d["permission_policy"] == PermissionManager.POLICY_DEFAULT

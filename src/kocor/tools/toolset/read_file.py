@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 
+from kocor.harness.permission import PermissionManager
 from kocor.tools.tool_utils import resolve_safe_path
 
 
@@ -12,7 +13,7 @@ class ReadFile:
 
     NAME = "read_file"
     DESCRIPTION = "读取文件内容"
-    SAFETY_LEVEL = "caution"
+    SAFETY_LEVEL = PermissionManager.SAFETY_SAFE
     PARAMETERS = {
         "type": "object",
         "properties": {

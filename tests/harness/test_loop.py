@@ -77,7 +77,7 @@ class TestAgentLoop:
         agent = Agent(
             llm=llm,
             tool_manager=MockToolRegistry(),
-            permission_mgr=PermissionManager(policy="permissive"),
+            permission_mgr=PermissionManager(policy=PermissionManager.POLICY_PERMISSIVE),
         )
         result = agent.run("hi")
         assert result == "Hello! How can I help?"
@@ -96,7 +96,7 @@ class TestAgentLoop:
         agent = Agent(
             llm=llm,
             tool_manager=MockToolRegistry(),
-            permission_mgr=PermissionManager(policy="permissive"),
+            permission_mgr=PermissionManager(policy=PermissionManager.POLICY_PERMISSIVE),
         )
         result = agent.run("read test.txt")
         assert "hello" in result
@@ -118,7 +118,7 @@ class TestAgentLoop:
         agent = Agent(
             llm=llm,
             tool_manager=MockToolRegistry(),
-            permission_mgr=PermissionManager(policy="permissive"),
+            permission_mgr=PermissionManager(policy=PermissionManager.POLICY_PERMISSIVE),
         )
         result = agent.run("read both")
         assert "Both files read." in result
@@ -134,7 +134,7 @@ class TestAgentLoop:
             ),
             Message(role="assistant", content="I see it was denied."),
         ])
-        pm = PermissionManager(policy="strict", always_ask={"write_file"})
+        pm = PermissionManager(policy=PermissionManager.POLICY_STRICT, always_ask={"write_file"})
         agent = Agent(
             llm=llm,
             tool_manager=MockToolRegistry(),
@@ -158,7 +158,7 @@ class TestAgentLoop:
         agent = Agent(
             llm=llm,
             tool_manager=MockToolRegistry(),
-            permission_mgr=PermissionManager(policy="permissive"),
+            permission_mgr=PermissionManager(policy=PermissionManager.POLICY_PERMISSIVE),
             budget=budget,
         )
         result = agent.run("do work")
@@ -178,7 +178,7 @@ class TestAgentLoop:
         agent = Agent(
             llm=llm,
             tool_manager=MockToolRegistry(),
-            permission_mgr=PermissionManager(policy="permissive"),
+            permission_mgr=PermissionManager(policy=PermissionManager.POLICY_PERMISSIVE),
         )
         agent.run("read")
         history = agent.get_tool_history()
@@ -199,7 +199,7 @@ class TestAgentLoop:
         agent = Agent(
             llm=llm,
             tool_manager=MockToolRegistry(),
-            permission_mgr=PermissionManager(policy="permissive"),
+            permission_mgr=PermissionManager(policy=PermissionManager.POLICY_PERMISSIVE),
             event_emitter=emitter,
         )
         agent.run("test")
@@ -228,7 +228,7 @@ class TestAgentLoop:
         agent = Agent(
             llm=llm,
             tool_manager=MockToolRegistry(),
-            permission_mgr=PermissionManager(policy="permissive"),
+            permission_mgr=PermissionManager(policy=PermissionManager.POLICY_PERMISSIVE),
             hook_manager=hook_manager,
         )
         agent.run("read")
@@ -255,7 +255,7 @@ class TestAgentLoop:
         agent = Agent(
             llm=llm,
             tool_manager=ErrorToolRegistry(),
-            permission_mgr=PermissionManager(policy="permissive", always_allow={"run_python"}),
+            permission_mgr=PermissionManager(policy=PermissionManager.POLICY_PERMISSIVE, always_allow={"run_python"}),
         )
         result = agent.run("run")
         assert "error" in result.lower() or "Error" in result or "There was" in result
@@ -267,7 +267,7 @@ class TestAgentLoop:
         agent = Agent(
             llm=llm,
             tool_manager=MockToolRegistry(),
-            permission_mgr=PermissionManager(policy="permissive"),
+            permission_mgr=PermissionManager(policy=PermissionManager.POLICY_PERMISSIVE),
         )
         chunks = list(agent.stream("test"))
         assert len(chunks) > 0
@@ -287,7 +287,7 @@ class TestAgentLoop:
         agent = Agent(
             llm=llm,
             tool_manager=MockToolRegistry(),
-            permission_mgr=PermissionManager(policy="permissive"),
+            permission_mgr=PermissionManager(policy=PermissionManager.POLICY_PERMISSIVE),
         )
         chunks = list(agent.stream("test"))
         assert len(chunks) > 0
@@ -306,7 +306,7 @@ class TestAgentLoop:
         agent = Agent(
             llm=llm,
             tool_manager=MockToolRegistry(),
-            permission_mgr=PermissionManager(policy="permissive"),
+            permission_mgr=PermissionManager(policy=PermissionManager.POLICY_PERMISSIVE),
             budget=budget,
         )
         result = agent.run("do")
@@ -335,7 +335,7 @@ class TestAgentLoop:
         agent = Agent(
             llm=llm,
             tool_manager=LongResultToolRegistry(),
-            permission_mgr=PermissionManager(policy="permissive"),
+            permission_mgr=PermissionManager(policy=PermissionManager.POLICY_PERMISSIVE),
         )
         agent.run("read big file")
         tool_messages = [m for m in agent._messages if m.role == "tool"]
@@ -348,7 +348,7 @@ class TestAgentLoop:
         agent = Agent(
             llm=llm,
             tool_manager=MockToolRegistry(),
-            permission_mgr=PermissionManager(policy="permissive"),
+            permission_mgr=PermissionManager(policy=PermissionManager.POLICY_PERMISSIVE),
         )
         result = agent.run("")
         assert result is not None

@@ -9,6 +9,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Callable
 
+from kocor.harness.permission import PermissionManager
+
 from kocor.tools.tool_manager import ToolManager
 
 
@@ -62,6 +64,7 @@ class SkillDefinition:
     enabled: bool = True
     version: str = "1.0.0"
     author: str = ""
+    safety_level: str = PermissionManager.SAFETY_CAUTION
 
 
 @dataclass

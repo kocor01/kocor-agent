@@ -83,7 +83,7 @@ class Agent:
         self.skill_manager = skill_manager
 
         # Harness 组件
-        self.permission_mgr = permission_mgr or PermissionManager(policy="permissive")
+        self.permission_mgr = permission_mgr or PermissionManager(policy=PermissionManager.POLICY_PERMISSIVE)
         self.hook_manager = hook_manager or HookManager()
         self.event_emitter = event_emitter or EventEmitter()
         self.budget = budget or IterationBudget(iterations_limit=max_iterations)
@@ -270,7 +270,7 @@ class Agent:
             ))
             return Message(
                 role="tool",
-                content="[Permission Denied] 用户拒绝了此工具调用",
+                content="[Permission Denied] 用户拒绝了此工具调用，请勿再尝试使用此工具。",
                 tool_call_id=tool_call.id,
             )
 

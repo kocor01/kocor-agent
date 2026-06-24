@@ -5,6 +5,8 @@
 
 from __future__ import annotations
 
+from kocor.harness.permission import PermissionManager
+
 
 class ToolDefinition:
     """工具定义，用于 JSON Schema 描述。
@@ -16,7 +18,7 @@ class ToolDefinition:
         safety_level: 安全等级
     """
 
-    def __init__(self, name: str, description: str, parameters: dict, safety_level: str = "caution"):
+    def __init__(self, name: str, description: str, parameters: dict, safety_level: str = PermissionManager.SAFETY_CAUTION):
         self.name = name
         self.description = description
         self.parameters = parameters

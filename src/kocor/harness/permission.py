@@ -6,8 +6,6 @@
 
 import json
 
-VALID_POLICIES = {"permissive", "default", "strict"}
-
 
 class PermissionManager:
     """所有工具类型的统一权限管理器。
@@ -17,19 +15,34 @@ class PermissionManager:
     - default: safe 自动允许，caution/dangerous 询问一次
     - strict: 全部检查，dangerous 默认拒绝
 
+    安全等级（每个工具注册时指定）：
+    - safe:      只读操作，无害（如读文件），所有策略下均自动放行
+    - caution:   有潜在影响的操作（如目录列举），default/strict 会询问
+    - dangerous: 高风险操作（如写文件、执行代码），strict 下默认拒绝
+
     会话级别的缓存避免同一工具的重复提示。
     """
 
+    # 权限策略常量
+    POLICY_PERMISSIVE = "permissive"
+    POLICY_DEFAULT = "default"
+    POLICY_STRICT = "strict"
+
+    # 安全等级常量
+    SAFETY_SAFE = "safe"
+    SAFETY_CAUTION = "caution"
+    SAFETY_DANGEROUS = "dangerous"
+
     def __init__(
         self,
-        policy: str = "default",
+        policy: str = POLICY_DEFAULT,
         always_allow: set[str] | None = None,
         always_ask: set[str] | None = None,
         cache_enabled: bool = True,
         cache_max_size: int = 50,
         tool_manager=None,
     ):
-        self.policy = policy if policy in VALID_POLICIES else "default"
+        self.policy = policy
         self._always_allow = always_allow or set()
         self._always_ask = always_ask or set()
         self._cache: set[str] = set()
@@ -59,18 +72,20 @@ class PermissionManager:
             return self._ask_user(tool_name, args)
 
         # 4. 基于策略的决策
-        safety = getattr(self._tool_manager._tools.get(tool_name), 'safety_level', 'caution') if self._tool_manager else "caution"
+        safety = getattr(self._tool_manager._tools.get(tool_name), 'safety_level', PermissionManager.SAFETY_CAUTION) if self._tool_manager else PermissionManager.SAFETY_CAUTION
 
-        if self.policy == "permissive":
+        if self.policy == PermissionManager.POLICY_PERMISSIVE:
             return True
 
-        if self.policy == "strict":
-            if safety == "safe":
+        if self.policy == PermissionManager.POLICY_STRICT:
+            if safety == PermissionManager.SAFETY_SAFE:
                 return True
+            if safety == PermissionManager.SAFETY_DANGEROUS:
+                return False
             return self._ask_user(tool_name, args)
 
         # default 策略
-        if safety == "safe":
+        if safety == PermissionManager.SAFETY_SAFE:
             return True
         return self._ask_user(tool_name, args)
 
@@ -111,7 +126,7 @@ class PermissionManager:
         """从字典更新配置（例如解析后的 JSON）。"""
         if "policy" in config:
             policy = config["policy"]
-            self.policy = policy if policy in VALID_POLICIES else "default"
+            self.policy = policy
         if "always_allow" in config:
             self._always_allow = set(config["always_allow"])
         if "always_ask" in config:

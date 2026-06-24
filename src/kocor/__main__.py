@@ -213,11 +213,11 @@ def main() -> None:
     config = load_config()
 
     # Determine permission policy from CLI flags
-    permission_policy = "default"
+    permission_policy = PermissionManager.POLICY_DEFAULT
     if args.strict:
-        permission_policy = "strict"
+        permission_policy = PermissionManager.POLICY_STRICT
     elif args.permissive:
-        permission_policy = "permissive"
+        permission_policy = PermissionManager.POLICY_PERMISSIVE
 
     llm = LlmManager.create_llm_client(config)
 

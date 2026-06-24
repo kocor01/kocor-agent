@@ -2,6 +2,8 @@
 
 from dataclasses import dataclass
 
+from kocor.harness.permission import PermissionManager
+
 
 @dataclass
 class HarnessConfig:
@@ -18,7 +20,7 @@ class HarnessConfig:
     max_total_time: int = 300
 
     # 权限
-    permission_policy: str = "default"  # permissive | default | strict
+    permission_policy: str = PermissionManager.POLICY_DEFAULT  # permissive | default | strict
                                         # permissive: safe/caution 自动允许，dangerous 询问一次
                                         # default: safe 自动允许，caution/dangerous 询问一次
                                         # strict: 全部检查，dangerous 默认拒绝

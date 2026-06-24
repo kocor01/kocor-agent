@@ -17,6 +17,7 @@ from kocor.skill.models import (
     SkillType,
 )
 from kocor.tools.tool_manager import ToolManager
+from kocor.harness.permission import PermissionManager
 
 
 class SkillManager:
@@ -147,6 +148,7 @@ class SkillManager:
                 enabled=cfg.get("enabled", True),
                 version=cfg.get("version", "1.0.0"),
                 author=cfg.get("author", ""),
+                safety_level=cfg.get("safety_level", PermissionManager.SAFETY_CAUTION),
             )
             self.register(skill)
 
@@ -324,6 +326,7 @@ class SkillManager:
                     enabled=getattr(mod, "ENABLED", True),
                     version=getattr(mod, "VERSION", "1.0.0"),
                     author=getattr(mod, "AUTHOR", ""),
+                    safety_level=getattr(mod, "SAFETY_LEVEL", PermissionManager.SAFETY_CAUTION),
                 )
                 self.register(skill)
         finally:
@@ -439,6 +442,7 @@ class SkillManager:
                 name=f"skill_{skill.name}",
                 description=skill.description,
                 parameters=self._build_tool_parameters(skill),
+                safety_level=skill.safety_level,
                 handler=lambda user_input="", _s=skill: self._tool_wrapper(_s, user_input),
             )
 
@@ -508,6 +512,7 @@ def skill(
             enabled=True,
             version=version,
             author=author,
+            safety_level=PermissionManager.SAFETY_CAUTION,
         )
         func._skill_definition = sd
         return func
