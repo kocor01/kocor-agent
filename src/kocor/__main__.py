@@ -26,7 +26,6 @@ from kocor.tools.tool_manager import ToolManager
 from kocor.harness import IterationBudget
 from kocor.harness.permission import PermissionManager
 from kocor.hook.hook_manager import HookManager
-from kocor.hook.hooks import AuditLogHook
 from kocor.harness.events import EventEmitter
 from kocor.harness.logger import HarnessLogger
 
@@ -232,7 +231,7 @@ def main() -> None:
         policy=permission_policy,
     )
     hook_manager = HookManager()
-    hook_manager.register(AuditLogHook(log_path="./log/audit.log"))
+    hook_manager.register_all()
     event_emitter = EventEmitter()
     harness_logger = HarnessLogger(level="INFO", log_path="./log/kocor.log")
     budget = IterationBudget(iterations_limit=max_iterations)

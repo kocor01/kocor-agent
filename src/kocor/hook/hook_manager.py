@@ -9,6 +9,11 @@ class HookManager:
     def __init__(self):
         self._hooks: dict[HookPoint, list] = {}
 
+    def register_all(self, log_path: str = "./log/audit.log") -> None:
+        """注册默认钩子。"""
+        from kocor.hook.hooks.audit_log import AuditLogHook
+        self.register(AuditLogHook(log_path=log_path))
+
     def register(self, hook: Hook) -> None:
         """注册一个钩子实例。"""
         point = hook.hook_point

@@ -12,7 +12,7 @@ class AuditLogHook:
 
     hook_point = HookPoint.POST_TOOL
 
-    def __init__(self, log_path: str = "audit.log"):
+    def __init__(self, log_path: str = "./log/audit.log"):
         self.log_path = log_path
 
     def run(self, context: HookContext) -> HookResult:
