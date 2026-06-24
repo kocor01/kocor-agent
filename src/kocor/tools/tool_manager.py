@@ -23,14 +23,35 @@ class ToolManager:
         self._tools: dict[str, ToolDefinition] = {}
         self._handlers: dict[str, Callable] = {}
         self._timeout = timeout
+        self.mcp_manager = None
+        self.skill_manager = None
 
-    def register_defaults(self) -> None:
+    def register_builtin_tools(self) -> None:
         """向当前 ToolManager 注册内置工具（读文件、写文件、沙盒执行 Python）。"""
-        from kocor.tools.toolset import read_file, write_file, run_python
+        from kocor.tools.toolset.read_file import ReadFile
+        from kocor.tools.toolset.write_file import WriteFile
+        from kocor.tools.toolset.run_python import RunPython
 
-        read_file.toolRegistry_to(self)
-        write_file.toolRegistry_to(self)
-        run_python.toolRegistry_to(self)
+        builtin_tools = [ReadFile, WriteFile, RunPython]
+        for tool in builtin_tools:
+            self.register(tool.NAME, tool.DESCRIPTION, tool.PARAMETERS, tool.handler)
+
+
+    def register_all(self, config) -> None:
+        """统一注册所有工具：内置工具 → MCP 工具 → 技能工具。
+
+        Args:
+            config: Config 配置对象，需包含 mcp_config / skills_config / skills_dir 字段
+        """
+        self.register_builtin_tools()
+
+        from kocor.mcp import McpManager
+        self.mcp_manager = McpManager(self, config.mcp_config)
+        self.mcp_manager.register_all()
+
+        from kocor.skill import SkillManager
+        self.skill_manager = SkillManager(self)
+        self.skill_manager.register_all(config.skills_config, config.skills_dir)
 
     def register(
         self,

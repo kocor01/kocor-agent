@@ -135,7 +135,7 @@ class TestCreateDefaultTools:
         """测试读取不存在的文件"""
         mock_exists.return_value = False
         registry = ToolManager()
-        registry.register_defaults()
+        registry.register_builtin_tools()
         tools = registry
 
         tool_call = ToolCall(
@@ -151,7 +151,7 @@ class TestCreateDefaultTools:
         """测试读取文件成功"""
         mock_exists.return_value = True
         registry = ToolManager()
-        registry.register_defaults()
+        registry.register_builtin_tools()
         tools = registry
 
         tool_call = ToolCall(
@@ -165,7 +165,7 @@ class TestCreateDefaultTools:
     def test_write_file(self, mock_makedirs):
         """测试写入文件"""
         registry = ToolManager()
-        registry.register_defaults()
+        registry.register_builtin_tools()
         tools = registry
 
         tool_call = ToolCall(
@@ -184,7 +184,7 @@ class TestCreateDefaultTools:
         with tempfile.TemporaryDirectory() as tmpdir:
             with patch("kocor.tools.toolset.read_file.os.getcwd", return_value=tmpdir):
                 registry = ToolManager()
-                registry.register_defaults()
+                registry.register_builtin_tools()
                 tools = registry
 
                 tool_call = ToolCall(
@@ -202,7 +202,7 @@ class TestCreateDefaultTools:
         with tempfile.TemporaryDirectory() as tmpdir:
             with patch("kocor.tools.toolset.write_file.os.getcwd", return_value=tmpdir):
                 registry = ToolManager()
-                registry.register_defaults()
+                registry.register_builtin_tools()
                 tools = registry
 
                 tool_call = ToolCall(
@@ -224,7 +224,7 @@ class TestCreateDefaultTools:
         })()
 
         registry = ToolManager()
-        registry.register_defaults()
+        registry.register_builtin_tools()
         tools = registry
         tool_call = ToolCall(
             id="call_1",
@@ -243,7 +243,7 @@ class TestCreateDefaultTools:
         })()
 
         registry = ToolManager()
-        registry.register_defaults()
+        registry.register_builtin_tools()
         tools = registry
         tool_call = ToolCall(
             id="call_1",
@@ -287,7 +287,7 @@ class TestCreateDefaultTools:
         })()
 
         registry = ToolManager()
-        registry.register_defaults()
+        registry.register_builtin_tools()
         tools = registry
         tool_call = ToolCall(
             id="call_1",

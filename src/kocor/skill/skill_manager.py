@@ -66,6 +66,20 @@ class SkillManager:
             skills = [s for s in skills if s.category == category]
         return skills
 
+    # -- 统一加载入口 ---------------------------------------------------------------
+
+    def register_all(self, skills_config: str, skills_dir: str) -> None:
+        """统一加载技能，按顺序执行：配置加载 → 目录发现 → Cline 发现 → 注册为工具。
+
+        Args:
+            skills_config: JSON 配置文件路径
+            skills_dir: 技能文件目录
+        """
+        self.load_from_config(skills_config)
+        self.discover_skills(skills_dir)
+        self.discover_cline_skills(skills_dir)
+        self.register_as_tools()
+
     # -- 从配置文件加载 -----------------------------------------------------------
 
     def load_from_config(self, config_path: str) -> None:

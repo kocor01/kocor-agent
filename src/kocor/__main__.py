@@ -18,9 +18,7 @@ from dotenv import load_dotenv
 from kocor.agent import Agent
 from kocor.config import load_config
 from kocor.llm_provider.llm_manager import LlmManager
-from kocor.mcp import McpManager
 from kocor.llm_provider.message import StreamChunk
-from kocor.skill import SkillManager
 from kocor.skill.models import InvokeStrategy
 from kocor.tools.tool_manager import ToolManager
 
@@ -225,15 +223,7 @@ def main() -> None:
     llm = LlmManager.create_llm_client(config)
 
     toolManager = ToolManager()
-    toolManager.register_defaults()
-    mcp_manager = McpManager(toolManager, config.mcp_config)
-    mcp_manager.register_all()
-
-    skillManager = SkillManager(toolManager)
-    skillManager.load_from_config(config.skills_config)
-    skillManager.discover_skills(config.skills_dir)
-    skillManager.discover_cline_skills(config.skills_dir)
-    skillManager.register_as_tools(toolManager)
+    toolManager.register_all(config)
 
     # Build Harness components
     max_iterations = args.max_iterations or config.max_iterations
@@ -250,7 +240,7 @@ def main() -> None:
     agent = Agent(
         llm=llm,
         tool_manager=toolManager,
-        skill_manager=skillManager,
+        skill_manager=toolManager.skill_manager,
         max_iterations=max_iterations,
         memory_dir=config.memory_dir or None,
         context_strategy=config.context_strategy,
@@ -271,8 +261,8 @@ def main() -> None:
         except ImportError:
             pass
         print("Kocor Agent — 输入 exit 或 Ctrl+C 退出")
-        if skillManager:
-            skills = skillManager.list_skills(enabled_only=True)
+        if toolManager.skill_manager:
+            skills = toolManager.skill_manager.list_skills(enabled_only=True)
             slash_names = [f"/{s.name}" for s in skills
                            if s.invoke_strategy in (InvokeStrategy.SLASH, InvokeStrategy.BOTH)]
             print(f"Slash 命令: {', '.join(sorted(slash_names))}")
@@ -302,7 +292,7 @@ def main() -> None:
             result = agent.run(user_input)
             print(result)
     finally:
-        mcp_manager.shutdown_all()
+        toolManager.mcp_manager.shutdown_all()
 
 
 if __name__ == "__main__":
