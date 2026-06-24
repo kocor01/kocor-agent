@@ -1,7 +1,7 @@
 """统一 PermissionManager 测试。"""
 
 import pytest
-from kocor.harness.permission import PermissionManager
+from kocor.tools.permission import PermissionManager
 from kocor.tools.toolset.read_file import ReadFile
 from kocor.tools.toolset.write_file import WriteFile
 from kocor.tools.toolset.run_python import RunPython

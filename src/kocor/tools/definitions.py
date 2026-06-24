@@ -5,7 +5,7 @@
 
 from __future__ import annotations
 
-from kocor.harness.permission import PermissionManager
+from kocor.tools.permission import PermissionManager
 
 
 class ToolDefinition:

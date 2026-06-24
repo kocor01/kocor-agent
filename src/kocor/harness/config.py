@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass
 
-from kocor.harness.permission import PermissionManager
+from kocor.tools.permission import PermissionManager
 
 
 @dataclass

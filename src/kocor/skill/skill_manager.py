@@ -17,7 +17,7 @@ from kocor.skill.models import (
     SkillType,
 )
 from kocor.tools.tool_manager import ToolManager
-from kocor.harness.permission import PermissionManager
+from kocor.tools.permission import PermissionManager
 
 
 class SkillManager:

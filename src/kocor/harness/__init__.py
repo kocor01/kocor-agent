@@ -4,7 +4,7 @@ from kocor.harness.loop import ToolCallRecord
 from kocor.harness.budget import IterationBudget
 from kocor.harness.events import HarnessEvent, EventEmitter
 from kocor.harness.config import HarnessConfig
-from kocor.harness.permission import PermissionManager
+from kocor.tools.permission import PermissionManager
 from kocor.harness.file_guard import FileAccessGuard
 from kocor.harness.sandbox import Sandbox, SandboxResult
 from kocor.harness.error_handler import ErrorHandler, GracefulDegradation

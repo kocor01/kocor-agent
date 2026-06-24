@@ -6,7 +6,7 @@ import ast
 import subprocess
 import sys
 
-from kocor.harness.permission import PermissionManager
+from kocor.tools.permission import PermissionManager
 from kocor.tools.tool_utils import sanitize_env
 
 

@@ -8,7 +8,7 @@ from typing import Callable
 
 from kocor.tools.definitions import ToolDefinition
 from kocor.llm_provider.message import ToolCall, ToolResult
-from kocor.harness.permission import PermissionManager
+from kocor.tools.permission import PermissionManager
 
 
 class ToolManager:

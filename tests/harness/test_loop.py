@@ -9,7 +9,7 @@ from kocor.agent import Agent
 from kocor.harness.loop import ToolCallRecord
 from kocor.harness.budget import IterationBudget
 from kocor.harness.events import EventEmitter
-from kocor.harness.permission import PermissionManager
+from kocor.tools.permission import PermissionManager
 from kocor.hook.base import HookPoint, HookContext, HookResult
 from kocor.hook.hook_manager import HookManager
 from kocor.llm_provider.message import Message, ToolCall, FunctionCall, StreamChunk

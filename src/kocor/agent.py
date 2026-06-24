@@ -22,7 +22,7 @@ from kocor.tools.tool_manager import ToolManager
 from kocor.harness.budget import IterationBudget
 from kocor.harness.events import HarnessEvent, EventEmitter
 from kocor.harness.logger import HarnessLogger
-from kocor.harness.permission import PermissionManager
+from kocor.tools.permission import PermissionManager
 from kocor.harness.loop import ToolCallRecord
 from kocor.hook.base import HookPoint, HookContext, HookResult
 from kocor.hook.hook_manager import HookManager

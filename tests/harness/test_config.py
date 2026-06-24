@@ -3,7 +3,7 @@
 import dataclasses
 
 from kocor.harness.config import HarnessConfig
-from kocor.harness.permission import PermissionManager
+from kocor.tools.permission import PermissionManager
 
 
 def _update_from_dict(config, data):

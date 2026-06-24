@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 
-from kocor.harness.permission import PermissionManager
+from kocor.tools.permission import PermissionManager
 from kocor.tools.tool_utils import resolve_safe_path
 
 

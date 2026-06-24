@@ -8,7 +8,7 @@ import os
 from kocor.mcp.client import MCPClient
 from kocor.mcp.config import load_mcp_servers, sanitize_server_name
 from kocor.mcp.event_loop import MCPError
-from kocor.harness.permission import PermissionManager
+from kocor.tools.permission import PermissionManager
 
 
 class McpManager:
