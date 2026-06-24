@@ -33,10 +33,10 @@ class TestPermissionManager:
         pm = PermissionManager(policy="permissive")
         assert pm.check("unknown_safe_tool") is True
 
-    def test_permissive_policy_denies_dangerous_no_stdin(self):
+    def test_permissive_policy_allows_dangerous(self):
         pm = PermissionManager(policy="permissive")
-        # permissive 策略下 dangerous 需要询问，但无 stdin -> 拒绝
-        assert pm.check("run_python") is False
+        # permissive 策略下全部自动允许，包括 dangerous
+        assert pm.check("run_python") is True
 
     def test_default_policy_allows_safe(self):
         pm = PermissionManager(policy="default")

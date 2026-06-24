@@ -298,10 +298,6 @@ class HarnessConfig:
     # 安全
     sandbox_timeout: int = 30
     sandbox_memory_limit: str = "256m"
-    
-    # 可观测性
-    debug: bool = False
-    log_level: str = "INFO"  # DEBUG | INFO | WARN | ERROR
 
 
 @dataclass 
@@ -360,7 +356,7 @@ class HarnessEvent:
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
 │                         CLI 入口 (__main__.py)                       │
-│            python -m kocor "..." | --stream | --debug               │
+│            python -m kocor "..." | --stream                        │
 └───────────────────────────┬─────────────────────────────────────────┘
                             │
 ┌───────────────────────────▼─────────────────────────────────────────┐
@@ -1455,59 +1451,7 @@ class FileAccessGuard:
   └── TOOD 调用统计 (调用频率、失败率)
 ```
 
-### 11.2 Debug 模式
-
-```python
-class DebugManager:
-    """调试管理器：提供详细的运行时信息。"""
-
-    def __init__(self, enabled: bool = False):
-        self.enabled = enabled
-        self.events: list[HarnessEvent] = []
-
-    def record_event(self, event: HarnessEvent) -> None:
-        """记录事件（启用时）。"""
-        if not self.enabled:
-            return
-        self.events.append(event)
-
-    def print_context(self, messages: list[Message]) -> None:
-        """打印完整的消息上下文（DEBUG）。"""
-        if not self.enabled:
-            return
-        total_tokens = sum(len(m.content) // 4 for m in messages if m.content)
-        
-        print(f"\n{'─' * 50}")
-        print(f"🔍 [DEBUG] 上下文概览")
-        print(f"  消息数: {len(messages)}")
-        print(f"  估算 Token: ~{total_tokens}")
-        print(f"  System Prompt: {len(messages[0].content)} chars" 
-              if messages and messages[0].role == "system" else "")
-        for msg in messages[-3:]:  # 显示最后 3 条
-            role_icon = {"user": "👤", "assistant": "🤖", "tool": "🔧", "system": "⚙️"}
-            icon = role_icon.get(msg.role, "❓")
-            preview = (msg.content[:100] + "...") if msg.content and len(msg.content) > 100 else (msg.content or "")
-            tool_info = ""
-            if msg.tool_calls:
-                tool_info = f" [tools: {', '.join(tc.function.name for tc in msg.tool_calls)}]"
-            print(f"  {icon} {msg.role}{tool_info}: {preview}")
-        print(f"{'─' * 50}\n")
-
-    def print_tool_history(self, records: list[ToolCallRecord]) -> None:
-        """打印工具调用历史（DEBUG）。"""
-        if not self.enabled or not records:
-            return
-        print(f"\n{'─' * 50}")
-        print(f"🔍 [DEBUG] 工具调用历史 ({len(records)} 次)")
-        for rec in records:
-            icon = "✅" if rec.error is None else "❌"
-            perm_icon = "🔄" if rec.permission == "auto" else "👤" if rec.permission == "confirm" else "🚫"
-            print(f"  #{rec.iteration} {icon} {perm_icon} {rec.tool_name}({json.dumps(rec.arguments)[:80]})")
-            print(f"     耗时: {rec.duration_ms:.0f}ms | 结果: {rec.result_summary[:100]}")
-        print(f"{'─' * 50}\n")
-```
-
-### 11.3 日志系统
+### 11.2 日志系统
 
 ```python
 # 使用标准库 logging + 结构化字段
@@ -1550,7 +1494,6 @@ class HarnessLogger:
 
 | 决策 | 选择 | 理由 |
 |------|------|------|
-| 调试触发方式 | **CLI 参数 `--debug`** | 按需启用 |
 | 日志框架 | **标准库 `logging`** | 零依赖 |
 | 审计记录 | **ToolCallRecord 列表** | 轻量，内存中 |
 | 用户可见信息 | **迭代计数 + 工具调用摘要** | 不多不少 |
@@ -1669,7 +1612,7 @@ class GracefulDegradation:
 ```
 配置优先级（从高到低）：
 
-1. CLI 参数         --dangerous, --debug, --stream
+1. CLI 参数         --dangerous, --stream
 2. 环境变量         KOCOR_*
 3. 本地配置         kocor.harness.json (项目级)
 4. 全局默认         代码中的 Config 默认值
@@ -1702,11 +1645,6 @@ class HarnessConfig:
     sandbox_memory_limit: str = "256m"
     sandbox_blocked_modules: list[str] | None = None
     sandbox_network: bool = False
-    
-    # 可观测性
-    debug: bool = False
-    log_level: str = "INFO"
-    log_file: str = ""
     
     # Tools
     allowed_dir: str = ""  # 文件工具允许的目录
@@ -1761,7 +1699,6 @@ def parse_args():
     
     # 模式
     parser.add_argument("--stream", action="store_true", help="流式输出")
-    parser.add_argument("--debug", action="store_true", help="调试模式")
     parser.add_argument("--verbose", "-v", action="store_true", help="详细输出")
     
     # 权限
@@ -1786,9 +1723,8 @@ def parse_args():
 class UserInterface:
     """用户界面：统一管理用户可见的输出。"""
 
-    def __init__(self, width: int = 60, debug: bool = False):
+    def __init__(self, width: int = 60):
         self.width = width
-        self.debug = debug
         self.iteration = 0
 
     def start_session(self) -> None:
@@ -1838,7 +1774,6 @@ class UserInterface:
 | 决策 | 选择 | 理由 |
 |------|------|------|
 | 输出格式 | **纯文本 + Emoji 图标** | 无需依赖，清晰可读 |
-| 调试模式 | **`--debug` CLI 参数** | 只在需要时开启 |
 | 权限交互 | **stdin input()** | 简单，零额外依赖 |
 
 ---
@@ -1873,11 +1808,6 @@ Phase 4: 沙盒增强
     环境变量过滤
 
 Phase 5: 可观测性
-  DebugManager + HarnessLogger ← 依赖: Phase 1
-    调试模式
-    结构化日志
-    CLI --debug 集成
-
 Phase 6: 错误处理与降级
   ErrorHandler + GracefulDegradation ← 依赖: Phase 1-2
     重试策略
@@ -1941,7 +1871,6 @@ src/kocor/
 │   ├── permission.py                 # PermissionManager（从 mcp/ 迁移）
 │   ├── sandbox.py                    # Sandbox（从 tools/toolset/ 迁移增强）
 │   ├── file_guard.py                 # FileAccessGuard
-│   ├── debug.py                      # DebugManager
 │   ├── logger.py                     # HarnessLogger
 │   ├── error_handler.py             # ErrorHandler
 │   └── config.py                     # HarnessConfig 加载

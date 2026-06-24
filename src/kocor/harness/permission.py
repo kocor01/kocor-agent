@@ -30,7 +30,7 @@ class PermissionManager:
     """所有工具类型的统一权限管理器。
 
     三层策略：
-    - permissive: safe/caution 自动允许，dangerous 询问一次
+    - permissive: 全部自动允许（不确认）
     - default: safe 自动允许，caution/dangerous 询问一次
     - strict: 全部检查，dangerous 默认拒绝
 
@@ -74,7 +74,7 @@ class PermissionManager:
         safety = TOOL_SAFETY_MAP.get(tool_name, ToolSafetyLevel("caution"))
 
         if self.policy == "permissive":
-            return self._ask_user(tool_name, args) if safety.level == "dangerous" else True
+            return True
 
         if self.policy == "strict":
             if safety.level == "safe":

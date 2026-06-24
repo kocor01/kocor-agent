@@ -36,11 +36,6 @@ class HarnessConfig:
     sandbox_blocked_modules: list[str] | None = None
     sandbox_network: bool = False
 
-    # 可观测性
-    debug: bool = False
-    log_level: str = "INFO"
-    log_file: str = ""
-
     # 工具
     allowed_dir: str = ""
 

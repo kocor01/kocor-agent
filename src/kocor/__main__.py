@@ -25,12 +25,11 @@ from kocor.skill.models import InvokeStrategy
 from kocor.tools.tool_manager import ToolManager
 
 # Harness imports
-from kocor.harness import IterationBudget, HarnessConfig
+from kocor.harness import IterationBudget
 from kocor.harness.permission import PermissionManager
 from kocor.hook.hook_manager import HookManager
 from kocor.hook.hooks import AuditLogHook
 from kocor.harness.events import EventEmitter
-from kocor.harness.debug import DebugManager
 from kocor.harness.logger import HarnessLogger
 
 W = 58
@@ -160,12 +159,7 @@ def parse_args():
         help="交互式 REPL 模式",
     )
     parser.add_argument(
-        "--debug",
-        action="store_true",
-        help="调试模式（详细运行时信息）",
-    )
-    parser.add_argument(
-        "--dangerous",
+        "--permissive",
         action="store_true",
         help="允许危险操作（不确认）",
     )
@@ -225,7 +219,7 @@ def main() -> None:
     permission_policy = "default"
     if args.strict:
         permission_policy = "strict"
-    elif args.dangerous:
+    elif args.permissive:
         permission_policy = "permissive"
 
     llm = LlmManager.create_llm_client(config)
@@ -243,13 +237,6 @@ def main() -> None:
 
     # Build Harness components
     max_iterations = args.max_iterations or config.max_iterations
-    harness_config = HarnessConfig(
-        max_iterations=max_iterations,
-        permission_policy=permission_policy,
-        debug=args.debug or False,
-        log_level="DEBUG" if args.debug else "INFO",
-        context_max_tokens=config.context_max_tokens,
-    )
 
     permission_mgr = PermissionManager(
         policy=permission_policy,
@@ -257,8 +244,7 @@ def main() -> None:
     hook_manager = HookManager()
     hook_manager.register(AuditLogHook(log_path="./log/audit.log"))
     event_emitter = EventEmitter()
-    debug_mgr = DebugManager(enabled=harness_config.debug)
-    harness_logger = HarnessLogger(level=harness_config.log_level, log_path="./log/kocor.log")
+    harness_logger = HarnessLogger(level="INFO", log_path="./log/kocor.log")
     budget = IterationBudget(iterations_limit=max_iterations)
 
     agent = Agent(
