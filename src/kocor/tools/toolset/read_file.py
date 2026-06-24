@@ -12,6 +12,7 @@ class ReadFile:
 
     NAME = "read_file"
     DESCRIPTION = "读取文件内容"
+    SAFETY_LEVEL = "caution"
     PARAMETERS = {
         "type": "object",
         "properties": {

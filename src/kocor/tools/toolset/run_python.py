@@ -14,6 +14,7 @@ class RunPython:
 
     NAME = "run_python"
     DESCRIPTION = "在沙盒中执行 Python 代码，只有在没有合适的工具可以完成任务时才使用这个工具。只能使用python标准库。"
+    SAFETY_LEVEL = "dangerous"
     PARAMETERS = {
         "type": "object",
         "properties": {

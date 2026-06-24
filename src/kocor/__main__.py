@@ -224,16 +224,21 @@ def main() -> None:
     toolManager = ToolManager()
     toolManager.register_all(config)
 
+    permission_mgr = PermissionManager(
+        policy=permission_policy,
+        tool_manager=toolManager,
+    )
+
     # Build Harness components
     max_iterations = args.max_iterations or config.max_iterations
 
-    permission_mgr = PermissionManager(
-        policy=permission_policy,
-    )
     hook_manager = HookManager()
     hook_manager.register_all()
+
     event_emitter = EventEmitter()
-    harness_logger = HarnessLogger(level="INFO", log_path="./log/kocor.log")
+
+    harness_logger = HarnessLogger("INFO")
+
     budget = IterationBudget(iterations_limit=max_iterations)
 
     agent = Agent(

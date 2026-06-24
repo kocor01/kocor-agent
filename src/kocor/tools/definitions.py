@@ -13,9 +13,11 @@ class ToolDefinition:
         name: 工具名称
         description: 工具描述
         parameters: JSON Schema 参数定义
+        safety_level: 安全等级
     """
 
-    def __init__(self, name: str, description: str, parameters: dict):
+    def __init__(self, name: str, description: str, parameters: dict, safety_level: str = "caution"):
         self.name = name
         self.description = description
         self.parameters = parameters
+        self.safety_level = safety_level

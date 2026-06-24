@@ -4,9 +4,7 @@ from kocor.harness.loop import ToolCallRecord
 from kocor.harness.budget import IterationBudget
 from kocor.harness.events import HarnessEvent, EventEmitter
 from kocor.harness.config import HarnessConfig
-from kocor.harness.permission import (
-    PermissionManager, ToolSafetyLevel, TOOL_SAFETY_MAP,
-)
+from kocor.harness.permission import PermissionManager
 from kocor.harness.file_guard import FileAccessGuard
 from kocor.harness.sandbox import Sandbox, SandboxResult
 from kocor.harness.error_handler import ErrorHandler, GracefulDegradation
@@ -24,8 +22,6 @@ __all__ = [
     "HarnessConfig",
     # 权限
     "PermissionManager",
-    "ToolSafetyLevel",
-    "TOOL_SAFETY_MAP",
     # 文件守卫
     "FileAccessGuard",
     # 沙箱

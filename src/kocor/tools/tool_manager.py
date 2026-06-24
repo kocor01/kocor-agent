@@ -33,8 +33,8 @@ class ToolManager:
         from kocor.tools.toolset.run_python import RunPython
 
         builtin_tools = [ReadFile, WriteFile, RunPython]
-        for tool in builtin_tools:
-            self.register(tool.NAME, tool.DESCRIPTION, tool.PARAMETERS, tool.handler)
+        for tools in builtin_tools:
+            self.register(tools.NAME, tools.DESCRIPTION, tools.PARAMETERS, tools.handler, tools.SAFETY_LEVEL)
 
 
     def register_all(self, config) -> None:
@@ -59,6 +59,7 @@ class ToolManager:
         description: str,
         parameters: dict,
         handler: Callable[..., str],
+        safety_level: str = "caution",
     ) -> None:
         """注册工具。
 
@@ -67,11 +68,13 @@ class ToolManager:
             description: 工具描述
             parameters: JSON Schema 参数定义
             handler: 工具处理器，接收 **kwargs 返回结果字符串
+            safety_level: 安全等级
         """
         self._tools[name] = ToolDefinition(
             name=name,
             description=description,
             parameters=parameters,
+            safety_level=safety_level,
         )
         self._handlers[name] = handler
 

@@ -256,12 +256,13 @@ class Agent:
     def _execute_one_tool(self, tool_call) -> Message | None:
         """执行单个工具调用：权限检查、钩子、执行、审计。"""
         tool_name = tool_call.function.name
+        tool_arguments = tool_call.function.arguments
 
-        if not self.permission_mgr.check(tool_name):
+        if not self.permission_mgr.check(tool_call):
             self._tool_history.append(ToolCallRecord(
                 iteration=self._iteration,
                 tool_name=tool_name,
-                arguments={},
+                arguments=tool_arguments,
                 result_summary="[Permission Denied]",
                 result_token_count=0,
                 duration_ms=0,
@@ -283,12 +284,9 @@ class Agent:
 
         self._emit("pre_tool", iteration=self._iteration, tool_call=tool_call)
 
-        args = {}
         duration = 0
         start = time.monotonic()
         try:
-            if tool_call.function.arguments:
-                args = json.loads(tool_call.function.arguments)
             result = self.tool_manager.execute(tool_call)
             duration = (time.monotonic() - start) * 1000
             content = result.content or ""
@@ -298,7 +296,7 @@ class Agent:
             self._tool_history.append(ToolCallRecord(
                 iteration=self._iteration,
                 tool_name=tool_name,
-                arguments=args,
+                arguments=tool_arguments,
                 result_summary=truncated[:200],
                 result_token_count=token_count,
                 duration_ms=duration,
@@ -324,7 +322,7 @@ class Agent:
             self._tool_history.append(ToolCallRecord(
                 iteration=self._iteration,
                 tool_name=tool_name,
-                arguments=args,
+                arguments=tool_arguments,
                 result_summary=f"Error: {type(e).__name__}",
                 result_token_count=0,
                 duration_ms=duration,

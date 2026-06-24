@@ -12,6 +12,7 @@ class WriteFile:
 
     NAME = "write_file"
     DESCRIPTION = "写入文件内容"
+    SAFETY_LEVEL = "dangerous"
     PARAMETERS = {
         "type": "object",
         "properties": {

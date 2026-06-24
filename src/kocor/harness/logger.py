@@ -9,7 +9,7 @@ class HarnessLogger:
     包装标准库的 logging 模块，提供针对迭代、工具调用、预算和错误的便捷方法。
     """
 
-    def __init__(self, level: str = "INFO", log_path: str | None = None):
+    def __init__(self, level: str = "INFO", log_path: str = "./log/kocor.log"):
         self.logger = logging.getLogger("kocor.harness")
         self.logger.setLevel(getattr(logging, level.upper(), logging.INFO))
         if not self.logger.handlers:
