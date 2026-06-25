@@ -3,6 +3,16 @@
 import time
 from dataclasses import dataclass, field
 from collections import defaultdict
+from enum import Enum
+
+
+class EventType(str, Enum):
+    """事件类型常量，统一管理事件名称。"""
+
+    PRE_GENERATE = "pre_generate"
+    POST_GENERATE = "post_generate"
+    PRE_TOOL = "pre_tool"
+    POST_TOOL = "post_tool"
 
 
 @dataclass

@@ -1,16 +1,16 @@
 """HarnessEvent 和 EventEmitter 测试。"""
 
-from kocor.harness.events import HarnessEvent, EventEmitter
+from kocor.harness.events import HarnessEvent, EventEmitter, EventType
 
 
 class TestHarnessEvent:
     def test_create_event(self):
         event = HarnessEvent(
-            type="pre_tool",
+            type=EventType.PRE_TOOL,
             iteration=1,
             data={"tool": "read_file"},
         )
-        assert event.type == "pre_tool"
+        assert event.type == EventType.PRE_TOOL
         assert event.iteration == 1
         assert event.data["tool"] == "read_file"
         assert event.timestamp > 0
@@ -24,21 +24,21 @@ class TestEventEmitter:
         def handler(event):
             received.append(event)
 
-        emitter.subscribe("pre_tool", handler)
-        event = HarnessEvent(type="pre_tool", iteration=1, data={})
+        emitter.subscribe(EventType.PRE_TOOL, handler)
+        event = HarnessEvent(type=EventType.PRE_TOOL, iteration=1, data={})
         emitter.fire(event)
 
         assert len(received) == 1
-        assert received[0].type == "pre_tool"
+        assert received[0].type == EventType.PRE_TOOL
 
     def test_multiple_subscribers(self):
         emitter = EventEmitter()
         results = []
 
-        emitter.subscribe("pre_tool", lambda e: results.append("a"))
-        emitter.subscribe("pre_tool", lambda e: results.append("b"))
+        emitter.subscribe(EventType.PRE_TOOL, lambda e: results.append("a"))
+        emitter.subscribe(EventType.PRE_TOOL, lambda e: results.append("b"))
 
-        emitter.fire(HarnessEvent(type="pre_tool", iteration=1, data={}))
+        emitter.fire(HarnessEvent(type=EventType.PRE_TOOL, iteration=1, data={}))
         assert results == ["a", "b"]
 
     def test_unsubscribe(self):
@@ -48,9 +48,9 @@ class TestEventEmitter:
         def handler(event):
             results.append("called")
 
-        emitter.subscribe("pre_tool", handler)
-        emitter.unsubscribe("pre_tool", handler)
-        emitter.fire(HarnessEvent(type="pre_tool", iteration=1, data={}))
+        emitter.subscribe(EventType.PRE_TOOL, handler)
+        emitter.unsubscribe(EventType.PRE_TOOL, handler)
+        emitter.fire(HarnessEvent(type=EventType.PRE_TOOL, iteration=1, data={}))
         assert results == []
 
     def test_no_subscribers_does_not_error(self):
@@ -59,8 +59,8 @@ class TestEventEmitter:
 
     def test_unregister_all(self):
         emitter = EventEmitter()
-        emitter.subscribe("pre_tool", lambda e: None)
-        emitter.subscribe("post_tool", lambda e: None)
+        emitter.subscribe(EventType.PRE_TOOL, lambda e: None)
+        emitter.subscribe(EventType.POST_TOOL, lambda e: None)
         emitter.unregister_all()
         assert emitter._subscribers == {}
 
@@ -69,9 +69,9 @@ class TestEventEmitter:
         pre = []
         post = []
 
-        emitter.subscribe("pre_tool", lambda e: pre.append(e.type))
-        emitter.subscribe("post_tool", lambda e: post.append(e.type))
+        emitter.subscribe(EventType.PRE_TOOL, lambda e: pre.append(e.type))
+        emitter.subscribe(EventType.POST_TOOL, lambda e: post.append(e.type))
 
-        emitter.fire(HarnessEvent(type="pre_tool", iteration=1, data={}))
-        assert pre == ["pre_tool"]
+        emitter.fire(HarnessEvent(type=EventType.PRE_TOOL, iteration=1, data={}))
+        assert pre == [EventType.PRE_TOOL]
         assert post == []

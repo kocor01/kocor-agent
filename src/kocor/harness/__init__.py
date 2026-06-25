@@ -2,7 +2,7 @@
 
 from kocor.harness.loop import ToolCallRecord
 from kocor.harness.budget import IterationBudget
-from kocor.harness.events import HarnessEvent, EventEmitter
+from kocor.harness.events import HarnessEvent, EventEmitter, EventType
 from kocor.harness.config import HarnessConfig
 from kocor.tools.permission import PermissionManager
 from kocor.harness.file_guard import FileAccessGuard

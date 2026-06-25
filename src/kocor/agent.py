@@ -20,7 +20,7 @@ from kocor.skill.skill_manager import SkillManager
 from kocor.tools.tool_manager import ToolManager
 
 from kocor.harness.budget import IterationBudget
-from kocor.harness.events import HarnessEvent, EventEmitter
+from kocor.harness.events import HarnessEvent, EventEmitter, EventType
 from kocor.harness.logger import HarnessLogger
 from kocor.tools.permission import PermissionManager
 from kocor.harness.loop import ToolCallRecord
@@ -169,7 +169,7 @@ class Agent:
             self._iteration += 1
             self.budget.iterations_used = self._iteration
 
-            self._emit("pre_generate", iteration=self._iteration, messages=self._messages)
+            self._emit(EventType.PRE_GENERATE, iteration=self._iteration, messages=self._messages)
             self._run_hooks(HookPoint.PRE_GENERATE)
 
             response = self.llm.generate(
@@ -178,7 +178,7 @@ class Agent:
             )
             self._messages.append(response)
 
-            self._emit("post_generate", iteration=self._iteration, response=response)
+            self._emit(EventType.POST_GENERATE, iteration=self._iteration, response=response)
             self._run_hooks(HookPoint.POST_GENERATE)
             self._log_iteration(response.usage.output if response.usage else 0)
 
@@ -202,7 +202,7 @@ class Agent:
             self._iteration += 1
             self.budget.iterations_used = self._iteration
 
-            self._emit("pre_generate", iteration=self._iteration, messages=self._messages)
+            self._emit(EventType.PRE_GENERATE, iteration=self._iteration, messages=self._messages)
             self._run_hooks(HookPoint.PRE_GENERATE)
 
             accumulated_tool_calls = []
@@ -225,7 +225,7 @@ class Agent:
                     continue
                 yield chunk
 
-            self._emit("post_generate", iteration=self._iteration, response=None)
+            self._emit(EventType.POST_GENERATE, iteration=self._iteration, response=None)
             self._run_hooks(HookPoint.POST_GENERATE)
             self._log_iteration(streaming_usage.output if streaming_usage else 0)
 
@@ -282,7 +282,7 @@ class Agent:
                 tool_call_id=tool_call.id,
             )
 
-        self._emit("pre_tool", iteration=self._iteration, tool_call=tool_call)
+        self._emit(EventType.PRE_TOOL, iteration=self._iteration, tool_call=tool_call)
 
         duration = 0
         start = time.monotonic()
@@ -303,7 +303,7 @@ class Agent:
                 permission="auto",
             ))
 
-            self._emit("post_tool", iteration=self._iteration, result=result)
+            self._emit(EventType.POST_TOOL, iteration=self._iteration, result=result)
             self._log_tool_call(tool_name, duration, success=True)
             self._run_hooks(HookPoint.POST_TOOL, tool_call=tool_call, tool_result=result)
 

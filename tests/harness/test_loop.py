@@ -8,7 +8,7 @@ import pytest
 from kocor.agent import Agent
 from kocor.harness.loop import ToolCallRecord
 from kocor.harness.budget import IterationBudget
-from kocor.harness.events import EventEmitter
+from kocor.harness.events import EventEmitter, EventType
 from kocor.tools.permission import PermissionManager
 from kocor.hook.base import HookPoint, HookContext, HookResult
 from kocor.hook.hook_manager import HookManager
@@ -193,7 +193,7 @@ class TestAgentLoop:
         """事件发射器触发 pre_generate 事件。"""
         emitter = EventEmitter()
         events = []
-        emitter.subscribe("pre_generate", lambda e: events.append(e))
+        emitter.subscribe(EventType.PRE_GENERATE, lambda e: events.append(e))
 
         llm = MockLLM(responses=[Message(role="assistant", content="ok")])
         agent = Agent(
