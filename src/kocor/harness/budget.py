@@ -12,16 +12,16 @@ class IterationBudget:
     循环控制器在每次迭代后检查 `exhausted`。
     """
 
-    iterations_used: int = 0
-    iterations_limit: int = 20
+    iterations_used: int = 0       # 已用迭代次数
+    iterations_limit: int = 200     # 迭代次数上限
 
-    tokens_prompt: int = 0
-    tokens_completion: int = 0
-    tokens_limit: int = 200_000
+    tokens_prompt: int = 0         # 已用 Prompt Token 数
+    tokens_completion: int = 0     # 已用 Completion Token 数
+    tokens_limit: int = 200_000    # Token 总上限
 
-    time_start: float = 0.0
-    time_elapsed: float = 0.0
-    time_limit: float = 300.0
+    time_start: float = 0.0        # 起始时间戳（unix）
+    time_elapsed: float = 0.0      # 已用时长（秒）
+    time_limit: float = 300.0      # 运行时长上限（秒）
 
     def __post_init__(self):
         if self.time_start == 0.0:
