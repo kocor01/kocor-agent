@@ -1,6 +1,6 @@
 """HookManager — 钩子注册与执行管理器。"""
 
-from kocor.hook.base import HookPoint, HookContext, HookResult, Hook
+from kocor.hook.base import HookPoint, HookContext, HookResult, HookAction, Hook
 
 
 class HookManager:
@@ -38,11 +38,11 @@ class HookManager:
             try:
                 result = hook.run(context)
                 results.append(result)
-                if result.action == "abort":
+                if result.action == HookAction.ABORT:
                     break
             except Exception as e:
                 results.append(HookResult(
-                    action="continue",
+                    action=HookAction.CONTINUE,
                     message=f"Hook error: {e}",
                 ))
         return results

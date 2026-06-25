@@ -23,3 +23,6 @@ class ToolDefinition:
         self.description = description
         self.parameters = parameters
         self.safety_level = safety_level
+
+    def __repr__(self):
+        return f"ToolDefinition(name={self.name}, safety={self.safety_level})"

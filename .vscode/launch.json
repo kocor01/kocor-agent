@@ -1,0 +1,17 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "kocor --stream 查看.env.example",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "kocor",
+            "args": [
+                "--stream",
+                "使用MCP工具查看.env.example文件"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": true
+        }
+    ]
+}

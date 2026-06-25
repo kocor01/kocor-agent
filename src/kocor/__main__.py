@@ -26,7 +26,8 @@ from kocor.tools.tool_manager import ToolManager
 from kocor.harness import IterationBudget
 from kocor.tools.permission import PermissionManager
 from kocor.hook.hook_manager import HookManager
-from kocor.harness.events import EventEmitter
+from kocor.harness.event.event_manager import EventEmitter
+from kocor.harness.event.event_subscribe import EventSubscribe
 from kocor.harness.logger import HarnessLogger
 
 W = 58
@@ -239,6 +240,8 @@ def main() -> None:
 
     harness_logger = HarnessLogger("INFO")
 
+    EventSubscribe(event_emitter).subscribe_all(harness_logger)
+
     budget = IterationBudget(iterations_limit=max_iterations)
 
     agent = Agent(
@@ -254,7 +257,6 @@ def main() -> None:
         hook_manager=hook_manager,
         event_emitter=event_emitter,
         budget=budget,
-        harness_logger=harness_logger,
     )
 
     # 检测 REPL 模式：--repl 标志，或无参数且 stdin 是终端时默认进入

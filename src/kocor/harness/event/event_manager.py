@@ -9,10 +9,12 @@ from enum import Enum
 class EventType(str, Enum):
     """事件类型常量，统一管理事件名称。"""
 
-    PRE_GENERATE = "pre_generate"
-    POST_GENERATE = "post_generate"
-    PRE_TOOL = "pre_tool"
-    POST_TOOL = "post_tool"
+    PRE_GENERATE = "pre_generate"          # LLM 生成前
+    POST_GENERATE = "post_generate"        # LLM 生成后
+    PRE_TOOL = "pre_tool"                  # 工具执行前
+    POST_TOOL = "post_tool"                # 工具执行后
+    ON_ERROR = "on_error"                  # 发生错误时
+    ON_BUDGET_EXHAUSTED = "on_budget_exhausted"  # 预算耗尽时
 
 
 @dataclass

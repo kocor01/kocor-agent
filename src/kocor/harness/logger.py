@@ -2,12 +2,23 @@
 
 import logging
 
+from kocor.harness.event.event_manager import EventType
+
 
 class HarnessLogger:
     """为 harness 操作提供结构化日志。
 
-    包装标准库的 logging 模块，提供针对迭代、工具调用、预算和错误的便捷方法。
+    包装标准库的 logging 模块，提供事件驱动的日志记录。
     """
+
+    _EVENT_LEVELS = {
+        EventType.PRE_GENERATE: logging.INFO,
+        EventType.POST_GENERATE: logging.INFO,
+        EventType.PRE_TOOL: logging.INFO,
+        EventType.POST_TOOL: logging.INFO,
+        EventType.ON_ERROR: logging.ERROR,
+        EventType.ON_BUDGET_EXHAUSTED: logging.WARNING,
+    }
 
     def __init__(self, level: str = "INFO", log_path: str = "./log/kocor.log"):
         self.logger = logging.getLogger("kocor.harness")
@@ -19,16 +30,17 @@ class HarnessLogger:
             ))
             self.logger.addHandler(handler)
 
-    def log_iteration(self, iteration: int, token_count: int) -> None:
-        self.logger.info("iteration=%d tokens=%d", iteration, token_count)
+    def event(self, event_type: EventType, **data) -> None:
+        """按事件类型记录日志，自动选择日志级别。"""
+        level = self._EVENT_LEVELS.get(event_type, logging.INFO)
+        parts = " ".join(f"【{k}】={v}" for k, v in data.items())
+        self.logger.log(level, "%s %s", event_type.value, parts)
 
-    def log_tool_call(
-        self, name: str, duration_ms: float, success: bool
-    ) -> None:
-        self.logger.info("tool=%s duration_ms=%.0f success=%s", name, duration_ms, success)
+    def info(self, message: str) -> None:
+        self.logger.info(message)
 
-    def log_budget_warning(self, ratio: float) -> None:
-        self.logger.warning("budget_usage=%.0f%%", ratio * 100)
+    def warning(self, message: str) -> None:
+        self.logger.warning(message)
 
-    def log_error(self, component: str, error: str) -> None:
-        self.logger.error("component=%s error=%s", component, error)
+    def error(self, message: str) -> None:
+        self.logger.error(message)

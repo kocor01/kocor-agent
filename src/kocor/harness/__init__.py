@@ -2,7 +2,8 @@
 
 from kocor.harness.loop import ToolCallRecord
 from kocor.harness.budget import IterationBudget
-from kocor.harness.events import HarnessEvent, EventEmitter, EventType
+from kocor.harness.event.event_manager import HarnessEvent, EventEmitter, EventType
+from kocor.harness.event.event_subscribe import EventSubscribe
 from kocor.harness.config import HarnessConfig
 from kocor.tools.permission import PermissionManager
 from kocor.harness.file_guard import FileAccessGuard
@@ -18,6 +19,8 @@ __all__ = [
     # 事件
     "HarnessEvent",
     "EventEmitter",
+    "EventType",
+    "EventSubscribe",
     # 配置
     "HarnessConfig",
     # 权限

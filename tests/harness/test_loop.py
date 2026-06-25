@@ -8,9 +8,9 @@ import pytest
 from kocor.agent import Agent
 from kocor.harness.loop import ToolCallRecord
 from kocor.harness.budget import IterationBudget
-from kocor.harness.events import EventEmitter, EventType
+from kocor.harness.event.event_manager import EventEmitter, EventType
 from kocor.tools.permission import PermissionManager
-from kocor.hook.base import HookPoint, HookContext, HookResult
+from kocor.hook.base import HookPoint, HookContext, HookResult, HookAction
 from kocor.hook.hook_manager import HookManager
 from kocor.llm_provider.message import Message, ToolCall, FunctionCall, StreamChunk
 
@@ -214,7 +214,7 @@ class TestAgentLoop:
             hook_point = HookPoint.PRE_TOOL
             def run(self, ctx):
                 hook_calls.append(("pre_tool", ctx.iteration))
-                return HookResult(action="continue")
+                return HookResult(action=HookAction.CONTINUE)
 
         hook_manager.register(TestHook())
         llm = MockLLM(responses=[

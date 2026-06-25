@@ -68,7 +68,7 @@ class TestGracefulDegradation:
 
     def test_with_history(self):
         from kocor.harness.budget import IterationBudget
-        from kocor.harness.events import HarnessEvent
+        from kocor.harness.event.event_manager import HarnessEvent
 
         class FakeRecord:
             iteration = 1

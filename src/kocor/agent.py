@@ -20,11 +20,10 @@ from kocor.skill.skill_manager import SkillManager
 from kocor.tools.tool_manager import ToolManager
 
 from kocor.harness.budget import IterationBudget
-from kocor.harness.events import HarnessEvent, EventEmitter, EventType
-from kocor.harness.logger import HarnessLogger
+from kocor.harness.event.event_manager import HarnessEvent, EventEmitter, EventType
 from kocor.tools.permission import PermissionManager
 from kocor.harness.loop import ToolCallRecord
-from kocor.hook.base import HookPoint, HookContext, HookResult
+from kocor.hook.base import HookPoint, HookContext, HookResult, HookAction
 from kocor.hook.hook_manager import HookManager
 
 DEFAULT_SYSTEM_PROMPT = """\
@@ -74,7 +73,6 @@ class Agent:
         hook_manager: HookManager | None = None,
         event_emitter: EventEmitter | None = None,
         budget: IterationBudget | None = None,
-        harness_logger: HarnessLogger | None = None,
     ):
         self.llm = llm
         self.tool_manager = tool_manager or ToolManager()
@@ -87,7 +85,6 @@ class Agent:
         self.hook_manager = hook_manager or HookManager()
         self.event_emitter = event_emitter or EventEmitter()
         self.budget = budget or IterationBudget(iterations_limit=max_iterations)
-        self.logger = harness_logger
 
         # 循环状态
         self._iteration = 0
@@ -169,7 +166,8 @@ class Agent:
             self._iteration += 1
             self.budget.iterations_used = self._iteration
 
-            self._emit(EventType.PRE_GENERATE, iteration=self._iteration, messages=self._messages)
+            self._emit(EventType.PRE_GENERATE, iteration=self._iteration, messages=self._messages,
+                       tools=self.tool_manager.get_definitions())
             self._run_hooks(HookPoint.PRE_GENERATE)
 
             response = self.llm.generate(
@@ -180,7 +178,6 @@ class Agent:
 
             self._emit(EventType.POST_GENERATE, iteration=self._iteration, response=response)
             self._run_hooks(HookPoint.POST_GENERATE)
-            self._log_iteration(response.usage.output if response.usage else 0)
 
             if not response.tool_calls:
                 return response.content or ""
@@ -190,6 +187,8 @@ class Agent:
                 if result_msg is not None:
                     self._messages.append(result_msg)
 
+        self._emit(EventType.ON_BUDGET_EXHAUSTED, iteration=self._iteration,
+                       iterations_limit=self.budget.iterations_limit)
         self._run_hooks(HookPoint.ON_BUDGET_EXHAUSTED)
         return self._budget_exhausted_message()
 
@@ -202,11 +201,13 @@ class Agent:
             self._iteration += 1
             self.budget.iterations_used = self._iteration
 
-            self._emit(EventType.PRE_GENERATE, iteration=self._iteration, messages=self._messages)
+            self._emit(EventType.PRE_GENERATE, iteration=self._iteration, messages=self._messages,
+                       tools=self.tool_manager.get_definitions())
             self._run_hooks(HookPoint.PRE_GENERATE)
 
             accumulated_tool_calls = []
             final_content = ""
+            final_reasoning = ""
             streaming_usage = None
 
             for chunk in self.llm.stream(
@@ -219,21 +220,26 @@ class Agent:
                             accumulated_tool_calls.append(tc)
                 if chunk.content:
                     final_content += chunk.content
+                if chunk.reasoning:
+                    final_reasoning += chunk.reasoning
                 if chunk.usage:
                     streaming_usage = chunk.usage
                 if chunk.usage and not chunk.content and not chunk.reasoning and not chunk.tool_calls:
                     continue
                 yield chunk
 
-            self._emit(EventType.POST_GENERATE, iteration=self._iteration, response=None)
-            self._run_hooks(HookPoint.POST_GENERATE)
-            self._log_iteration(streaming_usage.output if streaming_usage else 0)
-
             response = Message(
                 role="assistant",
                 content=final_content,
+                reasoning=final_reasoning,
                 tool_calls=accumulated_tool_calls or None,
+                usage=streaming_usage,
             )
+
+            self._emit(EventType.POST_GENERATE, iteration=self._iteration,
+                       response=response)
+            self._run_hooks(HookPoint.POST_GENERATE)
+
             self._messages.append(response)
 
             if not accumulated_tool_calls:
@@ -248,15 +254,19 @@ class Agent:
                         is_final=False,
                     )
 
+        self._emit(EventType.ON_BUDGET_EXHAUSTED, iteration=self._iteration,
+                       iterations_limit=self.budget.iterations_limit)
         self._run_hooks(HookPoint.ON_BUDGET_EXHAUSTED)
         yield StreamChunk(content=self._budget_exhausted_message(), is_final=True)
 
     # ── 工具执行 ──
 
     def _execute_one_tool(self, tool_call) -> Message | None:
-        """执行单个工具调用：权限检查、钩子、执行、审计。"""
+        """执行单个工具调用：事件、权限检查、钩子、执行、审计。"""
         tool_name = tool_call.function.name
         tool_arguments = tool_call.function.arguments
+
+        self._emit(EventType.PRE_TOOL, iteration=self._iteration, tool_call=tool_call)
 
         if not self.permission_mgr.check(tool_call):
             self._tool_history.append(ToolCallRecord(
@@ -275,14 +285,14 @@ class Agent:
             )
 
         hook_results = self._run_hooks(HookPoint.PRE_TOOL, tool_call=tool_call)
-        if any(r.action == "skip_tool" for r in hook_results):
+        if any(r.action == HookAction.SKIP_TOOL for r in hook_results):
+            self._emit(EventType.POST_TOOL, iteration=self._iteration,
+                       tool_name=tool_name, success=False, skipped_by_hook=True)
             return Message(
                 role="tool",
                 content="[Tool Skipped by Hook]",
                 tool_call_id=tool_call.id,
             )
-
-        self._emit(EventType.PRE_TOOL, iteration=self._iteration, tool_call=tool_call)
 
         duration = 0
         start = time.monotonic()
@@ -303,8 +313,8 @@ class Agent:
                 permission="auto",
             ))
 
-            self._emit(EventType.POST_TOOL, iteration=self._iteration, result=result)
-            self._log_tool_call(tool_name, duration, success=True)
+            self._emit(EventType.POST_TOOL, iteration=self._iteration,
+                       tool_name=tool_name, duration=duration, success=True, result=result)
             self._run_hooks(HookPoint.POST_TOOL, tool_call=tool_call, tool_result=result)
 
             return Message(
@@ -314,9 +324,11 @@ class Agent:
             )
 
         except Exception as e:
+            self._emit(EventType.POST_TOOL, iteration=self._iteration,
+                       tool_name=tool_name, duration=duration, success=False, error=str(e))
+            self._emit(EventType.ON_ERROR, iteration=self._iteration,
+                       component="tool", error=str(e))
             self._run_hooks(HookPoint.ON_ERROR, error=e)
-            self._log_tool_call(tool_name, duration, success=False)
-            self._log_error("tool", f"{type(e).__name__}: {e}")
 
             duration = (time.monotonic() - start) * 1000
             self._tool_history.append(ToolCallRecord(
@@ -382,7 +394,6 @@ class Agent:
     # ── 辅助方法 ──
 
     def _budget_exhausted_message(self) -> str:
-        self._log_budget_warning()
         parts = [
             f"Agent 在 {self._iteration} 次迭代后未完成。",
             f"已执行 {len(self._tool_history)} 个工具调用。",
@@ -409,23 +420,6 @@ class Agent:
             **extra,
         )
         return self.hook_manager.run(point, ctx)
-
-    def _log_iteration(self, tokens: int = 0) -> None:
-        if self.logger:
-            self.logger.log_iteration(self._iteration, tokens)
-
-    def _log_tool_call(self, name: str, duration_ms: float, success: bool) -> None:
-        if self.logger:
-            self.logger.log_tool_call(name, duration_ms, success)
-
-    def _log_budget_warning(self) -> None:
-        if self.logger:
-            ratio = min(1.0, self._iteration / max(self.budget.iterations_limit, 1))
-            self.logger.log_budget_warning(ratio)
-
-    def _log_error(self, component: str, error: str) -> None:
-        if self.logger:
-            self.logger.log_error(component, error)
 
     def _emit(self, event_type: str, **data) -> None:
         self.event_emitter.fire(HarnessEvent(

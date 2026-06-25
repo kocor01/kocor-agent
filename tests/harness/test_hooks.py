@@ -1,6 +1,6 @@
 """钩子系统测试。"""
 
-from kocor.hook.base import HookPoint, HookContext, HookResult
+from kocor.hook.base import HookPoint, HookContext, HookResult, HookAction
 from kocor.hook.hook_manager import HookManager
 from kocor.hook.hooks import AuditLogHook
 
@@ -25,7 +25,7 @@ class TestHookManager:
 
             def run(self, ctx):
                 results.append("called")
-                return HookResult(action="continue")
+                return HookResult(action=HookAction.CONTINUE)
 
         runner.register(TestHook())
         runner.run(HookPoint.PRE_TOOL, HookContext(iteration=1, messages=[]))
@@ -39,13 +39,13 @@ class TestHookManager:
             hook_point = HookPoint.PRE_TOOL
             def run(self, ctx):
                 order.append("a")
-                return HookResult(action="continue")
+                return HookResult(action=HookAction.CONTINUE)
 
         class HookB:
             hook_point = HookPoint.PRE_TOOL
             def run(self, ctx):
                 order.append("b")
-                return HookResult(action="continue")
+                return HookResult(action=HookAction.CONTINUE)
 
         runner.register(HookA())
         runner.register(HookB())
@@ -60,13 +60,13 @@ class TestHookManager:
             hook_point = HookPoint.PRE_TOOL
             def run(self, ctx):
                 order.append("abort")
-                return HookResult(action="abort")
+                return HookResult(action=HookAction.ABORT)
 
         class AfterAbort:
             hook_point = HookPoint.PRE_TOOL
             def run(self, ctx):
                 order.append("after")
-                return HookResult(action="continue")
+                return HookResult(action=HookAction.CONTINUE)
 
         runner.register(Aborter())
         runner.register(AfterAbort())
@@ -84,15 +84,15 @@ class TestHookManager:
         class GoodHook:
             hook_point = HookPoint.PRE_TOOL
             def run(self, ctx):
-                return HookResult(action="continue")
+                return HookResult(action=HookAction.CONTINUE)
 
         runner.register(BrokenHook())
         runner.register(GoodHook())
         results = runner.run(HookPoint.PRE_TOOL, HookContext(iteration=1, messages=[]))
         assert len(results) == 2
-        assert results[0].action == "continue"
+        assert results[0].action == HookAction.CONTINUE
         assert "boom" in results[0].message
-        assert results[1].action == "continue"
+        assert results[1].action == HookAction.CONTINUE
 
     def test_no_hooks_at_point(self):
         runner = HookManager()
@@ -108,13 +108,13 @@ class TestHookManager:
             hook_point = HookPoint.PRE_TOOL
             def run(self, ctx):
                 pre_results.append("pre")
-                return HookResult(action="continue")
+                return HookResult(action=HookAction.CONTINUE)
 
         class PostHook:
             hook_point = HookPoint.POST_TOOL
             def run(self, ctx):
                 post_results.append("post")
-                return HookResult(action="continue")
+                return HookResult(action=HookAction.CONTINUE)
 
         runner.register(PreHook())
         runner.register(PostHook())
@@ -128,11 +128,11 @@ class TestHookManager:
         class Skipper:
             hook_point = HookPoint.PRE_TOOL
             def run(self, ctx):
-                return HookResult(action="skip_tool", message="skip it")
+                return HookResult(action=HookAction.SKIP_TOOL, message="skip it")
 
         runner.register(Skipper())
         results = runner.run(HookPoint.PRE_TOOL, HookContext(iteration=1, messages=[]))
-        assert results[0].action == "skip_tool"
+        assert results[0].action == HookAction.SKIP_TOOL
         assert results[0].message == "skip it"
 
     def test_clear_all_hooks(self):
@@ -143,7 +143,7 @@ class TestHookManager:
             hook_point = HookPoint.PRE_TOOL
             def run(self, ctx):
                 tracker.append("called")
-                return HookResult(action="continue")
+                return HookResult(action=HookAction.CONTINUE)
 
         runner.register(SomeHook())
         runner.clear()
@@ -158,7 +158,7 @@ class TestHookManager:
             hook_point = HookPoint.PRE_TOOL
             def run(self, ctx):
                 tracker.append("called")
-                return HookResult(action="continue")
+                return HookResult(action=HookAction.CONTINUE)
 
         hook = SomeHook()
         runner.register(hook)
@@ -185,7 +185,7 @@ class TestAuditLogHook:
                 function=FunctionCall(name="read_file", arguments='{"path": "test.txt"}'),
             ),
         ))
-        assert result.action == "continue"
+        assert result.action == HookAction.CONTINUE
         log_content = log_file.read_text()
         assert "read_file" in log_content
         assert "call_1" in log_content
@@ -193,4 +193,4 @@ class TestAuditLogHook:
     def test_run_without_tool_call(self, tmp_path):
         hook = AuditLogHook(log_path=str(tmp_path / "empty.log"))
         result = hook.run(HookContext(iteration=1, messages=[]))
-        assert result.action == "continue"
+        assert result.action == HookAction.CONTINUE

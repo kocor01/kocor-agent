@@ -5,6 +5,14 @@ from enum import Enum
 from typing import Protocol
 
 
+class HookAction(str, Enum):
+    """钩子执行结果动作常量。"""
+
+    CONTINUE = "continue"          # 继续执行
+    SKIP_TOOL = "skip_tool"        # 跳过当前工具调用
+    ABORT = "abort"                # 终止当前阶段
+
+
 class HookPoint(Enum):
     """可以注册钩子的生命周期节点。"""
 
@@ -32,7 +40,7 @@ class HookContext:
 class HookResult:
     """钩子执行后返回的结果。"""
 
-    action: str = "continue"  # continue | skip_tool | abort
+    action: HookAction = HookAction.CONTINUE
     message: str = ""
 
 
