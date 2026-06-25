@@ -1,6 +1,8 @@
 """Harness 运行时的结构化日志。"""
 
 import logging
+import os
+from datetime import date
 
 from kocor.harness.event.event_manager import EventType
 
@@ -9,6 +11,7 @@ class HarnessLogger:
     """为 harness 操作提供结构化日志。
 
     包装标准库的 logging 模块，提供事件驱动的日志记录。
+    日志按天写入对应日期的子目录：实际写入路径为 ``{log_dir}/{日期}/kocor.log``。
     """
 
     _EVENT_LEVELS = {
@@ -20,11 +23,16 @@ class HarnessLogger:
         EventType.ON_BUDGET_EXHAUSTED: logging.WARNING,
     }
 
-    def __init__(self, level: str = "INFO", log_path: str = "./log/kocor.log"):
+    def __init__(self, level: str = "INFO", log_dir: str = "./log"):
+        today = date.today().isoformat()
+        daily_dir = os.path.join(log_dir, today)
+        os.makedirs(daily_dir, exist_ok=True)
+        daily_path = os.path.join(daily_dir, "kocor.log")
+
         self.logger = logging.getLogger("kocor.harness")
         self.logger.setLevel(getattr(logging, level.upper(), logging.INFO))
         if not self.logger.handlers:
-            handler = logging.FileHandler(log_path, encoding="utf-8") if log_path else logging.StreamHandler()
+            handler = logging.FileHandler(daily_path, encoding="utf-8")
             handler.setFormatter(logging.Formatter(
                 "%(asctime)s [%(levelname)s] %(message)s"
             ))

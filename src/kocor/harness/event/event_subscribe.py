@@ -1,7 +1,7 @@
 """统一管理事件订阅。"""
 
 from kocor.harness.event.event_manager import EventEmitter, EventType
-from kocor.harness.event.subscribes.logs.log import Logs
+from kocor.harness.event.subscribes.logs import Logs
 from kocor.harness.logger import HarnessLogger
 
 
