@@ -7,7 +7,7 @@ from datetime import date
 from kocor.harness.event.event_manager import EventType
 
 
-class HarnessLogger:
+class Logger:
     """为 harness 操作提供结构化日志。
 
     包装标准库的 logging 模块，提供事件驱动的日志记录。
@@ -52,3 +52,22 @@ class HarnessLogger:
 
     def error(self, message: str) -> None:
         self.logger.error(message)
+
+
+_logger_instance: Logger | None = None
+
+
+def setup_logger(level: str = "INFO", log_dir: str = "./log") -> Logger:
+    """初始化并设置全局 Logger 实例。"""
+    global _logger_instance
+    _logger_instance = Logger(level, log_dir)
+    return _logger_instance
+
+
+def get_logger() -> Logger:
+    """获取全局 Logger 实例，未初始化时抛出 RuntimeError。"""
+    if _logger_instance is None:
+        raise RuntimeError(
+            "Logger not initialized, call setup_logger() first"
+        )
+    return _logger_instance

@@ -28,7 +28,7 @@ from kocor.tools.permission import PermissionManager
 from kocor.hook.hook_manager import HookManager
 from kocor.harness.event.event_manager import EventEmitter
 from kocor.harness.event.event_subscribe import EventSubscribe
-from kocor.harness.logger import HarnessLogger
+from kocor.harness.logger import setup_logger
 
 W = 58
 
@@ -212,6 +212,8 @@ def main() -> None:
 
     load_dotenv()
     config = load_config()
+    
+    setup_logger("INFO")
 
     # Determine permission policy from CLI flags
     permission_policy = PermissionManager.POLICY_DEFAULT
@@ -238,9 +240,7 @@ def main() -> None:
 
     event_emitter = EventEmitter()
 
-    harness_logger = HarnessLogger("INFO")
-
-    EventSubscribe(event_emitter).subscribe_all(harness_logger)
+    EventSubscribe(event_emitter).subscribe_all()
 
     budget = IterationBudget(iterations_limit=max_iterations)
 

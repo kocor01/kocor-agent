@@ -9,7 +9,7 @@ from kocor.tools.permission import PermissionManager
 from kocor.harness.file_guard import FileAccessGuard
 from kocor.harness.sandbox import Sandbox, SandboxResult
 from kocor.harness.error_handler import ErrorHandler, GracefulDegradation
-from kocor.harness.logger import HarnessLogger
+from kocor.harness.logger import Logger, get_logger, setup_logger
 
 __all__ = [
     # 循环
@@ -34,5 +34,7 @@ __all__ = [
     "ErrorHandler",
     "GracefulDegradation",
     # 可观测性
-    "HarnessLogger",
+    "Logger",
+    "setup_logger",
+    "get_logger",
 ]

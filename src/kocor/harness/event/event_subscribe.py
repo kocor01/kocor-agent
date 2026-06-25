@@ -2,7 +2,6 @@
 
 from kocor.harness.event.event_manager import EventEmitter, EventType
 from kocor.harness.event.subscribes.logs import Logs
-from kocor.harness.logger import HarnessLogger
 
 
 class EventSubscribe:
@@ -11,9 +10,9 @@ class EventSubscribe:
     def __init__(self, event_emitter: EventEmitter):
         self._emitter = event_emitter
 
-    def subscribe_all(self, logger: HarnessLogger) -> None:
+    def subscribe_all(self) -> None:
         """订阅所有标准日志记录事件。"""
-        handler = Logs(logger)
+        handler = Logs()
 
         self._emitter.subscribe(EventType.PRE_GENERATE, handler._handle_pre_generate)
         self._emitter.subscribe(EventType.POST_GENERATE, handler._handle_post_generate)
