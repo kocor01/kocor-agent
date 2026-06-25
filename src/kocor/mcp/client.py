@@ -52,7 +52,7 @@ class MCPClient:
         ]
 
     def call_tool(self, name: str, arguments: dict) -> str:
-        """调用工具。
+        """调用工具，连接断开时自动重连一次。
 
         Args:
             name: 工具名
@@ -61,10 +61,14 @@ class MCPClient:
         Returns:
             文本形式的结果
         """
-        result = _run_async(
-            self._async_call_tool(name, arguments),
-            timeout=self._config.timeout,
-        )
+        try:
+            result = self._do_call_tool(name, arguments)
+        except MCPError:
+            try:
+                self.reconnect()
+            except Exception:
+                raise  # 重连失败，透传原错误
+            result = self._do_call_tool(name, arguments)
 
         texts = [
             block.text
@@ -83,6 +87,18 @@ class MCPClient:
             _run_async(self._async_shutdown(), timeout=5)
         except Exception:
             pass
+
+    def reconnect(self) -> None:
+        """断开当前连接并重新建立。"""
+        _run_async(self._async_shutdown(), timeout=5)
+        _run_async(self._async_start(), timeout=self._config.connect_timeout or 30)
+
+    def _do_call_tool(self, name: str, arguments: dict) -> mcp_types.CallToolResult:
+        """执行工具调用的内部方法，不做重试。"""
+        return _run_async(
+            self._async_call_tool(name, arguments),
+            timeout=self._config.timeout,
+        )
 
     # ── 异步内部实现 ──────────────────────────────────────────────────────
 

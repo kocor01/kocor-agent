@@ -45,8 +45,13 @@ class McpManager:
                 for t in tool_list:
                     full_name = f"mcp_{prefix}_{sanitize_server_name(t['name'])}"
 
-                    def handler(_tool_name=t["name"], **kwargs):
-                        return client.call_tool(_tool_name, kwargs)
+                    def handler(_tool_name=t["name"], _client=client, **kwargs):
+                        try:
+                            return _client.call_tool(_tool_name, kwargs)
+                        except MCPError as e:
+                            raise MCPError(
+                                f"MCP server '{name}' tool '{_tool_name}' failed: {e}"
+                            )
 
                     self.tool_manager.register(
                         name=full_name,
