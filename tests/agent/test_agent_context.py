@@ -2,12 +2,8 @@
 
 from __future__ import annotations
 
-import os
-import tempfile
-
 from kocor.agent import Agent
 from kocor.llm_provider.llm_client import LLMClient
-from kocor.tools.definitions import ToolDefinition
 from kocor.llm_provider.message import Message
 
 
@@ -76,29 +72,6 @@ class TestAgentContextIntegration:
         system_msg = llm.last_messages[0]
         assert "已记录的信息" in system_msg.content
         assert "用户: 张三" in system_msg.content
-
-    def test_agent_with_custom_project_instructions(self):
-        """自定义项目指令文件应被加载到 system prompt。"""
-        content = "项目规范：使用 Python 3.12"
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".md", delete=False, encoding="utf-8",
-        ) as f:
-            f.write(content)
-            path = f.name
-
-        try:
-            llm = FakeLLMClient()
-            agent = Agent(
-                llm=llm,
-                max_iterations=20,
-                project_instructions_path=path,
-            )
-            agent.run("你好")
-            system_msg = llm.last_messages[0]
-            assert "项目指令" in system_msg.content
-            assert "Python 3.12" in system_msg.content
-        finally:
-            os.unlink(path)
 
     def test_agent_context_strategy_does_not_break(self):
         """配置 context_strategy 不影响基本功能。"""

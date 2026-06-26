@@ -4,11 +4,11 @@ from __future__ import annotations
 
 from kocor.context.models import (
     AgentContext,
-    ContextStrategy,
     MemoryItem,
     SummaryNode,
     TokenBudget,
 )
+from kocor.context.strategies import ContextStrategy
 from kocor.llm_provider.message import Message
 from kocor.tools.definitions import ToolDefinition
 

@@ -8,7 +8,6 @@ from kocor.context.builder import ContextBuilder
 from kocor.context.memory import MemoryManager
 from kocor.context.models import (
     AgentContext,
-    ContextStrategy,
     MemoryItem,
     SummaryNode,
     TokenBudget,
@@ -18,13 +17,13 @@ from kocor.context.token_counter import TokenCounter
 from kocor.tools.truncate import ToolOutputTruncator
 
 from kocor.context.sliding_window import SlidingWindowStrategy
-from kocor.context.strategies import apply_context_strategy
+from kocor.context.strategies import ContextStrategy, ContextStrategyApplier
 
 __all__ = [
     "AgentContext",
-    "apply_context_strategy",
     "ContextBuilder",
     "ContextStrategy",
+    "ContextStrategyApplier",
     "HistorySummarizer",
     "MemoryItem",
     "MemoryManager",

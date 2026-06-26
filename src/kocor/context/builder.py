@@ -7,10 +7,12 @@ from __future__ import annotations
 
 from typing import Any
 
+from kocor.config import config_get
 from kocor.context.env_info import build_environment_info
-from kocor.context.models import AgentContext, ContextStrategy, TokenBudget
+from kocor.context.models import AgentContext, TokenBudget
+from kocor.context.strategies import ContextStrategy
 from kocor.context.project_instructions import load_project_instructions
-from kocor.context.strategies import apply_context_strategy
+from kocor.context.strategies import ContextStrategyApplier
 from kocor.context.summarizer import HistorySummarizer
 from kocor.context.token_counter import TokenCounter
 from kocor.llm_provider.message import Message
@@ -29,8 +31,6 @@ class ContextBuilder:
         identity_prompt: 核心身份定义（L1）
         tools: 工具注册表（用于获取工具定义 L6）
         memory: 记忆管理器（L4），可为 None
-        project_instructions_path: 项目指令文件路径（L2）
-        max_tokens: 上下文窗口上限
     """
 
     def __init__(
@@ -38,17 +38,19 @@ class ContextBuilder:
         identity_prompt: str,
         tools: Any,  # 鸭式类型：需要 get_definitions() 方法
         memory: Any | None = None,
-        project_instructions_path: str = "KOCOR.md",
-        max_tokens: int = 200_000,
         summarizer: HistorySummarizer | None = None,
+        preserve_rounds: int | None = None,
     ):
         self.identity_prompt = identity_prompt
         self.tools = tools
         self.memory = memory
-        self.project_instructions_path = project_instructions_path
-        self.max_tokens = max_tokens
         self._token_counter = TokenCounter()
         self.summarizer = summarizer
+        self.strategy_applier = (
+            ContextStrategyApplier(summarizer=summarizer, preserve_rounds=preserve_rounds)
+            if summarizer
+            else None
+        )
 
     def build_system_prompt(self, project_instructions: str | None = None) -> str:
         """构建完整的系统提示文本。
@@ -68,7 +70,7 @@ class ContextBuilder:
 
         # L2: 项目指令
         if project_instructions is None:
-            project_instructions = load_project_instructions(self.project_instructions_path)
+            project_instructions = load_project_instructions()
         if project_instructions:
             layers.append(project_instructions)
 
@@ -100,7 +102,7 @@ class ContextBuilder:
             AgentContext: 包含系统提示、消息列表、预算信息的上下文对象
         """
         # 1. 加载项目指令（仅一次，供 L2 和 AgentContext 共用）
-        project_instructions = load_project_instructions(self.project_instructions_path)
+        project_instructions = load_project_instructions()
 
         # 2. 构建系统提示（含 L1-L4 所有层）
         system_content = self.build_system_prompt(project_instructions)
@@ -108,14 +110,11 @@ class ContextBuilder:
         # 3. 应用上下文策略处理会话历史
         summary_node = None
         processed_history = session_history
-        if strategy != ContextStrategy.DEFAULT and self.summarizer:
-            from kocor.context.models import TokenBudget as _TB
-            budget = _TB(limit=self.max_tokens)
-            budget.used_prompt = self._token_counter.count(system_content) + self._token_counter.count(user_input)
-            processed_history, summary_node = apply_context_strategy(
+        if strategy != ContextStrategy.DEFAULT and self.strategy_applier:
+            used_prompt = self._token_counter.count(system_content) + self._token_counter.count(user_input)
+            processed_history, summary_node = self.strategy_applier.apply(
                 messages=session_history,
-                token_budget=budget,
-                summarizer=self.summarizer,
+                used_prompt=used_prompt,
                 strategy=strategy,
             )
 
@@ -132,7 +131,7 @@ class ContextBuilder:
         messages.append(Message(role="user", content=user_input))
 
         # 5. 计算 Token 预算
-        token_budget = TokenBudget(limit=self.max_tokens)
+        token_budget = TokenBudget(limit=config_get("context_max_tokens", 200_000))
         token_budget.used_prompt = self._token_counter.count_messages(messages)
 
         # 4. 获取工具定义

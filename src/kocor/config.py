@@ -36,11 +36,11 @@ class Config:
     # 上下文管理
     context_strategy: str = "default"
     memory_dir: str = ""
-    project_instructions_path: str = "KOCOR.md"
     context_max_tokens: int = 200_000
     context_summary_threshold: float = 0.70
     context_truncate_threshold: float = 0.90
     preserve_rounds: int = 3
+    token_margin: int = 10_000
 
     @classmethod
     def load(cls) -> Config:
@@ -139,6 +139,15 @@ class Config:
         else:
             preserve_rounds = 3
 
+        token_margin_raw = os.environ.get("KOCOR_TOKEN_MARGIN")
+        if token_margin_raw is not None:
+            try:
+                token_margin = int(token_margin_raw)
+            except ValueError:
+                token_margin = 10_000
+        else:
+            token_margin = 10_000
+
         context_summary_threshold_raw = os.environ.get("KOCOR_CONTEXT_SUMMARY_THRESHOLD")
         if context_summary_threshold_raw is not None:
             try:
@@ -172,11 +181,11 @@ class Config:
             anthropic_base_url=os.environ.get("ANTHROPIC_BASE_URL", ""),
             context_strategy=os.environ.get("KOCOR_CONTEXT_STRATEGY", "default"),
             memory_dir=os.environ.get("KOCOR_MEMORY_DIR", ""),
-            project_instructions_path=os.environ.get("KOCOR_PROJECT_INSTRUCTIONS_PATH", "KOCOR.md"),
             context_max_tokens=context_max_tokens,
             context_summary_threshold=context_summary_threshold,
             context_truncate_threshold=context_truncate_threshold,
             preserve_rounds=preserve_rounds,
+            token_margin=token_margin,
         )
 
 

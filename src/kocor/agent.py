@@ -12,7 +12,7 @@ from typing import Iterator
 from kocor.config import Config
 from kocor.context.builder import ContextBuilder
 from kocor.context.memory import MemoryManager
-from kocor.context.models import ContextStrategy
+from kocor.context.strategies import ContextStrategy
 from kocor.context.summarizer import HistorySummarizer
 from kocor.llm_provider.llm_client import LLMClient
 from kocor.llm_provider.message import Message, StreamChunk
@@ -67,8 +67,6 @@ class Agent:
         # 上下文管理参数
         memory_dir: str | None = None,
         context_strategy: str | None = None,
-        project_instructions_path: str | None = None,
-        context_max_tokens: int | None = None,
         # Harness 参数（可选）
         permission_mgr: PermissionManager | None = None,
         hook_manager: HookManager | None = None,
@@ -110,8 +108,6 @@ class Agent:
             identity_prompt=self.system_prompt,
             tools=self.tool_manager,
             memory=memory,
-            project_instructions_path=project_instructions_path if project_instructions_path is not None else cfg.project_instructions_path,
-            max_tokens=context_max_tokens if context_max_tokens is not None else cfg.context_max_tokens,
             summarizer=summarizer,
         )
 

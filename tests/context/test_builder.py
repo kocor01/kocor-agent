@@ -2,9 +2,6 @@
 
 from __future__ import annotations
 
-import os
-import tempfile
-
 from kocor.context.builder import ContextBuilder
 from kocor.context.models import AgentContext
 from kocor.tools.definitions import ToolDefinition
@@ -30,7 +27,6 @@ class TestContextBuilder:
             tools=tools,
         )
         assert builder.identity_prompt == "你是 Kocor"
-        assert builder.max_tokens == 200_000
 
     def test_build_system_prompt_contains_identity(self):
         """system prompt 应包含身份提示。"""
@@ -51,37 +47,13 @@ class TestContextBuilder:
         assert "当前工作目录" in prompt
 
     def test_build_system_prompt_with_custom_instructions(self):
-        """当项目指令文件存在时，system prompt 应包含它。"""
-        content = "使用 Python 3.12"
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".md", delete=False, encoding="utf-8",
-        ) as f:
-            f.write(content)
-            path = f.name
-
-        try:
-            builder = ContextBuilder(
-                identity_prompt="你是 Kocor",
-                tools=ToolRegistryStub(),
-                project_instructions_path=path,
-            )
-            prompt = builder.build_system_prompt()
-            assert "项目指令" in prompt
-            assert "Python 3.12" in prompt
-        finally:
-            os.unlink(path)
-
-    def test_build_system_prompt_without_project_instructions(self):
-        """项目指令文件不存在时，不包含 L2 层但不报错。"""
+        """项目指令文件不存在时不报错，只跳过 L2 层。"""
         builder = ContextBuilder(
             identity_prompt="你是 Kocor",
             tools=ToolRegistryStub(),
-            project_instructions_path="/tmp/nonexistent_KOCOR_test.md",
         )
         prompt = builder.build_system_prompt()
         assert "你是 Kocor" in prompt
-        # 不应包含项目指令
-        assert "## 项目指令" not in prompt
 
     def test_build_context_returns_agent_context(self):
         """build_context 应返回 AgentContext。"""

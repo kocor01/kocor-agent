@@ -5,17 +5,10 @@
 
 from __future__ import annotations
 
+from kocor.config import config_get
 from kocor.context.models import SummaryNode
 from kocor.context.token_counter import TokenCounter
 from kocor.llm_provider.message import Message
-
-DEFAULT_SUMMARIZATION_PROMPT = """\
-请压缩以下对话为一段摘要，保留所有关键信息（包括用户需求、工具调用结果、重要上下文）。
-摘要应该简洁但完整，以便后续理解对话背景。
-
-对话内容：
-{history_text}"""
-
 
 class HistorySummarizer:
     """会话历史摘要器。
@@ -25,18 +18,18 @@ class HistorySummarizer:
     Attributes:
         llm: LLM 客户端，用于生成摘要
         summarization_prompt: 摘要 prompt 模板，包含 {history_text} 占位符
-        max_input_chars: 摘要输入的最大字符数（防止输入过长）
     """
 
-    def __init__(
-        self,
-        llm,
-        summarization_prompt: str | None = None,
-        max_input_chars: int = 10_000,
-    ):
+    DEFAULT_PROMPT = """\
+请压缩以下对话为一段摘要，保留所有关键信息（包括用户需求、工具调用结果、重要上下文）。
+摘要应该简洁但完整，以便后续理解对话背景。
+
+对话内容：
+{history_text}"""
+
+    def __init__(self, llm):
         self.llm = llm
-        self.summarization_prompt = summarization_prompt or DEFAULT_SUMMARIZATION_PROMPT
-        self.max_input_chars = max_input_chars
+        self.summarization_prompt = self.DEFAULT_PROMPT
         self._token_counter = TokenCounter()
 
     def summarize(
@@ -67,9 +60,13 @@ class HistorySummarizer:
         # 将消息格式化为文本
         history_text = self._messages_to_text(messages)
 
-        # 截断过长的输入（防止 token 溢出）
-        if len(history_text) > self.max_input_chars:
-            history_text = history_text[:self.max_input_chars] + "\n[... 截断 ...]"
+        # 用 TokenCounter 估算 token 数，超限时按比例截断
+        max_tokens = config_get("context_max_tokens", 200_000)
+        estimated_tokens = self._token_counter.count(history_text)
+        if estimated_tokens > max_tokens:
+            ratio = max_tokens / estimated_tokens
+            truncate_len = int(len(history_text) * ratio)
+            history_text = history_text[:truncate_len] + "\n[... 截断 ...]"
 
         # 调用 LLM 生成摘要
         prompt = self.summarization_prompt.format(history_text=history_text)
@@ -99,13 +96,14 @@ class HistorySummarizer:
 
             if msg.tool_calls:
                 for tc in msg.tool_calls:
-                    lines.append(f"  -> 调用工具: {tc.function.name}({tc.function.arguments})")
+                    lines.append(f"  -> [{tc.id}] 调用工具: {tc.function.name}({tc.function.arguments})")
 
             if msg.content:
                 # 截断超长内容，避免工具结果膨胀
+                prefix = f"  [{msg.tool_call_id}] " if msg.tool_call_id else "  "
                 content = msg.content
                 if len(content) > 1000:
                     content = content[:1000] + "..."
-                lines.append(f"  {content}")
+                lines.append(f"{prefix}{content}")
 
         return "\n".join(lines)

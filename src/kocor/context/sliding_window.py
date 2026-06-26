@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+from kocor.config import config_get
 from kocor.context.models import SummaryNode
 from kocor.context.summarizer import HistorySummarizer
 from kocor.context.token_counter import TokenCounter
@@ -28,17 +29,14 @@ class SlidingWindowStrategy:
         self,
         summarizer: HistorySummarizer,
         preserve_rounds: int = 3,
-        token_margin: int = 10_000,
     ):
         self.summarizer = summarizer
         self.preserve_rounds = preserve_rounds
-        self.token_margin = token_margin
         self._token_counter = TokenCounter()
 
     def apply(
         self,
         messages: list[Message],
-        max_tokens: int,
         current_usage: int,
     ) -> tuple[list[Message], SummaryNode | None]:
         """对消息列表应用滑动窗口。
@@ -48,7 +46,6 @@ class SlidingWindowStrategy:
 
         Args:
             messages: 原始消息列表（不含 system prompt 和当前用户输入）
-            max_tokens: 上下文窗口上限
             current_usage: 当前已用 token（含 system prompt）
 
         Returns:
@@ -61,7 +58,9 @@ class SlidingWindowStrategy:
         rounds = self._split_into_rounds(messages)
 
         # 估算 token 使用，检查是否需要紧急截断
-        available = max_tokens - current_usage - self.token_margin
+        max_tokens = config_get("context_max_tokens", 200_000)
+        token_margin = config_get("token_margin", 10_000)
+        available = max_tokens - current_usage - token_margin
         history_tokens = self._token_counter.count_messages(messages)
 
         if history_tokens > available or available <= 0:

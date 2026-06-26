@@ -103,7 +103,8 @@ class TestHistorySummarizer:
         """自定义摘要 prompt。"""
         llm = FakeLLMForSummary()
         custom_prompt = "请用中文总结：{history_text}"
-        summarizer = HistorySummarizer(llm=llm, summarization_prompt=custom_prompt)
+        summarizer = HistorySummarizer(llm=llm)
+        summarizer.summarization_prompt = custom_prompt
         summarizer.summarize([
             Message(role="user", content="hi"),
             Message(role="assistant", content="hello"),

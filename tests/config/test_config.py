@@ -153,7 +153,6 @@ class TestContextConfig:
         for key in [
             "KOCOR_CONTEXT_STRATEGY",
             "KOCOR_MEMORY_DIR",
-            "KOCOR_PROJECT_INSTRUCTIONS_PATH",
             "KOCOR_CONTEXT_MAX_TOKENS",
             "KOCOR_PRESERVE_ROUNDS",
         ]:
@@ -166,10 +165,6 @@ class TestContextConfig:
     def test_default_memory_dir(self):
         cfg = Config()
         assert cfg.memory_dir == ""
-
-    def test_default_project_instructions(self):
-        cfg = Config()
-        assert cfg.project_instructions_path == "KOCOR.md"
 
     def test_default_context_max_tokens(self):
         cfg = Config()
@@ -188,11 +183,6 @@ class TestContextConfig:
         os.environ["KOCOR_MEMORY_DIR"] = ".kocor/memories"
         cfg = Config._load()
         assert cfg.memory_dir == ".kocor/memories"
-
-    def test_load_project_instructions_from_env(self):
-        os.environ["KOCOR_PROJECT_INSTRUCTIONS_PATH"] = "CUSTOM.md"
-        cfg = Config._load()
-        assert cfg.project_instructions_path == "CUSTOM.md"
 
     def test_load_context_max_tokens_from_env(self):
         os.environ["KOCOR_CONTEXT_MAX_TOKENS"] = "100000"
