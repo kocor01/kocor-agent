@@ -163,15 +163,17 @@ class Config:
         )
 
 
-def config_get(key: str, default: Any = None) -> Any:
-    """快速获取单个配置项的值。
+def config_get(key: str) -> Any:
+    """获取配置项的值。
 
     Args:
         key: 配置项名称（如 "provider", "max_iterations"）
-        default: 配置项不存在时返回的默认值
 
     Returns:
         配置项的值
+
+    Raises:
+        AttributeError: 配置项不存在
 
     Examples:
         >>> get_config("provider")
@@ -179,4 +181,4 @@ def config_get(key: str, default: Any = None) -> Any:
         >>> get_config("max_iterations")
         20
     """
-    return getattr(Config.load(), key, default)
+    return getattr(Config.load(), key)

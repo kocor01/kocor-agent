@@ -1,7 +1,9 @@
 """Agent 循环的迭代预算追踪。"""
 
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
+
+from kocor.config import config_get
 
 
 @dataclass
@@ -13,15 +15,15 @@ class IterationBudget:
     """
 
     iterations_used: int = 0       # 已用迭代次数
-    iterations_limit: int = 200     # 迭代次数上限
+    iterations_limit: int = config_get("max_iterations")  # 迭代次数上限
 
     tokens_prompt: int = 0         # 已用 Prompt Token 数
     tokens_completion: int = 0     # 已用 Completion Token 数
-    tokens_limit: int = 200_000    # Token 总上限
+    tokens_limit: int = config_get("context_max_tokens")  # Token 总上限
 
     time_start: float = 0.0        # 起始时间戳（unix）
     time_elapsed: float = 0.0      # 已用时长（秒）
-    time_limit: float = 300.0      # 运行时长上限（秒）
+    time_limit: float = config_get("timeout")  # 运行时长上限（秒）
 
     def __post_init__(self):
         if self.time_start == 0.0:

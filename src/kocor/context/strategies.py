@@ -61,8 +61,8 @@ class ContextStrategyApplier:
             preserve_last = 1
             preserve_first = 0
         elif effective_strategy == ContextStrategy.SLIDING_WINDOW:
-            preserve_last = config_get("preserve_last_rounds", 3)
-            preserve_first = config_get("preserve_first_rounds", 1)
+            preserve_last = config_get("preserve_last_rounds")
+            preserve_first = config_get("preserve_first_rounds")
         else:
             return messages, None
 

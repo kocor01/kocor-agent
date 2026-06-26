@@ -107,9 +107,9 @@ class ContextBuilder:
             + self._token_counter.count_messages(session_history)
         )
         token_budget = TokenBudget(
-            limit=config_get("context_max_tokens", 200_000),
-            threshold_summary=config_get("context_summary_threshold", 0.70),
-            threshold_truncate=config_get("context_truncate_threshold", 0.90),
+            limit=config_get("context_max_tokens"),
+            threshold_summary=config_get("context_summary_threshold"),
+            threshold_truncate=config_get("context_truncate_threshold"),
         )
         token_budget.used_prompt = estimated_total
 

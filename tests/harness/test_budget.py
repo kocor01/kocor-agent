@@ -1,10 +1,24 @@
 """IterationBudget 测试。"""
 
-from kocor.harness.budget import IterationBudget
+import os
 import time
+
+from kocor.config import Config
+from kocor.harness.budget import IterationBudget
 
 
 class TestIterationBudget:
+    def setup_method(self):
+        Config.reset()
+        self._saved = {}
+        for key in ["KOCOR_MAX_ITERATIONS", "KOCOR_TIMEOUT", "KOCOR_CONTEXT_MAX_TOKENS"]:
+            self._saved[key] = os.environ.pop(key, None)
+
+    def teardown_method(self):
+        for key, val in self._saved.items():
+            if val is not None:
+                os.environ[key] = val
+
     def test_default_values(self):
         budget = IterationBudget()
         assert budget.iterations_used == 0

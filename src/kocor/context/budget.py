@@ -7,6 +7,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from kocor.config import config_get
+
 
 @dataclass
 class TokenBudget:
@@ -20,11 +22,11 @@ class TokenBudget:
         threshold_truncate: 触发截断的阈值比例（0.0 ~ 1.0）
     """
 
-    limit: int = 200_000
+    limit: int = config_get("context_max_tokens")
     used_prompt: int = 0
     used_completion: int = 0
-    threshold_summary: float = 0.70
-    threshold_truncate: float = 0.90
+    threshold_summary: float = config_get("context_summary_threshold")
+    threshold_truncate: float = config_get("context_truncate_threshold")
 
     @property
     def remaining(self) -> int:
