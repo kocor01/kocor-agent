@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from kocor.context.models import SummaryNode
+from kocor.context.types import SummaryNode
 from kocor.context.summarizer import HistorySummarizer
 from kocor.llm_provider.message import FunctionCall, Message, ToolCall
 from kocor.tools.definitions import ToolDefinition

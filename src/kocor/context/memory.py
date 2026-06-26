@@ -10,7 +10,7 @@ import os
 from datetime import datetime
 from pathlib import Path
 
-from kocor.context.models import MemoryItem
+from kocor.context.types import MemoryItem
 
 
 class MemoryManager:

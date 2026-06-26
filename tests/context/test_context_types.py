@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-from kocor.context.models import (
+from kocor.context.budget import TokenBudget
+from kocor.context.types import (
     AgentContext,
+    ContextStrategy,
     MemoryItem,
     SummaryNode,
-    TokenBudget,
 )
-from kocor.context.strategies import ContextStrategy
 from kocor.llm_provider.message import Message
 from kocor.tools.definitions import ToolDefinition
 
@@ -127,22 +127,18 @@ class TestAgentContext:
 
     def test_default_construction(self):
         ctx = AgentContext(
-            identity_prompt="你是助手",
-            project_instructions="",
+            system_content="你是助手\n\n---\n\n项目指令",
             tool_definitions=[],
             session_messages=[],
         )
-        assert ctx.identity_prompt == "你是助手"
+        assert ctx.system_content == "你是助手\n\n---\n\n项目指令"
         assert ctx.session_memory == {}
-        assert ctx.persistent_memories == []
-        assert ctx.environment_info is None
         assert ctx.token_budget.limit == 200_000
 
     def test_with_messages(self):
         msgs = [Message(role="system", content="hi")]
         ctx = AgentContext(
-            identity_prompt="你是助手",
-            project_instructions="",
+            system_content="",
             tool_definitions=[],
             session_messages=msgs,
         )
@@ -152,8 +148,7 @@ class TestAgentContext:
     def test_with_tool_definitions(self):
         tools = [ToolDefinition(name="test", description="测试工具", parameters={})]
         ctx = AgentContext(
-            identity_prompt="",
-            project_instructions="",
+            system_content="",
             tool_definitions=tools,
             session_messages=[],
         )

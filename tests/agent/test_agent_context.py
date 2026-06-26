@@ -52,7 +52,7 @@ class TestAgentContextIntegration:
     def test_agent_with_memory_dir(self):
         """配置 memory_dir 后 Agent 应自动创建 MemoryManager。"""
         import tempfile
-        from kocor.context.models import MemoryItem
+        from kocor.context.types import MemoryItem
 
         mem_dir = tempfile.mkdtemp()
         # 预先写入一条记忆

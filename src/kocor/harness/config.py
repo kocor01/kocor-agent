@@ -30,7 +30,8 @@ class HarnessConfig:
     context_max_tokens: int = 200_000
     context_summary_threshold: float = 0.70
     context_truncate_threshold: float = 0.90
-    preserve_rounds: int = 3
+    preserve_last_rounds: int = 3
+    preserve_first_rounds: int = 1
 
     # 沙箱
     sandbox_timeout: int = 30

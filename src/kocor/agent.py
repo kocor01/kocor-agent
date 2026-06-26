@@ -12,11 +12,11 @@ from typing import Iterator
 from kocor.config import Config
 from kocor.context.builder import ContextBuilder
 from kocor.context.memory import MemoryManager
-from kocor.context.strategies import ContextStrategy
+from kocor.context.types import ContextStrategy
 from kocor.context.summarizer import HistorySummarizer
 from kocor.llm_provider.llm_client import LLMClient
 from kocor.llm_provider.message import Message, StreamChunk
-from kocor.skill.models import InvokeStrategy, SkillContext, SkillType
+from kocor.skill.types import InvokeStrategy, SkillContext, SkillType
 from kocor.skill.skill_manager import SkillManager
 from kocor.tools.tool_manager import ToolManager
 
@@ -109,6 +109,8 @@ class Agent:
             tools=self.tool_manager,
             memory=memory,
             summarizer=summarizer,
+            preserve_last_rounds=cfg.preserve_last_rounds,
+            preserve_first_rounds=cfg.preserve_first_rounds,
         )
 
     @staticmethod

@@ -6,7 +6,7 @@ import tempfile
 
 import pytest
 
-from kocor.skill.models import InvokeStrategy, SkillType
+from kocor.skill.types import InvokeStrategy, SkillType
 from kocor.skill.skill_manager import SkillManager
 
 

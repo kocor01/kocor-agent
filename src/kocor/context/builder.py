@@ -9,10 +9,11 @@ from typing import Any
 
 from kocor.config import config_get
 from kocor.context.env_info import build_environment_info
-from kocor.context.models import AgentContext, TokenBudget
-from kocor.context.strategies import ContextStrategy
-from kocor.context.project_instructions import load_project_instructions
+from kocor.context.budget import TokenBudget
+from kocor.context.types import AgentContext
 from kocor.context.strategies import ContextStrategyApplier
+from kocor.context.types import ContextStrategy
+from kocor.context.project_instructions import load_project_instructions
 from kocor.context.summarizer import HistorySummarizer
 from kocor.context.token_counter import TokenCounter
 from kocor.llm_provider.message import Message
@@ -39,7 +40,8 @@ class ContextBuilder:
         tools: Any,  # 鸭式类型：需要 get_definitions() 方法
         memory: Any | None = None,
         summarizer: HistorySummarizer | None = None,
-        preserve_rounds: int | None = None,
+        preserve_last_rounds: int | None = None,
+        preserve_first_rounds: int = 1,
     ):
         self.identity_prompt = identity_prompt
         self.tools = tools
@@ -47,18 +49,20 @@ class ContextBuilder:
         self._token_counter = TokenCounter()
         self.summarizer = summarizer
         self.strategy_applier = (
-            ContextStrategyApplier(summarizer=summarizer, preserve_rounds=preserve_rounds)
+            ContextStrategyApplier(
+                summarizer=summarizer,
+                preserve_last_rounds=preserve_last_rounds,
+                preserve_first_rounds=preserve_first_rounds,
+            )
             if summarizer
             else None
         )
 
-    def build_system_prompt(self, project_instructions: str | None = None) -> str:
+    def build_system_prompt(self) -> str:
         """构建完整的系统提示文本。
 
-        组装所有可用层，用分隔线分开。
-
-        Args:
-            project_instructions: 已加载的项目指令文本，None 则内部加载
+        组装所有可用层（L1 身份 + L2 项目指令 + L3 环境 + L4 记忆），
+        用分隔线分开。
 
         Returns:
             多层合并后的系统提示字符串
@@ -69,14 +73,12 @@ class ContextBuilder:
         layers.append(self.identity_prompt)
 
         # L2: 项目指令
-        if project_instructions is None:
-            project_instructions = load_project_instructions()
+        project_instructions = load_project_instructions()
         if project_instructions:
             layers.append(project_instructions)
 
         # L3: 动态环境信息
-        env_info = build_environment_info()
-        layers.append(f"## 环境信息\n{env_info}")
+        layers.append(build_environment_info())
 
         # L4: 持久记忆（如有）
         memories_text = self._build_memories_block()
@@ -96,50 +98,53 @@ class ContextBuilder:
         Args:
             user_input: 当前用户输入
             session_history: 当前会话历史消息
-            strategy: 上下文管理策略（应用于会话历史）
+            strategy: 上下文管理策略
 
         Returns:
             AgentContext: 包含系统提示、消息列表、预算信息的上下文对象
         """
-        # 1. 加载项目指令（仅一次，供 L2 和 AgentContext 共用）
-        project_instructions = load_project_instructions()
+        # 1. 构建系统提示（含 L1-L4 所有层）
+        system_content = self.build_system_prompt()
 
-        # 2. 构建系统提示（含 L1-L4 所有层）
-        system_content = self.build_system_prompt(project_instructions)
+        # 2. 估算总 token 用量并构建预算（用于驱动策略决策）
+        estimated_total = (
+            self._token_counter.count(system_content)
+            + self._token_counter.count(user_input)
+            + self._token_counter.count_messages(session_history)
+        )
+        token_budget = TokenBudget(
+            limit=config_get("context_max_tokens", 200_000),
+            threshold_summary=config_get("context_summary_threshold", 0.70),
+            threshold_truncate=config_get("context_truncate_threshold", 0.90),
+        )
+        token_budget.used_prompt = estimated_total
 
         # 3. 应用上下文策略处理会话历史
-        summary_node = None
         processed_history = session_history
-        if strategy != ContextStrategy.DEFAULT and self.strategy_applier:
+        if self.strategy_applier:
             used_prompt = self._token_counter.count(system_content) + self._token_counter.count(user_input)
-            processed_history, summary_node = self.strategy_applier.apply(
+            processed_history, _ = self.strategy_applier.apply(
                 messages=session_history,
                 used_prompt=used_prompt,
                 strategy=strategy,
+                token_budget=token_budget,
             )
 
-        # 4. 构建消息列表
+        # 4. 构建消息列表（摘要已由 strategy 嵌入 processed_history）
         messages: list[Message] = [
             Message(role="system", content=system_content),
         ]
-        if summary_node:
-            messages.append(Message(
-                role="system",
-                content=f"[历史对话摘要]\n{summary_node.summary}",
-            ))
         messages.extend(processed_history)
         messages.append(Message(role="user", content=user_input))
 
-        # 5. 计算 Token 预算
-        token_budget = TokenBudget(limit=config_get("context_max_tokens", 200_000))
+        # 5. 计算最终 Token 预算
         token_budget.used_prompt = self._token_counter.count_messages(messages)
 
-        # 4. 获取工具定义
+        # 6. 获取工具定义
         tool_definitions = self.tools.get_definitions()
 
         return AgentContext(
-            identity_prompt=self.identity_prompt,
-            project_instructions=project_instructions,
+            system_content=system_content,
             tool_definitions=tool_definitions,
             session_messages=messages,
             token_budget=token_budget,

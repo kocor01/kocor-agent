@@ -1,13 +1,13 @@
 """滑动窗口策略。
 
-将消息列表按轮次分割，保留最近的 N 轮完整消息，
-将之前的轮次压缩为一段摘要。
+将消息列表按轮次分割，支持三段落结构：
+  [保留最开始 N 轮] + [摘要中间轮次] + [保留最近 N 轮]
 """
 
 from __future__ import annotations
 
 from kocor.config import config_get
-from kocor.context.models import SummaryNode
+from kocor.context.types import SummaryNode
 from kocor.context.summarizer import HistorySummarizer
 from kocor.context.token_counter import TokenCounter
 from kocor.llm_provider.message import Message
@@ -17,21 +17,27 @@ class SlidingWindowStrategy:
     """滑动窗口策略。
 
     将消息列表按语义轮次（user -> assistant[tool chain] -> assistant[text]）分割。
-    保留最近的 N 轮完整消息，将之前的轮次压缩为一段摘要。
+    支持三段落结构：
+    - 保留最开始 N 轮完整消息
+    - 中间轮次压缩为摘要
+    - 保留最近 N 轮完整消息
 
     Attributes:
         summarizer: 历史摘要器
-        preserve_rounds: 保留的完整轮次数
+        preserve_last_rounds: 保留的最近完整轮次数
+        preserve_first_rounds: 保留的最开始完整轮次数
         token_margin: token 余量（预留空间）
     """
 
     def __init__(
         self,
         summarizer: HistorySummarizer,
-        preserve_rounds: int = 3,
+        preserve_last_rounds: int = 3,
+        preserve_first_rounds: int = 1,
     ):
         self.summarizer = summarizer
-        self.preserve_rounds = preserve_rounds
+        self.preserve_last_rounds = preserve_last_rounds
+        self.preserve_first_rounds = preserve_first_rounds
         self._token_counter = TokenCounter()
 
     def apply(
@@ -41,8 +47,13 @@ class SlidingWindowStrategy:
     ) -> tuple[list[Message], SummaryNode | None]:
         """对消息列表应用滑动窗口。
 
-        核心逻辑：按轮次分割 → 如果轮次超过 preserve_rounds → 旧轮次做摘要。
-        Token 预算检查用于降级到紧急截断（即使轮次未超过限制）。
+        三段落结构：
+        1. 保留最开始 N 轮完整消息
+        2. 中间轮次压缩为摘要（嵌入在返回消息列表的对应位置）
+        3. 保留最近 N 轮完整消息
+
+        当 preserve_first_rounds=0 时行为与原来一致。
+        当 first + last >= 总轮次时不截断。
 
         Args:
             messages: 原始消息列表（不含 system prompt 和当前用户输入）
@@ -65,25 +76,48 @@ class SlidingWindowStrategy:
 
         if history_tokens > available or available <= 0:
             if available <= 0 or history_tokens > max(available, 1) * 3:
-                # token 空间严重不足 → 紧急截断（仅保留最后一轮）
                 return self._aggressive_truncate(rounds)
 
-        if len(rounds) <= self.preserve_rounds:
-            # 轮次少于保留数，不截断
+        # 三段式逻辑
+        total_rounds = len(rounds)
+        if total_rounds <= self.preserve_last_rounds + self.preserve_first_rounds:
+            # 轮次不足，不截断
             return messages, None
 
-        # 保留最近的 N 轮，之前的做摘要
-        preserve = rounds[-self.preserve_rounds:]
-        summarize = rounds[:-self.preserve_rounds]
+        # 分割三段
+        first = rounds[:self.preserve_first_rounds] if self.preserve_first_rounds > 0 else []
+        last = rounds[-self.preserve_last_rounds:]
+        middle = rounds[self.preserve_first_rounds:-self.preserve_last_rounds] \
+            if self.preserve_first_rounds > 0 else rounds[:-self.preserve_last_rounds]
 
-        result = [msg for round_msgs in preserve for msg in round_msgs]
-        to_summarize = [msg for round_msgs in summarize for msg in round_msgs]
+        if not middle:
+            # 中间无轮次，只需拼接首尾
+            result: list[Message] = []
+            for r in first:
+                result.extend(r)
+            for r in last:
+                result.extend(r)
+            return result, None
 
+        # 中间轮次做摘要
+        to_summarize = [msg for r in middle for msg in r]
         summary_node = self.summarizer.summarize(
             to_summarize,
             start_index=0,
             end_index=len(to_summarize),
         )
+        summary_msg = Message(
+            role="system",
+            content=f"[历史对话摘要]\n{summary_node.summary}",
+        )
+
+        # 组装结果: first + summary + last
+        result = []
+        for r in first:
+            result.extend(r)
+        result.append(summary_msg)
+        for r in last:
+            result.extend(r)
 
         return result, summary_node
 
@@ -104,7 +138,6 @@ class SlidingWindowStrategy:
 
         for msg in messages:
             if msg.role == "user" and current_round:
-                # 上一个 user 消息开始新轮次
                 rounds.append(current_round)
                 current_round = []
 
@@ -118,7 +151,7 @@ class SlidingWindowStrategy:
     def _aggressive_truncate(
         self, rounds: list[list[Message]],
     ) -> tuple[list[Message], SummaryNode | None]:
-        """紧急截断：仅保留最后一轮。
+        """紧急截断：仅保留最后一轮，摘要嵌入返回结果。
 
         Args:
             rounds: 轮次列表
@@ -133,4 +166,10 @@ class SlidingWindowStrategy:
         earlier = [msg for r in rounds[:-1] for msg in r]
 
         summary_node = self.summarizer.summarize(earlier)
-        return last_round, summary_node
+        summary_msg = Message(
+            role="system",
+            content=f"[历史对话摘要]\n{summary_node.summary}",
+        )
+        result: list[Message] = [summary_msg]
+        result.extend(last_round)
+        return result, summary_node

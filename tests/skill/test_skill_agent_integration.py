@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 
 from kocor.agent import Agent
 from kocor.llm_provider.message import Message, StreamChunk
-from kocor.skill.models import InvokeStrategy, SkillDefinition, SkillType
+from kocor.skill.types import InvokeStrategy, SkillDefinition, SkillType
 from kocor.skill.skill_manager import SkillManager
 from kocor.tools.tool_manager import ToolManager
 

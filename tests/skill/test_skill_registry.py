@@ -2,7 +2,7 @@
 
 import pytest
 
-from kocor.skill.models import InvokeStrategy, SkillDefinition, SkillType
+from kocor.skill.types import InvokeStrategy, SkillDefinition, SkillType
 from kocor.skill.skill_manager import SkillManager
 
 

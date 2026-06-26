@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from kocor.skill.models import (
+from kocor.skill.types import (
     InvokeStrategy,
     SkillContext,
     SkillDefinition,

@@ -39,7 +39,8 @@ class Config:
     context_max_tokens: int = 200_000
     context_summary_threshold: float = 0.70
     context_truncate_threshold: float = 0.90
-    preserve_rounds: int = 3
+    preserve_last_rounds: int = 3
+    preserve_first_rounds: int = 1
     token_margin: int = 10_000
 
     @classmethod
@@ -130,14 +131,23 @@ class Config:
         else:
             context_max_tokens = 200_000
 
-        preserve_rounds_raw = os.environ.get("KOCOR_PRESERVE_ROUNDS")
-        if preserve_rounds_raw is not None:
+        preserve_last_rounds_raw = os.environ.get("KOCOR_PRESERVE_LAST_ROUNDS")
+        if preserve_last_rounds_raw is not None:
             try:
-                preserve_rounds = int(preserve_rounds_raw)
+                preserve_last_rounds = int(preserve_last_rounds_raw)
             except ValueError:
-                preserve_rounds = 3
+                preserve_last_rounds = 3
         else:
-            preserve_rounds = 3
+            preserve_last_rounds = 3
+
+        preserve_first_rounds_raw = os.environ.get("KOCOR_PRESERVE_FIRST_ROUNDS")
+        if preserve_first_rounds_raw is not None:
+            try:
+                preserve_first_rounds = int(preserve_first_rounds_raw)
+            except ValueError:
+                preserve_first_rounds = 1
+        else:
+            preserve_first_rounds = 1
 
         token_margin_raw = os.environ.get("KOCOR_TOKEN_MARGIN")
         if token_margin_raw is not None:
@@ -184,7 +194,8 @@ class Config:
             context_max_tokens=context_max_tokens,
             context_summary_threshold=context_summary_threshold,
             context_truncate_threshold=context_truncate_threshold,
-            preserve_rounds=preserve_rounds,
+            preserve_last_rounds=preserve_last_rounds,
+            preserve_first_rounds=preserve_first_rounds,
             token_margin=token_margin,
         )
 

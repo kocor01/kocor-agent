@@ -38,7 +38,8 @@ class TestHarnessConfig:
         config = HarnessConfig()
         assert config.context_summary_threshold == 0.70
         assert config.context_truncate_threshold == 0.90
-        assert config.preserve_rounds == 3
+        assert config.preserve_last_rounds == 3
+        assert config.preserve_first_rounds == 1
 
     def test_update_from_dict(self):
         config = HarnessConfig()

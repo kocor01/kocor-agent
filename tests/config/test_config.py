@@ -154,7 +154,8 @@ class TestContextConfig:
             "KOCOR_CONTEXT_STRATEGY",
             "KOCOR_MEMORY_DIR",
             "KOCOR_CONTEXT_MAX_TOKENS",
-            "KOCOR_PRESERVE_ROUNDS",
+            "KOCOR_PRESERVE_LAST_ROUNDS",
+            "KOCOR_PRESERVE_FIRST_ROUNDS",
         ]:
             os.environ.pop(key, None)
 
@@ -170,9 +171,9 @@ class TestContextConfig:
         cfg = Config()
         assert cfg.context_max_tokens == 200_000
 
-    def test_default_preserve_rounds(self):
+    def test_default_preserve_last_rounds(self):
         cfg = Config()
-        assert cfg.preserve_rounds == 3
+        assert cfg.preserve_last_rounds == 3
 
     def test_load_context_strategy_from_env(self):
         os.environ["KOCOR_CONTEXT_STRATEGY"] = "sliding"
@@ -189,9 +190,18 @@ class TestContextConfig:
         cfg = Config._load()
         assert cfg.context_max_tokens == 100_000
 
-    def test_load_preserve_rounds_from_env(self):
-        os.environ["KOCOR_PRESERVE_ROUNDS"] = "5"
+    def test_load_preserve_last_rounds_from_env(self):
+        os.environ["KOCOR_PRESERVE_LAST_ROUNDS"] = "5"
         cfg = Config._load()
-        assert cfg.preserve_rounds == 5
+        assert cfg.preserve_last_rounds == 5
+
+    def test_default_preserve_first_rounds(self):
+        cfg = Config()
+        assert cfg.preserve_first_rounds == 1
+
+    def test_load_preserve_first_rounds_from_env(self):
+        os.environ["KOCOR_PRESERVE_FIRST_ROUNDS"] = "2"
+        cfg = Config._load()
+        assert cfg.preserve_first_rounds == 2
 
 

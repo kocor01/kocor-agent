@@ -1,7 +1,7 @@
 """测试技能暴露为 ToolManager 工具。"""
 
 from kocor.llm_provider.message import FunctionCall, ToolCall
-from kocor.skill.models import InvokeStrategy, SkillDefinition, SkillType
+from kocor.skill.types import InvokeStrategy, SkillDefinition, SkillType
 from kocor.skill.skill_manager import SkillManager
 from kocor.tools.tool_manager import ToolManager
 

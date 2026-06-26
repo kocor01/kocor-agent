@@ -1,6 +1,6 @@
 """测试 Skill 数据模型。"""
 
-from kocor.skill.models import (
+from kocor.skill.types import (
     InvokeStrategy,
     SkillContext,
     SkillDefinition,

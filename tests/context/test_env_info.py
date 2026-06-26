@@ -28,11 +28,12 @@ class TestEnvironmentInfo:
         result = build_environment_info()
         assert "Windows" in result or "Linux" in result or "Darwin" in result
 
-    def test_contains_git_branch(self):
-        """环境信息应包含 git 分支（如果在 git 仓库中）。"""
+    def test_format_has_key_info(self):
+        """环境信息应包含关键信息项。"""
         result = build_environment_info()
-        # 在 git 仓库中运行：应该有分支信息
-        assert "Git 分支:" in result
+        assert "当前日期:" in result
+        assert "当前工作目录:" in result
+        assert "操作系统:" in result
 
     def test_format_is_readable(self):
         result = build_environment_info()

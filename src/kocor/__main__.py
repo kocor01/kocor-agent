@@ -19,7 +19,7 @@ from kocor.agent import Agent
 from kocor.config import Config, config_get
 from kocor.llm_provider.llm_manager import LlmManager
 from kocor.llm_provider.message import StreamChunk
-from kocor.skill.models import InvokeStrategy
+from kocor.skill.types import InvokeStrategy
 from kocor.tools.tool_manager import ToolManager
 
 # Harness imports

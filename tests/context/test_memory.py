@@ -6,7 +6,7 @@ import os
 import tempfile
 
 from kocor.context.memory import MemoryManager
-from kocor.context.models import MemoryItem
+from kocor.context.types import MemoryItem
 
 
 class TestMemoryManager:

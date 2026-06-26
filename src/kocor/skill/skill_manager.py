@@ -9,7 +9,7 @@ import sys
 from pathlib import Path
 from typing import Callable
 
-from kocor.skill.models import (
+from kocor.skill.types import (
     InvokeStrategy,
     SkillContext,
     SkillDefinition,

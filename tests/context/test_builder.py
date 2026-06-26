@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from kocor.context.builder import ContextBuilder
-from kocor.context.models import AgentContext
+from kocor.context.types import AgentContext
 from kocor.tools.definitions import ToolDefinition
 
 
@@ -151,7 +151,7 @@ class TestContextBuilder:
         """记忆应注入到 system prompt 中。"""
         import tempfile
         from kocor.context.memory import MemoryManager
-        from kocor.context.models import MemoryItem
+        from kocor.context.types import MemoryItem
 
         mem_dir = tempfile.mkdtemp()
         memory = MemoryManager(memory_dir=mem_dir)

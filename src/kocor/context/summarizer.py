@@ -6,7 +6,7 @@
 from __future__ import annotations
 
 from kocor.config import config_get
-from kocor.context.models import SummaryNode
+from kocor.context.types import SummaryNode
 from kocor.context.token_counter import TokenCounter
 from kocor.llm_provider.message import Message
 
