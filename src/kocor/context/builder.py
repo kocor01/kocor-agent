@@ -100,11 +100,16 @@ class ContextBuilder:
         # 1. 构建系统提示（含 L1-L4 所有层）
         system_content = self.build_system_prompt()
 
-        # 2. 估算总 token 用量并构建预算（用于驱动策略决策）
+        # 2. 获取工具定义
+        tool_definitions = self.tools.get_definitions()
+        tool_tokens = self._token_counter.count_tools(tool_definitions)
+
+        # 3. 估算总 token 用量并构建预算（含工具定义，用于驱动策略决策）
         estimated_total = (
             self._token_counter.count(system_content)
             + self._token_counter.count(user_input)
             + self._token_counter.count_messages(session_history)
+            + tool_tokens
         )
         token_budget = TokenBudget(
             limit=config_get("context_max_tokens"),
@@ -113,7 +118,7 @@ class ContextBuilder:
         )
         token_budget.used_prompt = estimated_total
 
-        # 3. 应用上下文策略处理会话历史
+        # 4. 应用上下文策略处理会话历史
         processed_history = session_history
         if self.strategy_applier:
             processed_history, _ = self.strategy_applier.apply(
@@ -122,18 +127,13 @@ class ContextBuilder:
                 token_budget=token_budget,
             )
 
-        # 4. 构建消息列表（摘要已由 strategy 嵌入 processed_history）
+        # 5. 计算最终 Token 预算（含工具定义）
         messages: list[Message] = [
             Message(role="system", content=system_content),
         ]
         messages.extend(processed_history)
         messages.append(Message(role="user", content=user_input))
-
-        # 5. 计算最终 Token 预算
-        token_budget.used_prompt = self._token_counter.count_messages(messages)
-
-        # 6. 获取工具定义
-        tool_definitions = self.tools.get_definitions()
+        token_budget.used_prompt = self._token_counter.count_messages(messages) + tool_tokens
 
         return AgentContext(
             system_content=system_content,

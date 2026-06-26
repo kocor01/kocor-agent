@@ -13,8 +13,6 @@ import argparse
 import sys
 from typing import Iterator
 
-from dotenv import load_dotenv
-
 from kocor.agent import Agent
 from kocor.config import Config, config_get
 from kocor.llm_provider.llm_manager import LlmManager
@@ -210,7 +208,6 @@ def main() -> None:
     repl_enabled = args.repl
     user_args = args.user_input
 
-    load_dotenv()
     Config.load()
 
     setup_logger("INFO")

@@ -5,7 +5,10 @@
 
 from __future__ import annotations
 
+import json
+
 from kocor.llm_provider.message import Message
+from kocor.tools.definitions import ToolDefinition
 
 
 class TokenCounter:
@@ -77,3 +80,27 @@ class TokenCounter:
             估算的总 token 数
         """
         return sum(self.count_message(m) for m in messages)
+
+    def count_tools(self, tools: list[ToolDefinition]) -> int:
+        """估算工具定义列表的总 token 数。
+
+        使用与 LLM API 请求相同的序列化格式估算。
+
+        Args:
+            tools: 工具定义列表
+
+        Returns:
+            估算的总 token 数
+        """
+        total = 0
+        for tool in tools:
+            serialized = json.dumps({
+                "type": "function",
+                "function": {
+                    "name": tool.name,
+                    "description": tool.description,
+                    "parameters": tool.parameters,
+                },
+            }, ensure_ascii=False, indent=2)
+            total += self.count(serialized)
+        return total

@@ -9,7 +9,6 @@ from kocor.llm_provider.message import FunctionCall, StreamChunk, ToolCall
 def _mock_cli_main_stack(argv: list[str]) -> ExitStack:
     """创建 main() 所需的通用 mock 上下文栈。"""
     stack = ExitStack()
-    stack.enter_context(patch("kocor.__main__.load_dotenv"))
     mock_cfg = MagicMock(skills_config="", mcp_config="", max_iterations=20)
     stack.enter_context(patch("kocor.config.Config.load", return_value=mock_cfg))
     stack.enter_context(patch("kocor.__main__.LlmManager"))
@@ -56,14 +55,13 @@ class TestCLIParseArgs:
 class TestCLIMain:
     """测试 CLI main 函数"""
 
-    @patch("kocor.__main__.load_dotenv")
     @patch("kocor.config.Config.load")
     @patch("kocor.__main__.LlmManager")
     @patch("kocor.__main__.ToolManager")
     @patch("kocor.__main__.Agent")
     @patch("sys.argv", ["kocor", "--stream", "你好"])
     def test_main_with_stream(self, mock_agent_cls, mock_tools,
-                              mock_llm, mock_config, mock_dotenv):
+                              mock_llm, mock_config):
         """测试 --stream 模式"""
         from kocor.__main__ import main
 
@@ -82,14 +80,13 @@ class TestCLIMain:
         mock_agent.stream.assert_called_once()
         mock_agent.run.assert_not_called()
 
-    @patch("kocor.__main__.load_dotenv")
     @patch("kocor.config.Config.load")
     @patch("kocor.__main__.LlmManager")
     @patch("kocor.__main__.ToolManager")
     @patch("kocor.__main__.Agent")
     @patch("sys.argv", ["kocor", "你好"])
     def test_main_without_stream(self, mock_agent_cls, mock_tools,
-                                 mock_llm, mock_config, mock_dotenv):
+                                 mock_llm, mock_config):
         """测试非流式模式"""
         from kocor.__main__ import main
 
@@ -104,14 +101,13 @@ class TestCLIMain:
         mock_agent.run.assert_called_once()
         mock_agent.stream.assert_not_called()
 
-    @patch("kocor.__main__.load_dotenv")
     @patch("kocor.config.Config.load")
     @patch("kocor.__main__.LlmManager")
     @patch("kocor.__main__.ToolManager")
     @patch("kocor.__main__.Agent")
     @patch("sys.argv", ["kocor"])
     def test_main_no_input(self, mock_agent_cls, mock_tools,
-                           mock_llm, mock_config, mock_dotenv):
+                           mock_llm, mock_config):
         """测试无输入时打印用法"""
         from kocor.__main__ import main
 
@@ -130,14 +126,13 @@ class TestCLIMain:
         assert mock_exit.called
         mock_exit.assert_called_with(1)
 
-    @patch("kocor.__main__.load_dotenv")
     @patch("kocor.config.Config.load")
     @patch("kocor.__main__.LlmManager")
     @patch("kocor.__main__.ToolManager")
     @patch("kocor.__main__.Agent")
     @patch("sys.argv", ["kocor", "--stream", "你好"])
     def test_stream_prints_tool_calls(self, mock_agent_cls, mock_tools,
-                                      mock_llm, mock_config, mock_dotenv):
+                                      mock_llm, mock_config):
         """测试流式模式下工具调用输出"""
         from kocor.__main__ import main
 
@@ -206,7 +201,6 @@ class TestCLIMain:
 class TestCLIReasoning:
     """测试 CLI 流式模式下 reasoning 输出"""
 
-    @patch("kocor.__main__.load_dotenv")
     @patch("kocor.config.Config.load")
     @patch("kocor.__main__.LlmManager")
     @patch("kocor.__main__.ToolManager")
@@ -214,7 +208,7 @@ class TestCLIReasoning:
     @patch("sys.argv", ["kocor", "--stream", "你好"])
     def test_stream_prints_reasoning(self, mock_agent_cls,
                                      mock_tools, mock_llm,
-                                     mock_config, mock_dotenv):
+                                     mock_config):
         """测试流式模式下 reasoning 内容输出"""
         from kocor.__main__ import main
 
@@ -248,7 +242,6 @@ class TestCLIReasoning:
 
 
 _CLI_MAIN_MOCKS = [
-    patch("kocor.__main__.load_dotenv"),
     patch("kocor.config.Config.load"),
     patch("kocor.__main__.LlmManager"),
     patch("kocor.__main__.ToolManager"),

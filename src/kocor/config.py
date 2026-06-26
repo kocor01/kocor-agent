@@ -9,12 +9,15 @@ import os
 from dataclasses import dataclass
 from typing import Any, ClassVar, Optional
 
+from dotenv import load_dotenv
+
 
 @dataclass
 class Config:
     """系统配置。"""
 
     _instance: ClassVar[Optional[Config]] = None
+    _dotenv_loaded: ClassVar[bool] = False
 
     provider: str = "openai"                # AI 提供商（openai / anthropic）
     max_iterations: int = 20                # 最大迭代次数
@@ -54,10 +57,14 @@ class Config:
     def reset(cls) -> None:
         """清除全局实例（用于测试）。"""
         cls._instance = None
+        cls._dotenv_loaded = False
 
     @classmethod
     def _load(cls) -> Config:
         """从环境变量加载配置，未设置的字段使用类属性默认值。"""
+        if not cls._dotenv_loaded:
+            load_dotenv()
+            cls._dotenv_loaded = True
 
         provider_raw = os.environ.get("KOCOR_PROVIDER", Config.provider)
         provider = provider_raw.lower()
