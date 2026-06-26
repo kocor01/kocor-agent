@@ -64,13 +64,11 @@ echo "统计当前目录下 .py 文件数量" | python -m kocor
 
 ```python
 from kocor.agent import Agent
-from kocor.config import load_config
 from kocor.llm_client import create_llm_client
 from kocor.tools import create_default_tools
 
-config = load_config()
-llm = create_llm_client(config)
-tools = create_default_tools(config)
+llm = create_llm_client()
+tools = create_default_tools()
 agent = Agent(llm=llm, tools=tools)
 
 result = agent.run("帮我读取 .env 的内容")

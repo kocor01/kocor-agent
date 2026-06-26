@@ -30,13 +30,12 @@ class MockToolBlock:
 class TestAnthropicClient:
     """测试 Anthropic 客户端"""
 
-    def _make_config(self, **kwargs) -> Config:
-        defaults = {"provider": "anthropic"}
-        defaults.update(kwargs)
-        return Config(**defaults)
+    def setup_method(self):
+        Config.reset()
+        Config._instance = Config(provider="anthropic")
 
     def test_provider(self):
-        client = AnthropicClient(self._make_config())
+        client = AnthropicClient()
         assert client.provider == "anthropic"
 
     
@@ -50,7 +49,7 @@ class TestAnthropicClient:
         mock_response = MagicMock(content=[mock_text_block], stop_reason="end_turn")
         mock_client.messages.create.return_value = mock_response
 
-        client = AnthropicClient(self._make_config())
+        client = AnthropicClient()
         result = client.generate([Message(role="user", content="你好")])
 
         assert isinstance(result, Message)
@@ -72,7 +71,7 @@ class TestAnthropicClient:
         mock_response = MagicMock(content=[mock_tool_block], stop_reason="tool_use")
         mock_client.messages.create.return_value = mock_response
 
-        client = AnthropicClient(self._make_config())
+        client = AnthropicClient()
         result = client.generate([Message(role="user", content="读 test.txt")])
 
         assert isinstance(result, Message)
@@ -93,7 +92,7 @@ class TestAnthropicClient:
         mock_response = MagicMock(content=[mock_text_block], stop_reason="end_turn")
         mock_client.messages.create.return_value = mock_response
 
-        client = AnthropicClient(self._make_config())
+        client = AnthropicClient()
         tools = [
             ToolDefinition(
                 name="read_file",
@@ -116,7 +115,7 @@ class TestAnthropicClient:
         mock_response = MagicMock(content=[mock_text_block], stop_reason="end_turn")
         mock_client.messages.create.return_value = mock_response
 
-        client = AnthropicClient(self._make_config())
+        client = AnthropicClient()
         messages = [
             Message(role="system", content="你是助手"),
             Message(role="user", content="hi"),
@@ -136,7 +135,7 @@ class TestAnthropicClient:
             stop_reason="end_turn",
         )
 
-        client = AnthropicClient(self._make_config())
+        client = AnthropicClient()
         messages = [
             Message(role="user", content="hi"),
             Message(role="assistant", content="", tool_calls=[
@@ -157,7 +156,7 @@ class TestAnthropicClient:
             stop_reason="end_turn",
         )
 
-        client = AnthropicClient(self._make_config())
+        client = AnthropicClient()
         messages = [
             Message(role="user", content="do two things"),
             Message(role="assistant", content="", tool_calls=[
@@ -250,10 +249,9 @@ class MockMessageStop:
 class TestAnthropicClientStream:
     """测试 Anthropic 客户端流式"""
 
-    def _make_config(self, **kwargs) -> Config:
-        defaults = {"provider": "anthropic"}
-        defaults.update(kwargs)
-        return Config(**defaults)
+    def setup_method(self):
+        Config.reset()
+        Config._instance = Config(provider="anthropic")
 
     @patch("kocor.llm_provider.providers.anthropic_client.Anthropic")
     def test_stream_text_response(self, mock_anthropic_cls):
@@ -268,7 +266,7 @@ class TestAnthropicClientStream:
             MockMessageStop(),
         ]
 
-        client = AnthropicClient(self._make_config())
+        client = AnthropicClient()
         chunks = list(client.stream([Message(role="user", content="hi")]))
 
         assert len(chunks) == 3
@@ -295,7 +293,7 @@ class TestAnthropicClientStream:
             MockMessageStop(),
         ]
 
-        client = AnthropicClient(self._make_config())
+        client = AnthropicClient()
         chunks = list(client.stream(
             [Message(role="user", content="读 test.txt")],
             tools=[ToolDefinition(name="read_file", description="读文件", parameters={})],
@@ -325,7 +323,7 @@ class TestAnthropicClientStream:
             MockMessageStop(),
         ]
 
-        client = AnthropicClient(self._make_config())
+        client = AnthropicClient()
         chunks = list(client.stream([Message(role="user", content="hi")]))
 
         assert chunks[-1].is_final is True
@@ -346,10 +344,9 @@ class MockThinkingBlock:
 class TestAnthropicClientReasoning:
     """测试 Anthropic 客户端思维链 (thinking → reasoning)"""
 
-    def _make_config(self, **kwargs) -> Config:
-        defaults = {"provider": "anthropic"}
-        defaults.update(kwargs)
-        return Config(**defaults)
+    def setup_method(self):
+        Config.reset()
+        Config._instance = Config(provider="anthropic")
 
     @patch("kocor.llm_provider.providers.anthropic_client.Anthropic")
     def test_normalize_out_thinking_to_reasoning(self, mock_anthropic_cls):
@@ -362,7 +359,7 @@ class TestAnthropicClientReasoning:
         mock_response = MagicMock(content=[mock_thinking_block, mock_text_block], stop_reason="end_turn")
         mock_client.messages.create.return_value = mock_response
 
-        client = AnthropicClient(self._make_config())
+        client = AnthropicClient()
         result = client.generate([Message(role="user", content="读文件")])
 
         assert result.content == "文件内容是 hello"
@@ -379,7 +376,7 @@ class TestAnthropicClientReasoning:
         mock_response = MagicMock(content=[mock_thinking_block, mock_tool_block], stop_reason="tool_use")
         mock_client.messages.create.return_value = mock_response
 
-        client = AnthropicClient(self._make_config())
+        client = AnthropicClient()
         result = client.generate([Message(role="user", content="读文件")])
 
         assert result.reasoning == "我需要读取文件..."
@@ -400,7 +397,7 @@ class TestAnthropicClientReasoning:
             MockMessageStop(),
         ]
 
-        client = AnthropicClient(self._make_config())
+        client = AnthropicClient()
         chunks = list(client.stream([Message(role="user", content="读文件")]))
 
         # reasoning 增量返回（与 content 一致）

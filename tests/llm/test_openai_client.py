@@ -11,13 +11,12 @@ from kocor.llm_provider.message import FunctionCall, Message, ToolCall
 class TestOpenAIClient:
     """测试 OpenAI 客户端"""
 
-    def _make_config(self, **kwargs) -> Config:
-        defaults = {"provider": "openai"}
-        defaults.update(kwargs)
-        return Config(**defaults)
+    def setup_method(self):
+        Config.reset()
+        Config._instance = Config(provider="openai")
 
     def test_provider(self):
-        client = OpenAIClient(self._make_config())
+        client = OpenAIClient()
         assert client.provider == "openai"
 
     
@@ -34,7 +33,7 @@ class TestOpenAIClient:
         mock_response = MagicMock(choices=[mock_choice])
         mock_client.chat.completions.create.return_value = mock_response
 
-        client = OpenAIClient(self._make_config())
+        client = OpenAIClient()
         result = client.generate([Message(role="user", content="你好")])
 
         assert isinstance(result, Message)
@@ -65,7 +64,7 @@ class TestOpenAIClient:
         mock_response = MagicMock(choices=[mock_choice])
         mock_client.chat.completions.create.return_value = mock_response
 
-        client = OpenAIClient(self._make_config())
+        client = OpenAIClient()
         result = client.generate([Message(role="user", content="读 test.txt")])
 
         assert isinstance(result, Message)
@@ -87,7 +86,7 @@ class TestOpenAIClient:
         mock_response = MagicMock(choices=[mock_choice])
         mock_client.chat.completions.create.return_value = mock_response
 
-        client = OpenAIClient(self._make_config())
+        client = OpenAIClient()
         tools = [
             ToolDefinition(name="read_file", description="读文件", parameters={"type": "object", "properties": {}})
         ]
@@ -115,7 +114,7 @@ class TestOpenAIClient:
         mock_response = MagicMock(choices=[mock_choice])
         mock_client.chat.completions.create.return_value = mock_response
 
-        client = OpenAIClient(self._make_config())
+        client = OpenAIClient()
         client.generate(
             [Message(role="user", content="hi")],
             temperature=0.7,
@@ -143,10 +142,9 @@ class MockOpenAIChunk:
 class TestOpenAIClientStream:
     """测试 OpenAI 客户端流式"""
 
-    def _make_config(self, **kwargs) -> Config:
-        defaults = {"provider": "openai"}
-        defaults.update(kwargs)
-        return Config(**defaults)
+    def setup_method(self):
+        Config.reset()
+        Config._instance = Config(provider="openai")
 
     @patch("kocor.llm_provider.providers.openai_client.OpenAI")
     def test_stream_text_response(self, mock_openai_cls):
@@ -161,7 +159,7 @@ class TestOpenAIClientStream:
             MockOpenAIChunk(finish_reason="stop"),
         ]
 
-        client = OpenAIClient(self._make_config())
+        client = OpenAIClient()
         chunks = list(client.stream([Message(role="user", content="hi")]))
 
         assert len(chunks) == 3
@@ -191,7 +189,7 @@ class TestOpenAIClientStream:
             ),
         ]
 
-        client = OpenAIClient(self._make_config())
+        client = OpenAIClient()
         chunks = list(client.stream(
             [Message(role="user", content="读 test.txt")],
             tools=[ToolDefinition(name="read_file", description="读文件", parameters={})],
@@ -215,7 +213,7 @@ class TestOpenAIClientStream:
             MockOpenAIChunk(finish_reason="stop"),
         ]
 
-        client = OpenAIClient(self._make_config())
+        client = OpenAIClient()
         chunks = list(client.stream([Message(role="user", content="hi")]))
 
         # 空 content 的 chunk 仍 yield，因为 is_final 信号在最后一个 chunk 上
@@ -236,7 +234,7 @@ class TestOpenAIClientStream:
         mock_response = MagicMock(choices=[mock_choice])
         mock_client.chat.completions.create.return_value = mock_response
 
-        client = OpenAIClient(self._make_config())
+        client = OpenAIClient()
         messages = [
             Message(role="system", content="你是助手"),
             Message(role="user", content="hi"),
@@ -260,7 +258,7 @@ class TestOpenAIClientStream:
         mock_response = MagicMock(choices=[mock_choice])
         mock_client.chat.completions.create.return_value = mock_response
 
-        client = OpenAIClient(self._make_config())
+        client = OpenAIClient()
         messages = [
             Message(role="user", content="hi"),
             Message(role="assistant", content="", tool_calls=[
@@ -288,7 +286,7 @@ class TestOpenAIClientStream:
         mock_response = MagicMock(choices=[mock_choice])
         mock_client.chat.completions.create.return_value = mock_response
 
-        client = OpenAIClient(self._make_config())
+        client = OpenAIClient()
         messages = [
             Message(role="user", content="hi"),
             Message(role="assistant", content="结果", reasoning="让我想想..."),
@@ -314,7 +312,7 @@ class TestOpenAIClientStream:
         mock_response = MagicMock(choices=[mock_choice])
         mock_client.chat.completions.create.return_value = mock_response
 
-        client = OpenAIClient(self._make_config())
+        client = OpenAIClient()
         result = client.generate([Message(role="user", content="读文件")])
 
         assert result.content == "文件内容是 hello"
@@ -336,7 +334,7 @@ class TestOpenAIClientStream:
             MockOpenAIChunk(tool_calls=[mock_tc_delta], finish_reason="tool_calls"),
         ]
 
-        client = OpenAIClient(self._make_config())
+        client = OpenAIClient()
         chunks = list(client.stream([Message(role="user", content="读文件")]))
 
         # reasoning 增量返回（与 content 一致）

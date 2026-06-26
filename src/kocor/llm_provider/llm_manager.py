@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from kocor.config import Config
+from kocor.config import config_get
 from kocor.llm_provider.llm_client import LLMClient
 
 
@@ -28,11 +28,8 @@ class LlmManager:
         """
         self._clients[provider] = client_class
 
-    def create(self, config: Config) -> LLMClient:
-        """根据配置创建 LLM 客户端。
-
-        Args:
-            config: LLM 配置对象
+    def create(self) -> LLMClient:
+        """根据系统配置创建 LLM 客户端。
 
         Returns:
             对应的 LLMClient 实例
@@ -47,13 +44,14 @@ class LlmManager:
             self.register("openai", OpenAIClient)
             self.register("anthropic", AnthropicClient)
 
-        client_class = self._clients.get(config.provider)
+        provider = config_get("provider")
+        client_class = self._clients.get(provider)
         if client_class is None:
             raise ValueError(
-                f"不支持的 provider: '{config.provider}'，"
+                f"不支持的 provider: '{provider}'，"
                 f"可选值: {sorted(self._clients.keys())}"
             )
-        return client_class(config)
+        return client_class()
 
     @classmethod
     def reset(cls) -> None:
@@ -72,11 +70,8 @@ class LlmManager:
         cls.get_instance().register(provider, client_class)
 
     @classmethod
-    def create_llm_client(cls, config: Config) -> LLMClient:
-        """根据配置创建 LLM 客户端。
-
-        Args:
-            config: LLM 配置对象
+    def create_llm_client(cls) -> LLMClient:
+        """根据系统配置创建 LLM 客户端。
 
         Returns:
             对应的 LLMClient 实例
@@ -84,6 +79,6 @@ class LlmManager:
         Raises:
             ValueError: 不支持的 provider
         """
-        return cls.get_instance().create(config)
+        return cls.get_instance().create()
 
 

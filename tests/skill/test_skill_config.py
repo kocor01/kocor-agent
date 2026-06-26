@@ -2,7 +2,7 @@
 
 import os
 
-from kocor.config import Config, load_config
+from kocor.config import Config
 
 
 class TestConfigSkillDefaults:
@@ -41,26 +41,26 @@ class TestLoadConfigSkillEnv:
                 os.environ.pop(key, None)
 
     def test_load_skills_config_default(self):
-        cfg = load_config()
+        cfg = Config._load()
         assert cfg.skills_config == "kocor.skills.json"
 
     def test_load_skills_config_from_env(self):
         os.environ["KOCOR_SKILLS_CONFIG"] = "my_skills.json"
-        cfg = load_config()
+        cfg = Config._load()
         assert cfg.skills_config == "my_skills.json"
 
     def test_load_skills_dir_default(self):
-        cfg = load_config()
+        cfg = Config._load()
         assert cfg.skills_dir == "skills"
 
     def test_load_skills_dir_from_env(self):
         os.environ["KOCOR_SKILLS_DIR"] = "custom_skills"
-        cfg = load_config()
+        cfg = Config._load()
         assert cfg.skills_dir == "custom_skills"
 
     def test_load_both_skill_env(self):
         os.environ["KOCOR_SKILLS_CONFIG"] = "a.json"
         os.environ["KOCOR_SKILLS_DIR"] = "b"
-        cfg = load_config()
+        cfg = Config._load()
         assert cfg.skills_config == "a.json"
         assert cfg.skills_dir == "b"

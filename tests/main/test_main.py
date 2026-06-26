@@ -10,8 +10,8 @@ def _mock_cli_main_stack(argv: list[str]) -> ExitStack:
     """创建 main() 所需的通用 mock 上下文栈。"""
     stack = ExitStack()
     stack.enter_context(patch("kocor.__main__.load_dotenv"))
-    mock_cfg = MagicMock(skills_config="", mcp_config="")
-    stack.enter_context(patch("kocor.__main__.load_config", return_value=mock_cfg))
+    mock_cfg = MagicMock(skills_config="", mcp_config="", max_iterations=20)
+    stack.enter_context(patch("kocor.config.Config.load", return_value=mock_cfg))
     stack.enter_context(patch("kocor.__main__.LlmManager"))
     stack.enter_context(patch("kocor.__main__.ToolManager"))
     stack.enter_context(patch("sys.argv", argv))
@@ -57,7 +57,7 @@ class TestCLIMain:
     """测试 CLI main 函数"""
 
     @patch("kocor.__main__.load_dotenv")
-    @patch("kocor.__main__.load_config")
+    @patch("kocor.config.Config.load")
     @patch("kocor.__main__.LlmManager")
     @patch("kocor.__main__.ToolManager")
     @patch("kocor.__main__.Agent")
@@ -67,7 +67,7 @@ class TestCLIMain:
         """测试 --stream 模式"""
         from kocor.__main__ import main
 
-        mock_config.return_value = MagicMock(skills_config="")
+        mock_config.return_value = MagicMock(skills_config="", max_iterations=20)
         mock_agent = MagicMock()
         mock_agent.stream.return_value = iter([
             StreamChunk(content="你"),
@@ -83,7 +83,7 @@ class TestCLIMain:
         mock_agent.run.assert_not_called()
 
     @patch("kocor.__main__.load_dotenv")
-    @patch("kocor.__main__.load_config")
+    @patch("kocor.config.Config.load")
     @patch("kocor.__main__.LlmManager")
     @patch("kocor.__main__.ToolManager")
     @patch("kocor.__main__.Agent")
@@ -93,7 +93,7 @@ class TestCLIMain:
         """测试非流式模式"""
         from kocor.__main__ import main
 
-        mock_config.return_value = MagicMock(skills_config="")
+        mock_config.return_value = MagicMock(skills_config="", max_iterations=20)
         mock_agent = MagicMock()
         mock_agent.run.return_value = "非流式结果"
         mock_agent_cls.return_value = mock_agent
@@ -105,7 +105,7 @@ class TestCLIMain:
         mock_agent.stream.assert_not_called()
 
     @patch("kocor.__main__.load_dotenv")
-    @patch("kocor.__main__.load_config")
+    @patch("kocor.config.Config.load")
     @patch("kocor.__main__.LlmManager")
     @patch("kocor.__main__.ToolManager")
     @patch("kocor.__main__.Agent")
@@ -115,7 +115,7 @@ class TestCLIMain:
         """测试无输入时打印用法"""
         from kocor.__main__ import main
 
-        mock_config.return_value = MagicMock(skills_config="")
+        mock_config.return_value = MagicMock(skills_config="", max_iterations=20)
         mock_agent_cls.return_value = MagicMock()
 
         mock_stdin = MagicMock()
@@ -131,7 +131,7 @@ class TestCLIMain:
         mock_exit.assert_called_with(1)
 
     @patch("kocor.__main__.load_dotenv")
-    @patch("kocor.__main__.load_config")
+    @patch("kocor.config.Config.load")
     @patch("kocor.__main__.LlmManager")
     @patch("kocor.__main__.ToolManager")
     @patch("kocor.__main__.Agent")
@@ -141,7 +141,7 @@ class TestCLIMain:
         """测试流式模式下工具调用输出"""
         from kocor.__main__ import main
 
-        mock_config.return_value = MagicMock(skills_config="")
+        mock_config.return_value = MagicMock(skills_config="", max_iterations=20)
         mock_agent = MagicMock()
         mock_agent.stream.return_value = iter([
             StreamChunk(
@@ -207,7 +207,7 @@ class TestCLIReasoning:
     """测试 CLI 流式模式下 reasoning 输出"""
 
     @patch("kocor.__main__.load_dotenv")
-    @patch("kocor.__main__.load_config")
+    @patch("kocor.config.Config.load")
     @patch("kocor.__main__.LlmManager")
     @patch("kocor.__main__.ToolManager")
     @patch("kocor.__main__.Agent")
@@ -218,7 +218,7 @@ class TestCLIReasoning:
         """测试流式模式下 reasoning 内容输出"""
         from kocor.__main__ import main
 
-        mock_config.return_value = MagicMock(skills_config="")
+        mock_config.return_value = MagicMock(skills_config="", max_iterations=20)
         mock_agent = MagicMock()
         mock_agent.stream.return_value = iter([
             StreamChunk(content="让我"),
@@ -249,7 +249,7 @@ class TestCLIReasoning:
 
 _CLI_MAIN_MOCKS = [
     patch("kocor.__main__.load_dotenv"),
-    patch("kocor.__main__.load_config"),
+    patch("kocor.config.Config.load"),
     patch("kocor.__main__.LlmManager"),
     patch("kocor.__main__.ToolManager"),
     patch("kocor.__main__.Agent"),

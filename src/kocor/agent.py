@@ -9,6 +9,7 @@ import json
 import time
 from typing import Iterator
 
+from kocor.config import Config
 from kocor.context.builder import ContextBuilder
 from kocor.context.memory import MemoryManager
 from kocor.context.models import ContextStrategy
@@ -61,30 +62,32 @@ class Agent:
         llm: LLMClient,
         tool_manager: ToolManager | None = None,
         system_prompt: str | None = None,
-        max_iterations: int = 20,
+        max_iterations: int | None = None,
         skill_manager: SkillManager | None = None,
         # 上下文管理参数
         memory_dir: str | None = None,
-        context_strategy: str = "default",
-        project_instructions_path: str = "KOCOR.md",
-        context_max_tokens: int = 200_000,
+        context_strategy: str | None = None,
+        project_instructions_path: str | None = None,
+        context_max_tokens: int | None = None,
         # Harness 参数（可选）
         permission_mgr: PermissionManager | None = None,
         hook_manager: HookManager | None = None,
         event_emitter: EventEmitter | None = None,
         budget: IterationBudget | None = None,
     ):
+        cfg = Config.load()
+
         self.llm = llm
         self.tool_manager = tool_manager or ToolManager()
         self.system_prompt = system_prompt or DEFAULT_SYSTEM_PROMPT
-        self.max_iterations = max_iterations
+        self.max_iterations = max_iterations if max_iterations is not None else cfg.max_iterations
         self.skill_manager = skill_manager
 
         # Harness 组件
         self.permission_mgr = permission_mgr or PermissionManager(policy=PermissionManager.POLICY_PERMISSIVE)
         self.hook_manager = hook_manager or HookManager()
         self.event_emitter = event_emitter or EventEmitter()
-        self.budget = budget or IterationBudget(iterations_limit=max_iterations)
+        self.budget = budget or IterationBudget(iterations_limit=self.max_iterations)
 
         # 循环状态
         self._iteration = 0
@@ -92,10 +95,12 @@ class Agent:
         self._messages: list[Message] = []
 
         # 上下文管理
-        self.context_strategy = self._parse_strategy(context_strategy)
+        resolved_strategy = context_strategy if context_strategy is not None else cfg.context_strategy
+        self.context_strategy = self._parse_strategy(resolved_strategy)
         memory: MemoryManager | None = None
-        if memory_dir:
-            memory = MemoryManager(memory_dir=memory_dir)
+        memory_dir_resolved = memory_dir if memory_dir is not None else (cfg.memory_dir or None)
+        if memory_dir_resolved:
+            memory = MemoryManager(memory_dir=memory_dir_resolved)
 
         summarizer: HistorySummarizer | None = None
         if self.context_strategy != ContextStrategy.DEFAULT:
@@ -105,8 +110,8 @@ class Agent:
             identity_prompt=self.system_prompt,
             tools=self.tool_manager,
             memory=memory,
-            project_instructions_path=project_instructions_path,
-            max_tokens=context_max_tokens,
+            project_instructions_path=project_instructions_path if project_instructions_path is not None else cfg.project_instructions_path,
+            max_tokens=context_max_tokens if context_max_tokens is not None else cfg.context_max_tokens,
             summarizer=summarizer,
         )
 

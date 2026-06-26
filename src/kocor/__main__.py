@@ -16,7 +16,7 @@ from typing import Iterator
 from dotenv import load_dotenv
 
 from kocor.agent import Agent
-from kocor.config import load_config
+from kocor.config import Config, config_get
 from kocor.llm_provider.llm_manager import LlmManager
 from kocor.llm_provider.message import StreamChunk
 from kocor.skill.models import InvokeStrategy
@@ -211,8 +211,8 @@ def main() -> None:
     user_args = args.user_input
 
     load_dotenv()
-    config = load_config()
-    
+    Config.load()
+
     setup_logger("INFO")
 
     # Determine permission policy from CLI flags
@@ -222,10 +222,10 @@ def main() -> None:
     elif args.permissive:
         permission_policy = PermissionManager.POLICY_PERMISSIVE
 
-    llm = LlmManager.create_llm_client(config)
+    llm = LlmManager.create_llm_client()
 
     toolManager = ToolManager()
-    toolManager.register_all(config)
+    toolManager.register_all()
 
     permission_mgr = PermissionManager(
         policy=permission_policy,
@@ -233,7 +233,7 @@ def main() -> None:
     )
 
     # Build Harness components
-    max_iterations = args.max_iterations or config.max_iterations
+    max_iterations = args.max_iterations or config_get("max_iterations")
 
     hook_manager = HookManager()
     hook_manager.register_all()
@@ -249,10 +249,6 @@ def main() -> None:
         tool_manager=toolManager,
         skill_manager=toolManager.skill_manager,
         max_iterations=max_iterations,
-        memory_dir=config.memory_dir or None,
-        context_strategy=config.context_strategy,
-        project_instructions_path=config.project_instructions_path,
-        context_max_tokens=config.context_max_tokens,
         permission_mgr=permission_mgr,
         hook_manager=hook_manager,
         event_emitter=event_emitter,

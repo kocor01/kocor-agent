@@ -17,14 +17,10 @@ from kocor.llm_provider.message import FunctionCall, Message, StreamChunk, ToolC
 
 
 class AnthropicClient(LLMClient):
-    """Anthropic LLM 客户端。
+    """Anthropic LLM 客户端。"""
 
-    Attributes:
-        config: 系统配置
-    """
-
-    def __init__(self, config: Config):
-        self.config = config
+    def __init__(self):
+        self.config = Config.load()
 
     @property
     def provider(self) -> str:

@@ -111,12 +111,16 @@ class TestLLMClientStream:
 class TestCreateLLMClient:
     """测试 LLMClient 工厂函数"""
 
+    def setup_method(self):
+        LlmManager.reset()
+        Config.reset()
+
     def test_create_openai_client(self):
         """测试创建 OpenAI 客户端"""
         from kocor.llm_provider.providers import OpenAIClient
 
-        config = Config(provider="openai")
-        client = LlmManager.create_llm_client(config)
+        Config._instance = Config(provider="openai")
+        client = LlmManager.create_llm_client()
         assert isinstance(client, OpenAIClient)
         assert client.provider == "openai"
 
@@ -124,16 +128,16 @@ class TestCreateLLMClient:
         """测试创建 Anthropic 客户端"""
         from kocor.llm_provider.providers import AnthropicClient
 
-        config = Config(provider="anthropic")
-        client = LlmManager.create_llm_client(config)
+        Config._instance = Config(provider="anthropic")
+        client = LlmManager.create_llm_client()
         assert isinstance(client, AnthropicClient)
         assert client.provider == "anthropic"
 
     def test_create_unsupported_provider(self):
         """测试不支持的 provider 抛出异常"""
-        config = Config(provider="unknown")
+        Config._instance = Config(provider="unknown")
         try:
-            LlmManager.create_llm_client(config)
+            LlmManager.create_llm_client()
             assert False, "Should have raised ValueError"
         except ValueError as e:
             assert "不支持的 provider" in str(e)
@@ -141,7 +145,7 @@ class TestCreateLLMClient:
     def test_register_client(self):
         """测试 register_client 注册新 provider"""
         class FakeClient(LLMClient):
-            def __init__(self, config: Config = None):
+            def __init__(self):
                 pass
 
             @property
@@ -153,8 +157,8 @@ class TestCreateLLMClient:
 
         LlmManager.register_client("fake", FakeClient)
         try:
-            config = Config(provider="fake")
-            client = LlmManager.create_llm_client(config)
+            Config._instance = Config(provider="fake")
+            client = LlmManager.create_llm_client()
             assert isinstance(client, FakeClient)
             assert client.provider == "fake"
         finally:

@@ -39,21 +39,18 @@ class ToolManager:
             self.register(tools.NAME, tools.DESCRIPTION, tools.PARAMETERS, tools.handler, tools.SAFETY_LEVEL)
 
 
-    def register_all(self, config) -> None:
-        """统一注册所有工具：内置工具 → MCP 工具 → 技能工具。
-
-        Args:
-            config: Config 配置对象，需包含 mcp_config / skills_config / skills_dir 字段
-        """
+    def register_all(self) -> None:
+        """统一注册所有工具：内置工具 → MCP 工具 → 技能工具。"""
         self.register_builtin_tools()
 
+        from kocor.config import config_get
         from kocor.mcp import McpManager
-        self.mcp_manager = McpManager(self, config.mcp_config)
+        self.mcp_manager = McpManager(self, config_get("mcp_config"))
         self.mcp_manager.register_all()
 
         from kocor.skill import SkillManager
         self.skill_manager = SkillManager(self)
-        self.skill_manager.register_all(config.skills_config, config.skills_dir)
+        self.skill_manager.register_all(config_get("skills_config"), config_get("skills_dir"))
 
     def register(
         self,
