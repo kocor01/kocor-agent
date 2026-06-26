@@ -2,9 +2,7 @@
 
 from __future__ import annotations
 
-import os
 
-from kocor.config import Config
 from kocor.context.types import SummaryNode
 from kocor.context.sliding_window import SlidingWindowStrategy
 from kocor.context.summarizer import HistorySummarizer
@@ -55,7 +53,7 @@ class TestSlidingWindowStrategy:
     def test_no_truncation_needed(self):
         """历史消息少于保留轮次时，不截断。"""
         msgs = make_round("你好", "你好！")
-        result, summary = self.strategy.apply(msgs, current_usage=100)
+        result, summary = self.strategy.apply(msgs)
         assert summary is None
         assert len(result) == 2  # user + assistant
 
@@ -65,7 +63,7 @@ class TestSlidingWindowStrategy:
         for i in range(5):
             all_msgs.extend(make_round(f"问题{i}", f"回答{i}"))
 
-        result, summary = self.strategy.apply(all_msgs, current_usage=100)
+        result, summary = self.strategy.apply(all_msgs)
         # 应保留最近 2 轮（4 条消息） + 摘要
         assert summary is not None
         assert len(result) <= 6  # 2 rounds × 2 + margin
@@ -76,7 +74,7 @@ class TestSlidingWindowStrategy:
         for i in range(4):
             all_msgs.extend(make_round(f"问题{i}", f"回答{i}"))
 
-        result, summary = self.strategy.apply(all_msgs, current_usage=100)
+        result, summary = self.strategy.apply(all_msgs)
         # 最新一轮的内容应保留
         last_msgs_text = [m.content for m in result]
         assert "回答3" in " ".join(last_msgs_text)
@@ -89,43 +87,21 @@ class TestSlidingWindowStrategy:
         for i in range(4):
             all_msgs.extend(make_round(f"问题{i}", f"回答{i}"))
 
-        result, summary = strategy.apply(all_msgs, current_usage=100)
+        result, summary = strategy.apply(all_msgs)
         assert summary is not None
         assert len(result) <= 3  # 1 round × 2 + margin
         assert "问题3" in " ".join(m.content for m in result)
 
-    def test_limited_tokens_triggers_aggressive(self):
-        """token 空间不足时自动降级。"""
-        old = os.environ.get("KOCOR_CONTEXT_MAX_TOKENS")
-        os.environ["KOCOR_CONTEXT_MAX_TOKENS"] = "50"
-        Config.reset()
-        try:
-            strategy = SlidingWindowStrategy(summarizer=self.summarizer, preserve_last_rounds=3, preserve_first_rounds=0)
-            all_msgs = []
-            for i in range(3):
-                all_msgs.extend(make_round(f"问题{i}", f"回答{i}"))
-
-            # 极小 max_tokens 应触发紧急截断
-            result, summary = strategy.apply(all_msgs, current_usage=40)
-            assert summary is not None
-            assert len(result) <= len(all_msgs)
-        finally:
-            if old is None:
-                del os.environ["KOCOR_CONTEXT_MAX_TOKENS"]
-            else:
-                os.environ["KOCOR_CONTEXT_MAX_TOKENS"] = old
-            Config.reset()
-
     def test_empty_messages(self):
         """空消息列表应返回空。"""
-        result, summary = self.strategy.apply([], current_usage=0)
+        result, summary = self.strategy.apply([])
         assert result == []
         assert summary is None
 
     def test_single_round(self):
         """只有一轮时不截断。"""
         msgs = make_round("问题", "回答")
-        result, summary = self.strategy.apply(msgs, current_usage=0)
+        result, summary = self.strategy.apply(msgs)
         assert summary is None
         assert len(result) == 2
 
@@ -136,7 +112,7 @@ class TestSlidingWindowStrategy:
             all_msgs.extend(make_round(f"问题{i}", f"回答{i}",
                                        tool_calls=[("read_file", '{"path": "a.txt"}')]))
 
-        result, summary = self.strategy.apply(all_msgs, current_usage=0)
+        result, summary = self.strategy.apply(all_msgs)
         assert summary is not None
         # 最近的轮次应包含工具调用信息
         last_round = [m for m in result if m.role == "assistant" and m.tool_calls]
@@ -155,7 +131,7 @@ class TestSlidingWindowStrategy:
         for i in range(6):
             all_msgs.extend(make_round(f"问题{i}", f"回答{i}"))
 
-        result, summary = strategy.apply(all_msgs, current_usage=100)
+        result, summary = strategy.apply(all_msgs)
         assert summary is not None
         result_text = " ".join(m.content or "" for m in result)
         # 最开始 2 轮应保留
@@ -180,7 +156,7 @@ class TestSlidingWindowStrategy:
         for i in range(4):
             all_msgs.extend(make_round(f"问题{i}", f"回答{i}"))
 
-        result, summary = strategy.apply(all_msgs, current_usage=100)
+        result, summary = strategy.apply(all_msgs)
         assert summary is None  # 不应摘要
         assert len(result) == len(all_msgs)  # 全部保留
 
@@ -200,8 +176,8 @@ class TestSlidingWindowStrategy:
         for i in range(5):
             all_msgs.extend(make_round(f"问题{i}", f"回答{i}"))
 
-        result_zero, summary_zero = strategy_zero.apply(all_msgs, current_usage=100)
-        result_default, summary_default = strategy_default.apply(all_msgs, current_usage=100)
+        result_zero, summary_zero = strategy_zero.apply(all_msgs)
+        result_default, summary_default = strategy_default.apply(all_msgs)
         assert (summary_zero is None) == (summary_default is None)
         assert len(result_zero) == len(result_default)
 
@@ -216,7 +192,7 @@ class TestSlidingWindowStrategy:
         for i in range(4):
             all_msgs.extend(make_round(f"问题{i}", f"回答{i}"))
 
-        result, summary = strategy.apply(all_msgs, current_usage=100)
+        result, summary = strategy.apply(all_msgs)
         assert summary is None
         assert len(result) == len(all_msgs)
 
@@ -231,7 +207,7 @@ class TestSlidingWindowStrategy:
         for i in range(6):
             all_msgs.extend(make_round(f"问题{i}", f"回答{i}"))
 
-        result, summary = strategy.apply(all_msgs, current_usage=100)
+        result, summary = strategy.apply(all_msgs)
         assert summary is not None
         # 找到摘要消息的位置
         summary_idx = None

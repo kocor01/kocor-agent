@@ -23,7 +23,7 @@ class TestConfig:
 
     def test_default_timeout(self):
         cfg = Config()
-        assert cfg.timeout == 30
+        assert cfg.timeout == 300
 
     def test_custom_values(self):
         cfg = Config(

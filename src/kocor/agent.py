@@ -109,8 +109,6 @@ class Agent:
             tools=self.tool_manager,
             memory=memory,
             summarizer=summarizer,
-            preserve_last_rounds=cfg.preserve_last_rounds,
-            preserve_first_rounds=cfg.preserve_first_rounds,
         )
 
     @staticmethod

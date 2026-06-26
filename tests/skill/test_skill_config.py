@@ -1,6 +1,7 @@
 """测试 Config 中的 Skill 相关配置。"""
 
 import os
+from pathlib import Path
 
 from kocor.config import Config
 
@@ -32,6 +33,10 @@ class TestLoadConfigSkillEnv:
         self._saved = {}
         for key in ["KOCOR_SKILLS_CONFIG", "KOCOR_SKILLS_DIR"]:
             self._saved[key] = os.environ.pop(key, None)
+        # 创建测试用的配置文件（文件存在性校验需要）
+        self._test_files = ["my_skills.json", "a.json"]
+        for f in self._test_files:
+            Path(f).touch()
 
     def teardown_method(self):
         for key, val in self._saved.items():
@@ -39,6 +44,8 @@ class TestLoadConfigSkillEnv:
                 os.environ[key] = val
             else:
                 os.environ.pop(key, None)
+        for f in self._test_files:
+            Path(f).unlink(missing_ok=True)
 
     def test_load_skills_config_default(self):
         cfg = Config._load()

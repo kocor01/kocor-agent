@@ -5,42 +5,31 @@
 
 from __future__ import annotations
 
+from kocor.config import config_get
 from kocor.context.budget import TokenBudget
 from kocor.context.types import ContextStrategy, SummaryNode
 from kocor.context.sliding_window import SlidingWindowStrategy
 from kocor.context.summarizer import HistorySummarizer
 from kocor.llm_provider.message import Message
 
-# SLIDING_WINDOW 的默认保留轮次数
-DEFAULT_PRESERVE_LAST_ROUNDS = 3
-
 
 class ContextStrategyApplier:
     """上下文策略应用器。
 
-    持有 summarizer 和默认配置，在每次 apply() 时根据策略类型
+    持有 summarizer，在每次 apply() 时根据策略类型
     选择合适的上下文管理方式处理消息列表。
+    SLIDING_WINDOW 的 preserve_last/first_rounds 从 Config 读取。
 
     Attributes:
         summarizer: 历史摘要器
-        preserve_last_rounds: 保留的最近完整轮次数（None 则使用默认值 3）
-        preserve_first_rounds: 保留的最开始完整轮次数（0 表示不保留）
     """
 
-    def __init__(
-        self,
-        summarizer: HistorySummarizer,
-        preserve_last_rounds: int | None = None,
-        preserve_first_rounds: int = 1,
-    ):
+    def __init__(self, summarizer: HistorySummarizer):
         self.summarizer = summarizer
-        self.preserve_last_rounds = preserve_last_rounds
-        self.preserve_first_rounds = preserve_first_rounds
 
     def apply(
         self,
         messages: list[Message],
-        used_prompt: int,
         strategy: ContextStrategy = ContextStrategy.DEFAULT,
         token_budget: TokenBudget | None = None,
     ) -> tuple[list[Message], SummaryNode | None]:
@@ -48,7 +37,6 @@ class ContextStrategyApplier:
 
         Args:
             messages: 原始会话历史消息
-            used_prompt: 当前 prompt 已用 token（不含历史消息）
             strategy: 上下文管理策略
             token_budget: Token 预算对象，提供 should_summarize/truncate 判断
                         用于在预算紧张时自动升级策略
@@ -70,18 +58,17 @@ class ContextStrategyApplier:
             return messages, None
 
         if effective_strategy == ContextStrategy.AGGRESSIVE:
-            preserve = 1
+            preserve_last = 1
+            preserve_first = 0
         elif effective_strategy == ContextStrategy.SLIDING_WINDOW:
-            preserve = self.preserve_last_rounds or DEFAULT_PRESERVE_LAST_ROUNDS
+            preserve_last = config_get("preserve_last_rounds", 3)
+            preserve_first = config_get("preserve_first_rounds", 1)
         else:
             return messages, None
 
         window = SlidingWindowStrategy(
             summarizer=self.summarizer,
-            preserve_last_rounds=preserve,
-            preserve_first_rounds=self.preserve_first_rounds,
+            preserve_last_rounds=preserve_last,
+            preserve_first_rounds=preserve_first,
         )
-        return window.apply(
-            messages,
-            current_usage=used_prompt,
-        )
+        return window.apply(messages)

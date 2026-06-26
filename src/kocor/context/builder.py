@@ -40,8 +40,6 @@ class ContextBuilder:
         tools: Any,  # 鸭式类型：需要 get_definitions() 方法
         memory: Any | None = None,
         summarizer: HistorySummarizer | None = None,
-        preserve_last_rounds: int | None = None,
-        preserve_first_rounds: int = 1,
     ):
         self.identity_prompt = identity_prompt
         self.tools = tools
@@ -49,11 +47,7 @@ class ContextBuilder:
         self._token_counter = TokenCounter()
         self.summarizer = summarizer
         self.strategy_applier = (
-            ContextStrategyApplier(
-                summarizer=summarizer,
-                preserve_last_rounds=preserve_last_rounds,
-                preserve_first_rounds=preserve_first_rounds,
-            )
+            ContextStrategyApplier(summarizer=summarizer)
             if summarizer
             else None
         )
@@ -122,10 +116,8 @@ class ContextBuilder:
         # 3. 应用上下文策略处理会话历史
         processed_history = session_history
         if self.strategy_applier:
-            used_prompt = self._token_counter.count(system_content) + self._token_counter.count(user_input)
             processed_history, _ = self.strategy_applier.apply(
                 messages=session_history,
-                used_prompt=used_prompt,
                 strategy=strategy,
                 token_budget=token_budget,
             )
