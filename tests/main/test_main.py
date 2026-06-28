@@ -9,7 +9,8 @@ from kocor.llm_provider.message import FunctionCall, StreamChunk, ToolCall
 def _mock_cli_main_stack(argv: list[str]) -> ExitStack:
     """创建 main() 所需的通用 mock 上下文栈。"""
     stack = ExitStack()
-    mock_cfg = MagicMock(skills_config="", mcp_config="", max_iterations=20)
+    mock_cfg = MagicMock(skills_config="", mcp_config="", max_iterations=20,
+                          memory_dir="", context_strategy="default")
     stack.enter_context(patch("kocor.config.Config.load", return_value=mock_cfg))
     stack.enter_context(patch("kocor.__main__.LlmManager"))
     stack.enter_context(patch("kocor.__main__.ToolManager"))

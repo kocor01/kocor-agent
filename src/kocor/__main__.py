@@ -14,7 +14,7 @@ import sys
 from typing import Iterator
 
 from kocor.agent import Agent
-from kocor.config import Config, config_get
+from kocor.config import Config
 from kocor.llm_provider.llm_manager import LlmManager
 from kocor.llm_provider.message import StreamChunk
 from kocor.skill.types import InvokeStrategy
@@ -219,8 +219,6 @@ def main() -> None:
     elif args.permissive:
         permission_policy = PermissionManager.POLICY_PERMISSIVE
 
-    llm = LlmManager.create_llm_client()
-
     toolManager = ToolManager()
     toolManager.register_all()
 
@@ -230,7 +228,7 @@ def main() -> None:
     )
 
     # Build Harness components
-    max_iterations = args.max_iterations or config_get("max_iterations")
+    max_iterations = args.max_iterations or Config.get("max_iterations")
 
     hook_manager = HookManager()
     hook_manager.register_all()
@@ -242,7 +240,7 @@ def main() -> None:
     budget = IterationBudget(iterations_limit=max_iterations)
 
     agent = Agent(
-        llm=llm,
+        llm=LlmManager.get_llm_client(),
         tool_manager=toolManager,
         skill_manager=toolManager.skill_manager,
         max_iterations=max_iterations,

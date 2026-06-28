@@ -165,7 +165,7 @@ class TestContextConfig:
 
     def test_default_memory_dir(self):
         cfg = Config()
-        assert cfg.memory_dir == ""
+        assert cfg.memory_dir == ".kocor/memories"
 
     def test_default_context_max_tokens(self):
         cfg = Config()

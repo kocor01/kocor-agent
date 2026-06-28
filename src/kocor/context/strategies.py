@@ -5,7 +5,7 @@
 
 from __future__ import annotations
 
-from kocor.config import config_get
+from kocor.config import Config
 from kocor.context.budget import TokenBudget
 from kocor.context.types import ContextStrategy, SummaryNode
 from kocor.context.sliding_window import SlidingWindowStrategy
@@ -61,8 +61,8 @@ class ContextStrategyApplier:
             preserve_last = 1
             preserve_first = 0
         elif effective_strategy == ContextStrategy.SLIDING_WINDOW:
-            preserve_last = config_get("preserve_last_rounds")
-            preserve_first = config_get("preserve_first_rounds")
+            preserve_last = Config.get("preserve_last_rounds")
+            preserve_first = Config.get("preserve_first_rounds")
         else:
             return messages, None
 

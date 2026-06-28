@@ -15,7 +15,7 @@ class TestConfigSkillDefaults:
 
     def test_default_skills_dir(self):
         cfg = Config()
-        assert cfg.skills_dir == "skills"
+        assert cfg.skills_dir == ".kocor/skills"
 
     def test_custom_skills_config(self):
         cfg = Config(skills_config="custom_skills.json")
@@ -58,7 +58,7 @@ class TestLoadConfigSkillEnv:
 
     def test_load_skills_dir_default(self):
         cfg = Config._load()
-        assert cfg.skills_dir == "skills"
+        assert cfg.skills_dir == ".kocor/skills"
 
     def test_load_skills_dir_from_env(self):
         os.environ["KOCOR_SKILLS_DIR"] = "custom_skills"

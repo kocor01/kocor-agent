@@ -24,7 +24,7 @@ class Config:
     timeout: int = 300                      # 请求超时秒数
     mcp_config: str = "kocor.mcp.json"      # MCP 服务器配置文件
     skills_config: str = "kocor.skills.json"  # 技能配置文件
-    skills_dir: str = "skills"              # 技能目录
+    skills_dir: str = ".kocor/skills"              # 技能目录
 
     # OpenAI
     openai_api_key: str = ""                # OpenAI API 密钥
@@ -38,7 +38,7 @@ class Config:
 
     # 上下文管理
     context_strategy: str = "default"       # 上下文策略（default / sliding / summary）
-    memory_dir: str = ""                    # 记忆持久化目录（空=不持久化）
+    memory_dir: str = ".kocor/memories"                    # 记忆持久化目录（空=不持久化）
     context_max_tokens: int = 200_000       # 上下文最大 token 数
     context_summary_threshold: float = 0.70  # 触发摘要的上下文占用阈值 [0,1]
     context_truncate_threshold: float = 0.90  # 触发截断的上下文占用阈值 [0,1]
@@ -58,6 +58,21 @@ class Config:
         """清除全局实例（用于测试）。"""
         cls._instance = None
         cls._dotenv_loaded = False
+
+    @classmethod
+    def get(cls, key: str) -> Any:
+        """获取配置项的值。
+
+        Args:
+            key: 配置项名称（如 "provider", "max_iterations"）
+
+        Returns:
+            配置项的值
+
+        Raises:
+            AttributeError: 配置项不存在
+        """
+        return getattr(cls.load(), key)
 
     @classmethod
     def _load(cls) -> Config:
@@ -168,24 +183,3 @@ class Config:
             preserve_first_rounds=preserve_first_rounds,
             token_margin=token_margin,
         )
-
-
-def config_get(key: str) -> Any:
-    """获取配置项的值。
-
-    Args:
-        key: 配置项名称（如 "provider", "max_iterations"）
-
-    Returns:
-        配置项的值
-
-    Raises:
-        AttributeError: 配置项不存在
-
-    Examples:
-        >>> get_config("provider")
-        'openai'
-        >>> get_config("max_iterations")
-        20
-    """
-    return getattr(Config.load(), key)

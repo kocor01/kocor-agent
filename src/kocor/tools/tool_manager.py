@@ -43,14 +43,14 @@ class ToolManager:
         """统一注册所有工具：内置工具 → MCP 工具 → 技能工具。"""
         self.register_builtin_tools()
 
-        from kocor.config import config_get
+        from kocor.config import Config
         from kocor.mcp import McpManager
-        self.mcp_manager = McpManager(self, config_get("mcp_config"))
+        self.mcp_manager = McpManager(self, Config.get("mcp_config"))
         self.mcp_manager.register_all()
 
         from kocor.skill import SkillManager
         self.skill_manager = SkillManager(self)
-        self.skill_manager.register_all(config_get("skills_config"), config_get("skills_dir"))
+        self.skill_manager.register_all(Config.get("skills_config"), Config.get("skills_dir"))
 
     def register(
         self,

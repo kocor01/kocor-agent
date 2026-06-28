@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from kocor.config import config_get
+from kocor.config import Config
 from kocor.context.env_info import build_environment_info
 from kocor.context.budget import TokenBudget
 from kocor.context.session import AgentContext
@@ -112,9 +112,9 @@ class ContextBuilder:
             + tool_tokens
         )
         token_budget = TokenBudget(
-            limit=config_get("context_max_tokens"),
-            threshold_summary=config_get("context_summary_threshold"),
-            threshold_truncate=config_get("context_truncate_threshold"),
+            limit=Config.get("context_max_tokens"),
+            threshold_summary=Config.get("context_summary_threshold"),
+            threshold_truncate=Config.get("context_truncate_threshold"),
         )
         token_budget.used_prompt = estimated_total
 

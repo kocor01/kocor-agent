@@ -120,7 +120,7 @@ class TestCreateLLMClient:
         from kocor.llm_provider.providers import OpenAIClient
 
         Config._instance = Config(provider="openai")
-        client = LlmManager.create_llm_client()
+        client = LlmManager.get_llm_client()
         assert isinstance(client, OpenAIClient)
         assert client.provider == "openai"
 
@@ -129,7 +129,7 @@ class TestCreateLLMClient:
         from kocor.llm_provider.providers import AnthropicClient
 
         Config._instance = Config(provider="anthropic")
-        client = LlmManager.create_llm_client()
+        client = LlmManager.get_llm_client()
         assert isinstance(client, AnthropicClient)
         assert client.provider == "anthropic"
 
@@ -137,7 +137,7 @@ class TestCreateLLMClient:
         """测试不支持的 provider 抛出异常"""
         Config._instance = Config(provider="unknown")
         try:
-            LlmManager.create_llm_client()
+            LlmManager.get_llm_client()
             assert False, "Should have raised ValueError"
         except ValueError as e:
             assert "不支持的 provider" in str(e)
@@ -155,10 +155,10 @@ class TestCreateLLMClient:
             def generate(self, messages, tools=None, max_tokens=4096, temperature=0.0) -> Message:
                 return Message(role="assistant", content="fake")
 
-        LlmManager.register_client("fake", FakeClient)
+        LlmManager.register("fake", FakeClient)
         try:
             Config._instance = Config(provider="fake")
-            client = LlmManager.create_llm_client()
+            client = LlmManager.get_llm_client()
             assert isinstance(client, FakeClient)
             assert client.provider == "fake"
         finally:

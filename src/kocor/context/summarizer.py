@@ -5,9 +5,10 @@
 
 from __future__ import annotations
 
-from kocor.config import config_get
+from kocor.config import Config
 from kocor.context.types import SummaryNode
 from kocor.context.token_counter import TokenCounter
+from kocor.llm_provider.llm_manager import LlmManager
 from kocor.llm_provider.message import Message
 
 class HistorySummarizer:
@@ -27,8 +28,8 @@ class HistorySummarizer:
 对话内容：
 {history_text}"""
 
-    def __init__(self, llm):
-        self.llm = llm
+    def __init__(self, llm=None):
+        self.llm = llm if llm is not None else LlmManager.get_llm_client()
         self.summarization_prompt = self.DEFAULT_PROMPT
         self._token_counter = TokenCounter()
 
@@ -61,7 +62,7 @@ class HistorySummarizer:
         history_text = self._messages_to_text(messages)
 
         # 用 TokenCounter 估算 token 数，超限时按比例截断
-        max_tokens = config_get("context_max_tokens")
+        max_tokens = Config.get("context_max_tokens")
         estimated_tokens = self._token_counter.count(history_text)
         if estimated_tokens > max_tokens:
             ratio = max_tokens / estimated_tokens
