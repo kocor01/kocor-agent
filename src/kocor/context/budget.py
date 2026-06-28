@@ -41,3 +41,7 @@ class TokenBudget:
 
     def should_truncate(self) -> bool:
         return self.usage_ratio >= self.threshold_truncate
+
+    def reset(self) -> None:
+        """重置已用 token 计数。"""
+        self.used_prompt = 0

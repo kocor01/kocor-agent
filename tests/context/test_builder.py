@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 from kocor.context.builder import ContextBuilder
-from kocor.context.types import AgentContext
+from kocor.context.session import AgentContext
+from kocor.context.types import ContextStrategy
 from kocor.tools.definitions import ToolDefinition
 
 
@@ -72,7 +73,7 @@ class TestContextBuilder:
             tools=ToolRegistryStub(),
         )
         ctx = builder.build_context(user_input="帮我读文件", session_history=[])
-        messages = ctx.session_messages
+        messages = ctx.messages
         assert messages[-1].role == "user"
         assert messages[-1].content == "帮我读文件"
 
@@ -83,8 +84,8 @@ class TestContextBuilder:
             tools=ToolRegistryStub(),
         )
         ctx = builder.build_context(user_input="你好", session_history=[])
-        assert ctx.session_messages[0].role == "system"
-        assert len(ctx.session_messages[0].content) > 0
+        assert ctx.messages[0].role == "system"
+        assert len(ctx.messages[0].content) > 0
 
     def test_build_context_with_history(self):
         """会话历史应包含在消息列表中。"""
@@ -99,7 +100,7 @@ class TestContextBuilder:
             Message(role="assistant", content="回答1"),
         ]
         ctx = builder.build_context(user_input="第二轮", session_history=history)
-        messages = ctx.session_messages
+        messages = ctx.messages
         # system + 历史(2) + 当前用户输入
         assert len(messages) == 4
         assert messages[1].role == "user"
@@ -114,9 +115,9 @@ class TestContextBuilder:
             tools=ToolRegistryStub(),
         )
         ctx = builder.build_context(user_input="你好", session_history=[])
-        assert len(ctx.session_messages) == 2
-        assert ctx.session_messages[0].role == "system"
-        assert ctx.session_messages[1].role == "user"
+        assert len(ctx.messages) == 2
+        assert ctx.messages[0].role == "system"
+        assert ctx.messages[1].role == "user"
 
     def test_context_contains_tool_definitions(self):
         """context 应包含工具定义。"""
@@ -142,7 +143,7 @@ class TestContextBuilder:
             tools=ToolRegistryStub(),
         )
         ctx = builder.build_context(user_input="你好", session_history=[])
-        system_msg = ctx.session_messages[0].content
+        system_msg = ctx.messages[0].content
         assert "当前工作目录" in system_msg
 
     # ── 与 MemoryManager 集成 ──────────────────────────

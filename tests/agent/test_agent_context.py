@@ -111,3 +111,72 @@ class TestAgentContextIntegration:
         system_msg = llm.last_messages[0]
         assert system_msg.role == "system"
         assert "当前工作目录" in system_msg.content
+
+
+class TestMultiTurnConversation:
+    """测试多轮对话历史传递。"""
+
+    def test_session_history_across_runs(self):
+        """多次 run() 调用应传递会话历史。"""
+        class HistoryTrackingLLM:
+            def __init__(self):
+                self.call_count = 0
+                self.all_calls = []
+
+            @property
+            def provider(self):
+                return "fake"
+
+            def generate(self, messages, tools=None, max_tokens=4096, temperature=0.0):
+                self.all_calls.append(list(messages))
+                self.call_count += 1
+                return Message(role="assistant", content=f"回答{self.call_count}")
+
+            def stream(self, messages, tools=None, max_tokens=4096, temperature=0.0):
+                raise NotImplementedError
+
+        llm = HistoryTrackingLLM()
+        agent = Agent(llm=llm, max_iterations=20)
+
+        agent.run("第一轮问题")
+        turn1_msgs = llm.all_calls[0]
+        turn1_user = [m for m in turn1_msgs if m.role == "user"]
+        assert any("第一轮问题" in m.content for m in turn1_user)
+
+        agent.run("第二轮问题")
+        turn2_msgs = llm.all_calls[1]
+        turn2_users = [m for m in turn2_msgs if m.role == "user"]
+        assert any("第一轮问题" in m.content for m in turn2_users)
+        assert any("第二轮问题" in m.content for m in turn2_users)
+        assert "assistant" in [m.role for m in turn2_msgs]
+
+    def test_reset_conversation_clears_history(self):
+        """reset_conversation() 后历史应清空。"""
+        class TrackingLLM:
+            def __init__(self):
+                self.call_count = 0
+                self.all_calls = []
+
+            @property
+            def provider(self):
+                return "fake"
+
+            def generate(self, messages, tools=None, max_tokens=4096, temperature=0.0):
+                self.all_calls.append(list(messages))
+                self.call_count += 1
+                return Message(role="assistant", content=f"回答{self.call_count}")
+
+            def stream(self, messages, tools=None, max_tokens=4096, temperature=0.0):
+                raise NotImplementedError
+
+        llm = TrackingLLM()
+        agent = Agent(llm=llm, max_iterations=20)
+
+        agent.run("问题1")
+        agent.reset_conversation()
+        agent.run("问题2")
+
+        turn2_msgs = llm.all_calls[1]
+        turn2_users = [m for m in turn2_msgs if m.role == "user"]
+        assert not any("问题1" in m.content for m in turn2_users)
+        assert any("问题2" in m.content for m in turn2_users)

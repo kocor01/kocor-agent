@@ -10,7 +10,7 @@ from typing import Any
 from kocor.config import config_get
 from kocor.context.env_info import build_environment_info
 from kocor.context.budget import TokenBudget
-from kocor.context.types import AgentContext
+from kocor.context.session import AgentContext
 from kocor.context.strategies import ContextStrategyApplier
 from kocor.context.types import ContextStrategy
 from kocor.context.project_instructions import load_project_instructions
@@ -138,9 +138,17 @@ class ContextBuilder:
         return AgentContext(
             system_content=system_content,
             tool_definitions=tool_definitions,
-            session_messages=messages,
+            messages=messages,
             token_budget=token_budget,
         )
+
+    def count_message_tokens(self, messages: list[Message]) -> int:
+        """估算消息列表的 token 数。"""
+        return self._token_counter.count_messages(messages)
+
+    def count_tool_tokens(self) -> int:
+        """估算工具定义的 token 数。"""
+        return self._token_counter.count_tools(self.tools.get_definitions())
 
     def _build_memories_block(self, max_items: int = 20) -> str:
         """构建持久记忆文本块。

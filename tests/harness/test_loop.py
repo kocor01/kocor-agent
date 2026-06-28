@@ -81,7 +81,7 @@ class TestAgentLoop:
         )
         result = agent.run("hi")
         assert result == "Hello! How can I help?"
-        assert agent._iteration == 1
+        assert agent.ctx.iteration == 1
 
     def test_single_tool_call(self):
         """Agent 执行工具并返回结果。"""
@@ -100,7 +100,7 @@ class TestAgentLoop:
         )
         result = agent.run("read test.txt")
         assert "hello" in result
-        assert agent._iteration == 2
+        assert agent.ctx.iteration == 2
 
     def test_multiple_tool_calls_one_iteration(self):
         """Agent 在一次 LLM 响应中处理多个工具调用。"""
@@ -143,8 +143,8 @@ class TestAgentLoop:
         result = agent.run("write file")
         assert "denied" in result.lower() or "I see" in result
         # 该工具不应被执行
-        assert len(agent._tool_history) == 1
-        assert agent._tool_history[0].permission == "denied"
+        assert len(agent.ctx.tool_history) == 1
+        assert agent.ctx.tool_history[0].permission == "denied"
 
     def test_budget_exhaustion(self):
         """迭代预算耗尽时 Agent 应停止。"""
@@ -163,7 +163,7 @@ class TestAgentLoop:
         )
         result = agent.run("do work")
         assert "迭代" in result or "限制" in result
-        assert agent._iteration <= 3
+        assert agent.ctx.iteration <= 3
 
     def test_tool_history_tracking(self):
         """每次工具执行都会创建 ToolCallRecord。"""
@@ -259,7 +259,7 @@ class TestAgentLoop:
         )
         result = agent.run("run")
         assert "error" in result.lower() or "Error" in result or "There was" in result
-        assert agent._tool_history[0].error is not None
+        assert agent.ctx.tool_history[0].error is not None
 
     def test_stream_basic(self):
         """流模式应产出数据块。"""
@@ -310,7 +310,7 @@ class TestAgentLoop:
             budget=budget,
         )
         result = agent.run("do")
-        assert agent._iteration == 1  # Should stop after 1 iteration
+        assert agent.ctx.iteration == 1  # Should stop after 1 iteration
 
     def test_tool_output_truncation(self):
         """过长的工具输出会被截断。"""
@@ -338,7 +338,7 @@ class TestAgentLoop:
             permission_mgr=PermissionManager(policy=PermissionManager.POLICY_PERMISSIVE),
         )
         agent.run("read big file")
-        tool_messages = [m for m in agent._messages if m.role == "tool"]
+        tool_messages = [m for m in agent.ctx.messages if m.role == "tool"]
         if tool_messages:
             assert len(tool_messages[-1].content) < len(long_content)
 

@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 from kocor.context.budget import TokenBudget
+from kocor.context.session import AgentContext
 from kocor.context.types import (
-    AgentContext,
     ContextStrategy,
     MemoryItem,
     SummaryNode,
@@ -129,10 +129,9 @@ class TestAgentContext:
         ctx = AgentContext(
             system_content="你是助手\n\n---\n\n项目指令",
             tool_definitions=[],
-            session_messages=[],
+            messages=[],
         )
         assert ctx.system_content == "你是助手\n\n---\n\n项目指令"
-        assert ctx.session_memory == {}
         assert ctx.token_budget.limit == 200_000
 
     def test_with_messages(self):
@@ -140,17 +139,17 @@ class TestAgentContext:
         ctx = AgentContext(
             system_content="",
             tool_definitions=[],
-            session_messages=msgs,
+            messages=msgs,
         )
-        assert len(ctx.session_messages) == 1
-        assert ctx.session_messages[0].content == "hi"
+        assert len(ctx.messages) == 1
+        assert ctx.messages[0].content == "hi"
 
     def test_with_tool_definitions(self):
         tools = [ToolDefinition(name="test", description="测试工具", parameters={})]
         ctx = AgentContext(
             system_content="",
             tool_definitions=tools,
-            session_messages=[],
+            messages=[],
         )
         assert len(ctx.tool_definitions) == 1
         assert ctx.tool_definitions[0].name == "test"

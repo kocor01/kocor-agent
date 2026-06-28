@@ -50,14 +50,16 @@ class AnthropicClient(LLMClient):
             base_url=self.config.anthropic_base_url or None,
         )
 
-        # 提取 system 消息（Anthropic 用顶层参数）
-        system_content = ""
+        # 提取 system 消息（Anthropic 用顶层参数，多个 system 消息拼接）
+        system_parts: list[str] = []
         filtered_messages = []
         for msg in messages:
             if msg.role == "system":
-                system_content = msg.content
+                if msg.content:
+                    system_parts.append(msg.content)
             else:
                 filtered_messages.append(msg)
+        system_content = "\n\n---\n\n".join(system_parts)
 
         anthropic_messages = self._normalize_in(filtered_messages)
         anthropic_tools = [self._normalize_tool(t) for t in tools] if tools else None
@@ -100,13 +102,15 @@ class AnthropicClient(LLMClient):
         )
 
         # 提取 system 消息
-        system_content = ""
+        system_parts: list[str] = []
         filtered_messages = []
         for msg in messages:
             if msg.role == "system":
-                system_content = msg.content
+                if msg.content:
+                    system_parts.append(msg.content)
             else:
                 filtered_messages.append(msg)
+        system_content = "\n\n---\n\n".join(system_parts)
 
         anthropic_messages = self._normalize_in(filtered_messages)
         anthropic_tools = [self._normalize_tool(t) for t in tools] if tools else None

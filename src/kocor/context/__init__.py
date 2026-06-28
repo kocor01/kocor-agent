@@ -11,8 +11,8 @@ from kocor.context.sliding_window import SlidingWindowStrategy
 from kocor.context.strategies import ContextStrategyApplier
 from kocor.context.summarizer import HistorySummarizer
 from kocor.context.token_counter import TokenCounter
+from kocor.context.session import AgentContext
 from kocor.context.types import (
-    AgentContext,
     ContextStrategy,
     MemoryItem,
     SummaryNode,

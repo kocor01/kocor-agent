@@ -51,7 +51,7 @@ class TestSlidingWindowStrategy:
         self.strategy = SlidingWindowStrategy(summarizer=self.summarizer, preserve_last_rounds=2, preserve_first_rounds=0)
 
     def test_no_truncation_needed(self):
-        """历史消息少于保留轮次时，不截断。"""
+        """总轮次少于保留轮次时，不截断。"""
         msgs = make_round("你好", "你好！")
         result, summary = self.strategy.apply(msgs)
         assert summary is None
@@ -64,9 +64,9 @@ class TestSlidingWindowStrategy:
             all_msgs.extend(make_round(f"问题{i}", f"回答{i}"))
 
         result, summary = self.strategy.apply(all_msgs)
-        # 应保留最近 2 轮（4 条消息） + 摘要
         assert summary is not None
-        assert len(result) <= 6  # 2 rounds × 2 + margin
+        # 保留最近 2 轮 + 摘要（每轮 1 条消息，新分组下 user/assistant 各自成轮）
+        assert len(result) <= 4  # 2 rounds + 1 summary + margin
 
     def test_preserves_latest_rounds(self):
         """最近的轮次应完整保留。"""
@@ -75,13 +75,11 @@ class TestSlidingWindowStrategy:
             all_msgs.extend(make_round(f"问题{i}", f"回答{i}"))
 
         result, summary = self.strategy.apply(all_msgs)
-        # 最新一轮的内容应保留
         last_msgs_text = [m.content for m in result]
         assert "回答3" in " ".join(last_msgs_text)
-        assert "问题3" in " ".join(last_msgs_text)
 
     def test_aggressive_mode(self):
-        """AGGRESSIVE 策略只保留最后一轮。"""
+        """AGGRESSIVE 策略（preserve_last=1）只保留最后 1 轮（即最后的 assistant 输出）。"""
         strategy = SlidingWindowStrategy(summarizer=self.summarizer, preserve_last_rounds=1, preserve_first_rounds=0)
         all_msgs = []
         for i in range(4):
@@ -89,8 +87,8 @@ class TestSlidingWindowStrategy:
 
         result, summary = strategy.apply(all_msgs)
         assert summary is not None
-        assert len(result) <= 3  # 1 round × 2 + margin
-        assert "问题3" in " ".join(m.content for m in result)
+        assert len(result) <= 2  # 1 round + 1 summary
+        assert "回答3" in " ".join(m.content for m in result)
 
     def test_empty_messages(self):
         """空消息列表应返回空。"""
@@ -106,17 +104,19 @@ class TestSlidingWindowStrategy:
         assert len(result) == 2
 
     def test_round_with_tool_calls(self):
-        """包含工具调用的轮次应整体保留。"""
+        """包含工具调用的消息在新分组下：tool_call 与后续 tool result 同属一轮。"""
         all_msgs = []
         for i in range(3):
             all_msgs.extend(make_round(f"问题{i}", f"回答{i}",
                                        tool_calls=[("read_file", '{"path": "a.txt"}')]))
+        # make_round 产生 3 轮/次: [user], [asst(tc), tool], [asst(final)]
+        # 3 次 = 9 轮
 
-        result, summary = self.strategy.apply(all_msgs)
+        result, summary = self.strategy.apply(all_msgs)  # preserve_last=2
         assert summary is not None
-        # 最近的轮次应包含工具调用信息
-        last_round = [m for m in result if m.role == "assistant" and m.tool_calls]
-        assert len(last_round) <= 2  # 保留轮次内的工具调用
+        # 最近的 tool_call 轮应保留（最后 2 轮中的 tool_call）
+        last_tool_rounds = [m for m in result if m.role == "assistant" and m.tool_calls]
+        assert len(last_tool_rounds) <= 2
 
     # ── 三段落策略（preserve_first_rounds） ──────────────────────
 
@@ -130,6 +130,8 @@ class TestSlidingWindowStrategy:
         all_msgs = []
         for i in range(6):
             all_msgs.extend(make_round(f"问题{i}", f"回答{i}"))
+        # 新分组：每轮 user/assistant 各自成轮，6 call = 12 轮
+        # first=2 → [u0, a0]; last=2 → [u5, a5]; middle=8 → 摘要
 
         result, summary = strategy.apply(all_msgs)
         assert summary is not None
@@ -137,10 +139,9 @@ class TestSlidingWindowStrategy:
         # 最开始 2 轮应保留
         assert "问题0" in result_text
         assert "回答0" in result_text
-        assert "问题1" in result_text
         # 最近 2 轮应保留
-        assert "问题4" in result_text
         assert "问题5" in result_text
+        assert "回答5" in result_text
         # 摘要应嵌入在 first 和 last 之间
         summary_msgs = [m for m in result if m.role == "system"]
         assert len(summary_msgs) >= 1
@@ -153,8 +154,9 @@ class TestSlidingWindowStrategy:
             preserve_first_rounds=3,
         )
         all_msgs = []
-        for i in range(4):
+        for i in range(2):
             all_msgs.extend(make_round(f"问题{i}", f"回答{i}"))
+        # 2 call = 4 轮, first(3) + last(2) = 5 >= 4 → 不摘要
 
         result, summary = strategy.apply(all_msgs)
         assert summary is None  # 不应摘要
@@ -189,8 +191,9 @@ class TestSlidingWindowStrategy:
             preserve_first_rounds=2,
         )
         all_msgs = []
-        for i in range(4):
+        for i in range(2):
             all_msgs.extend(make_round(f"问题{i}", f"回答{i}"))
+        # 2 call = 4 轮, first(2) + last(2) = 4 >= 4 → 不摘要
 
         result, summary = strategy.apply(all_msgs)
         assert summary is None
@@ -206,10 +209,10 @@ class TestSlidingWindowStrategy:
         all_msgs = []
         for i in range(6):
             all_msgs.extend(make_round(f"问题{i}", f"回答{i}"))
+        # 6 call = 12 轮, first=2, last=2 → middle=8 被摘要
 
         result, summary = strategy.apply(all_msgs)
         assert summary is not None
-        # 找到摘要消息的位置
         summary_idx = None
         for i, m in enumerate(result):
             if m.role == "system":
@@ -219,8 +222,8 @@ class TestSlidingWindowStrategy:
         # first 段落应在摘要之前
         first_texts = " ".join(m.content or "" for m in result[:summary_idx])
         assert "问题0" in first_texts
-        assert "问题1" in first_texts
+        assert "回答0" in first_texts
         # last 段落应在摘要之后
         last_texts = " ".join(m.content or "" for m in result[summary_idx + 1:])
-        assert "问题4" in last_texts
         assert "问题5" in last_texts
+        assert "回答5" in last_texts

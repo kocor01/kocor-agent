@@ -12,8 +12,10 @@ from typing import Iterator
 from kocor.config import Config
 from kocor.context.builder import ContextBuilder
 from kocor.context.memory import MemoryManager
+from kocor.context.session import AgentContext
 from kocor.context.types import ContextStrategy
 from kocor.context.summarizer import HistorySummarizer
+from kocor.context.strategies import ContextStrategyApplier
 from kocor.llm_provider.llm_client import LLMClient
 from kocor.llm_provider.message import Message, StreamChunk
 from kocor.skill.types import InvokeStrategy, SkillContext, SkillType
@@ -87,11 +89,6 @@ class Agent:
         self.event_emitter = event_emitter or EventEmitter()
         self.budget = budget or IterationBudget(iterations_limit=self.max_iterations)
 
-        # 循环状态
-        self._iteration = 0
-        self._tool_history: list[ToolCallRecord] = []
-        self._messages: list[Message] = []
-
         # 上下文管理
         resolved_strategy = context_strategy if context_strategy is not None else cfg.context_strategy
         self.context_strategy = self._parse_strategy(resolved_strategy)
@@ -101,14 +98,23 @@ class Agent:
             memory = MemoryManager(memory_dir=memory_dir_resolved)
 
         summarizer: HistorySummarizer | None = None
+        strategy_applier: ContextStrategyApplier | None = None
         if self.context_strategy != ContextStrategy.DEFAULT:
             summarizer = HistorySummarizer(llm=llm)
+            strategy_applier = ContextStrategyApplier(summarizer=summarizer)
 
         self.context_builder = ContextBuilder(
             identity_prompt=self.system_prompt,
             tools=self.tool_manager,
             memory=memory,
             summarizer=summarizer,
+        )
+
+        # 运行时上下文管理器（替代 _messages/_iteration/_tool_history）
+        self.ctx = AgentContext(
+            context_builder=self.context_builder,
+            context_strategy=self.context_strategy,
+            strategy_applier=strategy_applier,
         )
 
     @staticmethod
@@ -127,11 +133,11 @@ class Agent:
         if self.skill_manager and user_input.startswith("/"):
             return self._handle_slash_command(user_input)
 
-        context = self.context_builder.build_context(
-            user_input=user_input,
-            session_history=[],
-        )
-        return self._run_messages(context.session_messages)
+        self.ctx.reset()
+        self.ctx.build_initial_context(user_input)
+        result = self._run_messages()
+        self.ctx.extract_session_history()
+        return result
 
     def stream(self, user_input: str) -> Iterator[StreamChunk]:
         """流式执行 Agent 循环。"""
@@ -140,44 +146,45 @@ class Agent:
             yield StreamChunk(content=result, is_final=True)
             return
 
-        context = self.context_builder.build_context(
-            user_input=user_input,
-            session_history=[],
-        )
-        yield from self._stream_messages(context.session_messages)
+        self.ctx.reset()
+        self.ctx.build_initial_context(user_input)
+        yield from self._stream_messages()
+        self.ctx.extract_session_history()
 
     def get_tool_history(self) -> list[ToolCallRecord]:
         """返回本次会话的审计记录。"""
-        return list(self._tool_history)
+        return list(self.ctx.tool_history)
+
+    def reset_conversation(self) -> None:
+        """清空会话历史，开始新对话。"""
+        self.ctx.reset_conversation()
 
     # ── 核心循环 ──
 
     def _reset_state(self) -> None:
-        self._iteration = 0
-        self._tool_history.clear()
-        self._messages.clear()
+        self.ctx.reset()
         self.budget.reset()
 
-    def _run_messages(self, messages: list[Message]) -> str:
-        """用已构建好的消息列表运行 ReAct 循环。"""
-        self._reset_state()
-        self._messages = list(messages)
+    def _run_messages(self) -> str:
+        """运行 ReAct 循环（消息已由 build_initial_context 设置）。"""
 
         while not self.budget.exhausted:
-            self._iteration += 1
-            self.budget.iterations_used = self._iteration
+            self.ctx.advance_iteration()
+            self.budget.iterations_used = self.ctx.iteration
 
-            self._emit(EventType.PRE_GENERATE, iteration=self._iteration, messages=self._messages,
+            self.ctx.compress_if_needed()
+
+            self._emit(EventType.PRE_GENERATE, iteration=self.ctx.iteration, messages=self.ctx.messages,
                        tools=self.tool_manager.get_definitions())
             self._run_hooks(HookPoint.PRE_GENERATE)
 
             response = self.llm.generate(
-                self._messages,
+                self.ctx.messages,
                 tools=self.tool_manager.get_definitions(),
             )
-            self._messages.append(response)
+            self.ctx.append(response)
 
-            self._emit(EventType.POST_GENERATE, iteration=self._iteration, response=response)
+            self._emit(EventType.POST_GENERATE, iteration=self.ctx.iteration, response=response)
             self._run_hooks(HookPoint.POST_GENERATE)
 
             if not response.tool_calls:
@@ -186,23 +193,23 @@ class Agent:
             for tool_call in response.tool_calls:
                 result_msg = self._execute_one_tool(tool_call)
                 if result_msg is not None:
-                    self._messages.append(result_msg)
+                    self.ctx.append(result_msg)
 
-        self._emit(EventType.ON_BUDGET_EXHAUSTED, iteration=self._iteration,
+        self._emit(EventType.ON_BUDGET_EXHAUSTED, iteration=self.ctx.iteration,
                        iterations_limit=self.budget.iterations_limit)
         self._run_hooks(HookPoint.ON_BUDGET_EXHAUSTED)
         return self._budget_exhausted_message()
 
-    def _stream_messages(self, messages: list[Message]) -> Iterator[StreamChunk]:
-        """以流模式用已构建好的消息列表运行 ReAct 循环。"""
-        self._reset_state()
-        self._messages = list(messages)
+    def _stream_messages(self) -> Iterator[StreamChunk]:
+        """以流模式运行 ReAct 循环（消息已由 build_initial_context 设置）。"""
 
         while not self.budget.exhausted:
-            self._iteration += 1
-            self.budget.iterations_used = self._iteration
+            self.ctx.advance_iteration()
+            self.budget.iterations_used = self.ctx.iteration
 
-            self._emit(EventType.PRE_GENERATE, iteration=self._iteration, messages=self._messages,
+            self.ctx.compress_if_needed()
+
+            self._emit(EventType.PRE_GENERATE, iteration=self.ctx.iteration, messages=self.ctx.messages,
                        tools=self.tool_manager.get_definitions())
             self._run_hooks(HookPoint.PRE_GENERATE)
 
@@ -212,7 +219,7 @@ class Agent:
             streaming_usage = None
 
             for chunk in self.llm.stream(
-                self._messages,
+                self.ctx.messages,
                 tools=self.tool_manager.get_definitions(),
             ):
                 if chunk.tool_calls:
@@ -237,11 +244,11 @@ class Agent:
                 usage=streaming_usage,
             )
 
-            self._emit(EventType.POST_GENERATE, iteration=self._iteration,
+            self._emit(EventType.POST_GENERATE, iteration=self.ctx.iteration,
                        response=response)
             self._run_hooks(HookPoint.POST_GENERATE)
 
-            self._messages.append(response)
+            self.ctx.append(response)
 
             if not accumulated_tool_calls:
                 return
@@ -249,13 +256,13 @@ class Agent:
             for tool_call in accumulated_tool_calls:
                 result_msg = self._execute_one_tool(tool_call)
                 if result_msg is not None:
-                    self._messages.append(result_msg)
+                    self.ctx.append(result_msg)
                     yield StreamChunk(
                         tool_result=result_msg,
                         is_final=False,
                     )
 
-        self._emit(EventType.ON_BUDGET_EXHAUSTED, iteration=self._iteration,
+        self._emit(EventType.ON_BUDGET_EXHAUSTED, iteration=self.ctx.iteration,
                        iterations_limit=self.budget.iterations_limit)
         self._run_hooks(HookPoint.ON_BUDGET_EXHAUSTED)
         yield StreamChunk(content=self._budget_exhausted_message(), is_final=True)
@@ -267,11 +274,11 @@ class Agent:
         tool_name = tool_call.function.name
         tool_arguments = tool_call.function.arguments
 
-        self._emit(EventType.PRE_TOOL, iteration=self._iteration, tool_call=tool_call)
+        self._emit(EventType.PRE_TOOL, iteration=self.ctx.iteration, tool_call=tool_call)
 
         if not self.permission_mgr.check(tool_call):
-            self._tool_history.append(ToolCallRecord(
-                iteration=self._iteration,
+            self.ctx.tool_history.append(ToolCallRecord(
+                iteration=self.ctx.iteration,
                 tool_name=tool_name,
                 arguments=tool_arguments,
                 result_summary="[Permission Denied]",
@@ -287,7 +294,7 @@ class Agent:
 
         hook_results = self._run_hooks(HookPoint.PRE_TOOL, tool_call=tool_call)
         if any(r.action == HookAction.SKIP_TOOL for r in hook_results):
-            self._emit(EventType.POST_TOOL, iteration=self._iteration,
+            self._emit(EventType.POST_TOOL, iteration=self.ctx.iteration,
                        tool_name=tool_name, success=False, skipped_by_hook=True)
             return Message(
                 role="tool",
@@ -304,8 +311,8 @@ class Agent:
             truncated = self._truncate_tool_output(content)
 
             token_count = max(1, len(truncated) // 4)
-            self._tool_history.append(ToolCallRecord(
-                iteration=self._iteration,
+            self.ctx.tool_history.append(ToolCallRecord(
+                iteration=self.ctx.iteration,
                 tool_name=tool_name,
                 arguments=tool_arguments,
                 result_summary=truncated[:200],
@@ -314,7 +321,7 @@ class Agent:
                 permission="auto",
             ))
 
-            self._emit(EventType.POST_TOOL, iteration=self._iteration,
+            self._emit(EventType.POST_TOOL, iteration=self.ctx.iteration,
                        tool_name=tool_name, duration=duration, success=True, result=result)
             self._run_hooks(HookPoint.POST_TOOL, tool_call=tool_call, tool_result=result)
 
@@ -325,15 +332,15 @@ class Agent:
             )
 
         except Exception as e:
-            self._emit(EventType.POST_TOOL, iteration=self._iteration,
+            self._emit(EventType.POST_TOOL, iteration=self.ctx.iteration,
                        tool_name=tool_name, duration=duration, success=False, error=str(e))
-            self._emit(EventType.ON_ERROR, iteration=self._iteration,
+            self._emit(EventType.ON_ERROR, iteration=self.ctx.iteration,
                        component="tool", error=str(e))
             self._run_hooks(HookPoint.ON_ERROR, error=e)
 
             duration = (time.monotonic() - start) * 1000
-            self._tool_history.append(ToolCallRecord(
-                iteration=self._iteration,
+            self.ctx.tool_history.append(ToolCallRecord(
+                iteration=self.ctx.iteration,
                 tool_name=tool_name,
                 arguments=tool_arguments,
                 result_summary=f"Error: {type(e).__name__}",
@@ -380,7 +387,9 @@ class Agent:
                 messages.append(Message(role="system", content=result.content))
             else:
                 messages.append(Message(role="user", content=result.content))
-            return self._run_messages(messages)
+            self.ctx.reset()
+            self.ctx.messages = messages
+            return self._run_messages()
         else:
             return result.content
 
@@ -396,12 +405,12 @@ class Agent:
 
     def _budget_exhausted_message(self) -> str:
         parts = [
-            f"Agent 在 {self._iteration} 次迭代后未完成。",
-            f"已执行 {len(self._tool_history)} 个工具调用。",
+            f"Agent 在 {self.ctx.iteration} 次迭代后未完成。",
+            f"已执行 {len(self.ctx.tool_history)} 个工具调用。",
         ]
-        if self._tool_history:
+        if self.ctx.tool_history:
             parts.append("已完成的操作:")
-            for rec in self._tool_history:
+            for rec in self.ctx.tool_history:
                 parts.append(f"  {rec.iteration}. {rec.tool_name}()")
         return "\n".join(parts)
 
@@ -416,8 +425,8 @@ class Agent:
 
     def _run_hooks(self, point: HookPoint, **extra) -> list[HookResult]:
         ctx = HookContext(
-            iteration=self._iteration,
-            messages=self._messages,
+            iteration=self.ctx.iteration,
+            messages=self.ctx.messages,
             **extra,
         )
         return self.hook_manager.run(point, ctx)
@@ -425,7 +434,7 @@ class Agent:
     def _emit(self, event_type: str, **data) -> None:
         self.event_emitter.fire(HarnessEvent(
             type=event_type,
-            iteration=self._iteration,
+            iteration=self.ctx.iteration,
             data=data,
             timestamp=time.time(),
         ))

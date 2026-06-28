@@ -126,6 +126,33 @@ class TestAnthropicClient:
         assert call_args.kwargs["system"] == "你是助手"
 
     @patch("kocor.llm_provider.providers.anthropic_client.Anthropic")
+    def test_generate_multiple_system_messages(self, mock_anthropic_cls):
+        """多个 system 消息应拼接而非覆盖。"""
+        mock_client = MagicMock()
+        mock_anthropic_cls.return_value = mock_client
+
+        mock_text_block = MockTextBlock(text="done")
+        mock_response = MagicMock(content=[mock_text_block], stop_reason="end_turn")
+        mock_client.messages.create.return_value = mock_response
+
+        client = AnthropicClient()
+        messages = [
+            Message(role="system", content="你是助手"),
+            Message(role="user", content="忽略"),
+            Message(role="system", content="[历史摘要] 用户问了天气"),
+            Message(role="assistant", content="晴天"),
+        ]
+        client.generate(messages)
+
+        call_args = mock_client.messages.create.call_args
+        system = call_args.kwargs["system"]
+        assert "你是助手" in system
+        assert "历史摘要" in system
+        # 过滤后的消息不应包含 system
+        msgs = call_args.kwargs["messages"]
+        assert all(m["role"] != "system" for m in msgs)
+
+    @patch("kocor.llm_provider.providers.anthropic_client.Anthropic")
     def test_normalize_tool_result(self, mock_anthropic_cls):
         """测试工具结果格式归一化"""
         mock_client = MagicMock()
