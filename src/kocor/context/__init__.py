@@ -5,13 +5,12 @@
 """
 
 from kocor.context.budget import TokenBudget
-from kocor.context.builder import ContextBuilder
 from kocor.context.memory import MemoryManager
 from kocor.context.sliding_window import SlidingWindowStrategy
 from kocor.context.strategies import ContextStrategyApplier
 from kocor.context.summarizer import HistorySummarizer
 from kocor.context.token_counter import TokenCounter
-from kocor.context.session import AgentContext
+from kocor.context.context_manager import ContextManager
 from kocor.context.types import (
     ContextStrategy,
     MemoryItem,
@@ -20,8 +19,7 @@ from kocor.context.types import (
 from kocor.tools.truncate import ToolOutputTruncator
 
 __all__ = [
-    "AgentContext",
-    "ContextBuilder",
+    "ContextManager",
     "ContextStrategy",
     "ContextStrategyApplier",
     "HistorySummarizer",

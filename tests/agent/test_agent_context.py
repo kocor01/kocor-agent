@@ -29,7 +29,7 @@ class FakeLLMClient(LLMClient):
         raise NotImplementedError
 
 
-class TestAgentContextIntegration:
+class TestContextManagerIntegration:
     """测试 Agent 与 ContextBuilder 的集成。"""
 
     def test_default_agent_still_works(self):
@@ -79,7 +79,6 @@ class TestAgentContextIntegration:
         agent = Agent(
             llm=llm,
             max_iterations=20,
-            context_strategy="default",
         )
         result = agent.run("测试")
         assert result == "OK"

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from kocor.context.budget import TokenBudget
-from kocor.context.session import AgentContext
+from kocor.context.context_manager import ContextManager
 from kocor.context.types import (
     ContextStrategy,
     MemoryItem,
@@ -122,35 +122,31 @@ class TestSummaryNode:
         assert node.original_end == 5
 
 
-class TestAgentContext:
-    """测试 AgentContext 数据模型。"""
+class TestContextManager:
+    """测试 ContextManager 数据模型。"""
 
     def test_default_construction(self):
-        ctx = AgentContext(
-            system_content="你是助手\n\n---\n\n项目指令",
-            tool_definitions=[],
-            messages=[],
-        )
-        assert ctx.system_content == "你是助手\n\n---\n\n项目指令"
+        ctx = ContextManager()
+        assert ctx.system_content == ""
         assert ctx.token_budget.limit == 200_000
+        assert ctx.messages == []
+        assert ctx.tool_definitions == []
+
+    def test_with_identity_prompt(self):
+        ctx = ContextManager(identity_prompt="你是助手")
+        assert ctx.identity_prompt == "你是助手"
 
     def test_with_messages(self):
         msgs = [Message(role="system", content="hi")]
-        ctx = AgentContext(
-            system_content="",
-            tool_definitions=[],
-            messages=msgs,
-        )
+        ctx = ContextManager()
+        ctx.messages = msgs
         assert len(ctx.messages) == 1
         assert ctx.messages[0].content == "hi"
 
     def test_with_tool_definitions(self):
         tools = [ToolDefinition(name="test", description="测试工具", parameters={})]
-        ctx = AgentContext(
-            system_content="",
-            tool_definitions=tools,
-            messages=[],
-        )
+        ctx = ContextManager()
+        ctx.tool_definitions = tools
         assert len(ctx.tool_definitions) == 1
         assert ctx.tool_definitions[0].name == "test"
 

@@ -2,7 +2,8 @@
 
 from unittest.mock import MagicMock
 
-from kocor.agent import DEFAULT_SYSTEM_PROMPT, Agent
+from kocor.config import Config
+from kocor.agent import Agent
 from kocor.llm_provider.llm_client import LLMClient
 from kocor.tools.definitions import ToolDefinition
 from kocor.llm_provider.message import FunctionCall, Message, StreamChunk, ToolCall, ToolResult
@@ -154,7 +155,7 @@ class TestAgentSystemPrompt:
 
     def test_default_system_prompt(self):
         """默认 system prompt 包含 Kocor"""
-        assert "Kocor" in DEFAULT_SYSTEM_PROMPT
+        assert "Kocor" in Config.get("default_system_prompt")
 
     def test_custom_system_prompt(self):
         """自定义 system prompt"""
@@ -165,12 +166,12 @@ class TestAgentSystemPrompt:
 
     def test_defensive_prompt_has_security_guidelines(self):
         """默认 system prompt 包含安全准则"""
-        assert "不可信任" in DEFAULT_SYSTEM_PROMPT or "不要执行" in DEFAULT_SYSTEM_PROMPT
-        assert "安全准则" in DEFAULT_SYSTEM_PROMPT or "安全" in DEFAULT_SYSTEM_PROMPT
+        assert "不可信任" in Config.get("default_system_prompt") or "不要执行" in Config.get("default_system_prompt")
+        assert "安全准则" in Config.get("default_system_prompt") or "安全" in Config.get("default_system_prompt")
 
     def test_defensive_prompt_warns_about_file_content(self):
         """默认 system prompt 提醒文件内容不可信"""
-        assert "文件内容" in DEFAULT_SYSTEM_PROMPT
+        assert "文件内容" in Config.get("default_system_prompt")
 
 
 # 简单的 mock 类，用于 spec

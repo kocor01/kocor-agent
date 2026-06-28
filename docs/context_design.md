@@ -155,7 +155,7 @@ Token 预算:
 
 ```python
 @dataclass
-class AgentContext:
+class ContextManager:
     """Agent 上下文聚合，运行时唯一上下文对象。
 
     包含构建最终 prompt 所需的所有信息。
@@ -470,7 +470,7 @@ class ContextBuilder:
         user_input: str,
         session_history: list[Message],
         strategy: ContextStrategy = ContextStrategy.DEFAULT,
-    ) -> AgentContext:
+    ) -> ContextManager:
         """构建完整上下文。"""
         # 1. 收集各层
         layers = []
@@ -514,7 +514,7 @@ class ContextBuilder:
         messages.append(Message(role="user", content=user_input))
 
         # 4. 计算 Token 并返回
-        return AgentContext(
+        return ContextManager(
             identity_prompt=self.identity_prompt,
             project_instructions=project_instructions,
             tool_definitions=self.tools.get_definitions(),
@@ -1262,7 +1262,7 @@ src/kocor/
 ├── context/                         # 新增：上下文管理模块
 │   ├── __init__.py
 │   ├── builder.py                   # ContextBuilder
-│   ├── models.py                    # AgentContext, TokenBudget, MemoryItem, SummaryNode
+│   ├── models.py                    # ContextManager, TokenBudget, MemoryItem, SummaryNode
 │   ├── memory.py                    # MemoryManager
 │   ├── summarizer.py               # HistorySummarizer
 │   ├── sliding_window.py           # SlidingWindowStrategy
@@ -1329,7 +1329,7 @@ class ContextBuilder:
         user_input: str,
         session_history: list[Message],
         strategy: ContextStrategy = ContextStrategy.DEFAULT,
-    ) -> AgentContext:
+    ) -> ContextManager:
         """构建完整上下文。
 
         Args:
@@ -1338,7 +1338,7 @@ class ContextBuilder:
             strategy: 上下文管理策略
 
         Returns:
-            AgentContext: 包含所有上下文信息
+            ContextManager: 包含所有上下文信息
         """
 
     def build_system_prompt(self) -> str:
@@ -1353,7 +1353,7 @@ class ContextBuilder:
 
 | # | 任务 | 产出 | 测试策略 |
 |---|------|------|---------|
-| 1 | 创建 `context/` 模块骨架 | `models.py`: AgentContext, TokenBudget, MemoryItem | 单元测试 |
+| 1 | 创建 `context/` 模块骨架 | `models.py`: ContextManager, TokenBudget, MemoryItem | 单元测试 |
 | 2 | 实现 `TokenCounter` | token 估算器 | 测试等价类：英文/中文/混合/空 |
 | 3 | 实现 `ToolOutputTruncator` | 统一工具输出截断 | 复用 MCP 测试 + 新增非 MCP 截断测试 |
 
