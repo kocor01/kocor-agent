@@ -22,6 +22,7 @@ class Config:
     provider: str = "openai"                # AI 提供商（openai / anthropic）
     max_iterations: int = 20                # 最大迭代次数
     timeout: int = 300                      # 请求超时秒数
+    permission_policy: str = "default"      # 权限策略（default / strict / permissive）
     mcp_config: str = "kocor.mcp.json"      # MCP 服务器配置文件
     skills_config: str = "kocor.skills.json"  # 技能配置文件
     skills_dir: str = ".kocor/skills"              # 技能目录
@@ -93,6 +94,16 @@ class Config:
         return getattr(cls.load(), key)
 
     @classmethod
+    def set(cls, key: str, value: Any) -> None:
+        """设置配置项的值（运行时覆盖，不持久化）。
+
+        Args:
+            key: 配置项名称
+            value: 配置项的值
+        """
+        setattr(cls.load(), key, value)
+
+    @classmethod
     def _load(cls) -> Config:
         """从环境变量加载配置，未设置的字段使用类属性默认值。"""
         if not cls._dotenv_loaded:
@@ -128,6 +139,15 @@ class Config:
         skills_config = os.environ.get("KOCOR_SKILLS_CONFIG", Config.skills_config)
         if skills_config and not os.path.exists(skills_config):
             raise ValueError(f"KOCOR_SKILLS_CONFIG 指定的文件不存在: '{skills_config}'")
+
+        permission_policy = os.environ.get(
+            "KOCOR_PERMISSION_POLICY", Config.permission_policy
+        ).lower()
+        valid_policies = {"default", "strict", "permissive"}
+        if permission_policy not in valid_policies:
+            raise ValueError(
+                f"不支持的 permission_policy: '{permission_policy}'，可选值: {sorted(valid_policies)}"
+            )
 
         context_max_tokens_raw = os.environ.get("KOCOR_CONTEXT_MAX_TOKENS", str(Config.context_max_tokens))
         try:
@@ -173,6 +193,7 @@ class Config:
             provider=provider,
             max_iterations=max_iterations,
             timeout=timeout,
+            permission_policy=permission_policy,
             mcp_config=mcp_config,
             skills_config=skills_config,
             skills_dir=Config.skills_dir,

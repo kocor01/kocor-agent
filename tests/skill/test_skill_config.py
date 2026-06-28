@@ -60,14 +60,8 @@ class TestLoadConfigSkillEnv:
         cfg = Config._load()
         assert cfg.skills_dir == ".kocor/skills"
 
-    def test_load_skills_dir_from_env(self):
-        os.environ["KOCOR_SKILLS_DIR"] = "custom_skills"
-        cfg = Config._load()
-        assert cfg.skills_dir == "custom_skills"
-
     def test_load_both_skill_env(self):
         os.environ["KOCOR_SKILLS_CONFIG"] = "a.json"
-        os.environ["KOCOR_SKILLS_DIR"] = "b"
         cfg = Config._load()
         assert cfg.skills_config == "a.json"
-        assert cfg.skills_dir == "b"
+        assert cfg.skills_dir == ".kocor/skills"

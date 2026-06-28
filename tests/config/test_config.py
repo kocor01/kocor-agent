@@ -146,6 +146,45 @@ class TestLoadConfigValidation:
             pass
 
 
+class TestPermissionPolicyConfig:
+    """测试权限策略配置"""
+
+    def setup_method(self):
+        Config.reset()
+        os.environ.pop("KOCOR_PERMISSION_POLICY", None)
+
+    def test_default_permission_policy(self):
+        cfg = Config()
+        assert cfg.permission_policy == "default"
+
+    def test_custom_permission_policy(self):
+        cfg = Config(permission_policy="strict")
+        assert cfg.permission_policy == "strict"
+
+    def test_load_permission_policy_from_env(self):
+        os.environ["KOCOR_PERMISSION_POLICY"] = "permissive"
+        cfg = Config._load()
+        assert cfg.permission_policy == "permissive"
+
+    def test_load_permission_policy_case_insensitive(self):
+        os.environ["KOCOR_PERMISSION_POLICY"] = "Strict"
+        cfg = Config._load()
+        assert cfg.permission_policy == "strict"
+
+    def test_load_invalid_permission_policy_raises(self):
+        os.environ["KOCOR_PERMISSION_POLICY"] = "invalid"
+        try:
+            Config._load()
+            assert False, "应抛出 ValueError"
+        except ValueError as e:
+            assert "不支持的 permission_policy" in str(e)
+
+    def test_cli_applies_to_config(self):
+        """模拟 CLI 参数通过 Config.set() 修改配置"""
+        Config.set("permission_policy", "strict")
+        assert Config.get("permission_policy") == "strict"
+
+
 class TestContextConfig:
     """测试上下文管理配置"""
 

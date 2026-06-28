@@ -157,7 +157,7 @@ def parse_args():
     parser.add_argument(
         "--permissive",
         action="store_true",
-        help="允许危险操作（不确认）",
+        help="允许危险操作（工具调用无需确认）",
     )
     parser.add_argument(
         "--strict",
@@ -210,25 +210,26 @@ def main() -> None:
 
     Config.load()
 
-    setup_logger("INFO")
-
-    # Determine permission policy from CLI flags
-    permission_policy = PermissionManager.POLICY_DEFAULT
+    # Apply CLI args to Config（CLI 优先级最高，覆盖环境变量）
     if args.strict:
-        permission_policy = PermissionManager.POLICY_STRICT
+        Config.set("permission_policy", PermissionManager.POLICY_STRICT)
     elif args.permissive:
-        permission_policy = PermissionManager.POLICY_PERMISSIVE
+        Config.set("permission_policy", PermissionManager.POLICY_PERMISSIVE)
+    if args.max_iterations is not None:
+        Config.set("max_iterations", args.max_iterations)
+
+    setup_logger("INFO")
 
     toolManager = ToolManager()
     toolManager.register_all()
 
     permission_mgr = PermissionManager(
-        policy=permission_policy,
+        policy=Config.get("permission_policy"),
         tool_manager=toolManager,
     )
 
     # Build Harness components
-    max_iterations = args.max_iterations or Config.get("max_iterations")
+    max_iterations = Config.get("max_iterations")
 
     hook_manager = HookManager()
     hook_manager.register_all()
