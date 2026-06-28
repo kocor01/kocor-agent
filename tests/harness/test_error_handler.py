@@ -1,6 +1,6 @@
 """ErrorHandler 和 GracefulDegradation 测试。"""
 
-from kocor.harness.error_handler import ErrorHandler, GracefulDegradation
+from kocor.harness.error_handler import ErrorHandler
 
 
 class RateLimitError(Exception): ...
@@ -60,21 +60,3 @@ class TestErrorHandler:
         assert "Error executing" in msg
 
 
-class TestGracefulDegradation:
-    def test_empty_history(self):
-        deg = GracefulDegradation()
-        msg = deg.partial_result([])
-        assert "完成任何操作前" in msg
-
-    def test_with_history(self):
-        from kocor.harness.budget import IterationBudget
-        from kocor.harness.event.event_manager import HarnessEvent
-
-        class FakeRecord:
-            iteration = 1
-            tool_name = "read_file"
-
-        deg = GracefulDegradation()
-        msg = deg.partial_result([FakeRecord()])
-        assert "read_file" in msg
-        assert "已达到执行限制" in msg

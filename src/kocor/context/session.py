@@ -7,9 +7,9 @@
 from __future__ import annotations
 
 from kocor.context.budget import TokenBudget
+from kocor.context.builder import ContextBuilder
 from kocor.context.strategies import ContextStrategyApplier
 from kocor.context.types import ContextStrategy
-from kocor.harness.loop import ToolCallRecord
 from kocor.llm_provider.message import Message
 from kocor.tools.definitions import ToolDefinition
 
@@ -27,7 +27,6 @@ class AgentContext:
         token_budget: Token 预算与使用统计
         session_history: 跨 run() 调用的会话历史
         iteration: 当前轮次迭代次数
-        tool_history: 本次会话的审计记录
     """
 
     def __init__(
@@ -52,7 +51,6 @@ class AgentContext:
 
         # 本轮状态
         self.iteration = 0
-        self.tool_history: list[ToolCallRecord] = []
 
         # 管理依赖
         self._context_builder = context_builder
@@ -120,7 +118,6 @@ class AgentContext:
     def reset(self) -> None:
         """重置本轮状态（保留 session_history 用于跨轮）。"""
         self.iteration = 0
-        self.tool_history.clear()
         self.messages.clear()
         self.token_budget.reset()
 

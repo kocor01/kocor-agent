@@ -6,7 +6,6 @@ from dataclasses import dataclass, field
 import pytest
 
 from kocor.agent import Agent
-from kocor.harness.loop import ToolCallRecord
 from kocor.harness.budget import IterationBudget
 from kocor.harness.event.event_manager import EventEmitter, EventType
 from kocor.tools.permission import PermissionManager
@@ -122,7 +121,6 @@ class TestAgentLoop:
         )
         result = agent.run("read both")
         assert "Both files read." in result
-        assert len(agent.get_tool_history()) == 2
 
     def test_permission_denied(self):
         """权限管理器拒绝的工具调用会返回错误给 LLM。"""
@@ -142,9 +140,6 @@ class TestAgentLoop:
         )
         result = agent.run("write file")
         assert "denied" in result.lower() or "I see" in result
-        # 该工具不应被执行
-        assert len(agent.ctx.tool_history) == 1
-        assert agent.ctx.tool_history[0].permission == "denied"
 
     def test_budget_exhaustion(self):
         """迭代预算耗尽时 Agent 应停止。"""
@@ -164,30 +159,6 @@ class TestAgentLoop:
         result = agent.run("do work")
         assert "迭代" in result or "限制" in result
         assert agent.ctx.iteration <= 3
-
-    def test_tool_history_tracking(self):
-        """每次工具执行都会创建 ToolCallRecord。"""
-        llm = MockLLM(responses=[
-            Message(
-                role="assistant",
-                content="reading...",
-                tool_calls=[ToolCall(id="call_1", function=FunctionCall(name="read_file", arguments='{"path": "test.txt"}'))],
-            ),
-            Message(role="assistant", content="done"),
-        ])
-        agent = Agent(
-            llm=llm,
-            tool_manager=MockToolRegistry(),
-            permission_mgr=PermissionManager(policy=PermissionManager.POLICY_PERMISSIVE),
-        )
-        agent.run("read")
-        history = agent.get_tool_history()
-        assert len(history) == 1
-        record = history[0]
-        assert record.tool_name == "read_file"
-        assert record.permission in ("auto", "confirm")
-        assert record.duration_ms >= 0
-        assert record.result_token_count > 0
 
     def test_pre_generate_event(self):
         """事件发射器触发 pre_generate 事件。"""
@@ -259,7 +230,6 @@ class TestAgentLoop:
         )
         result = agent.run("run")
         assert "error" in result.lower() or "Error" in result or "There was" in result
-        assert agent.ctx.tool_history[0].error is not None
 
     def test_stream_basic(self):
         """流模式应产出数据块。"""
@@ -354,30 +324,3 @@ class TestAgentLoop:
         assert result is not None
 
 
-class TestToolCallRecord:
-    def test_create_record(self):
-        record = ToolCallRecord(
-            iteration=1,
-            tool_name="read_file",
-            arguments={"path": "test.txt"},
-            result_summary="file content",
-            result_token_count=100,
-            duration_ms=50.0,
-            permission="auto",
-        )
-        assert record.tool_name == "read_file"
-        assert record.iteration == 1
-        assert record.error is None
-
-    def test_create_record_with_error(self):
-        record = ToolCallRecord(
-            iteration=1,
-            tool_name="run_python",
-            arguments={},
-            result_summary="Error!",
-            result_token_count=0,
-            duration_ms=10.0,
-            permission="auto",
-            error="RuntimeError",
-        )
-        assert record.error == "RuntimeError"

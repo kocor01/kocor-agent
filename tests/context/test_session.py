@@ -9,7 +9,6 @@ from kocor.context.builder import ContextBuilder
 from kocor.context.session import AgentContext
 from kocor.context.strategies import ContextStrategyApplier
 from kocor.context.types import ContextStrategy
-from kocor.harness.loop import ToolCallRecord
 from kocor.llm_provider.llm_manager import LlmManager
 from kocor.llm_provider.message import Message
 
@@ -40,7 +39,6 @@ class TestAgentContext:
         assert ctx.messages == []
         assert ctx.session_history == []
         assert ctx.iteration == 0
-        assert ctx.tool_history == []
         assert ctx.token_budget is not None
         assert ctx.system_content == ""
 
@@ -50,16 +48,11 @@ class TestAgentContext:
         ctx.messages = [Message(role="user", content="hi")]
         ctx.iteration = 5
         ctx.session_history = [Message(role="assistant", content="prev")]
-        ctx.tool_history.append(ToolCallRecord(
-            iteration=1, tool_name="test", arguments={},
-            result_summary="ok", result_token_count=10, duration_ms=5, permission="auto",
-        ))
 
         ctx.reset()
 
         assert ctx.messages == []
         assert ctx.iteration == 0
-        assert ctx.tool_history == []
         # session_history 应保留
         assert len(ctx.session_history) == 1
 

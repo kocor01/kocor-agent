@@ -1,6 +1,5 @@
 """Kocor Agent Harness — Agent 生命周期管理的运行时系统。"""
 
-from kocor.harness.loop import ToolCallRecord
 from kocor.harness.budget import IterationBudget
 from kocor.harness.event.event_manager import HarnessEvent, EventEmitter, EventType
 from kocor.harness.event.event_subscribe import EventSubscribe
@@ -8,12 +7,10 @@ from kocor.harness.config import HarnessConfig
 from kocor.tools.permission import PermissionManager
 from kocor.harness.file_guard import FileAccessGuard
 from kocor.harness.sandbox import Sandbox, SandboxResult
-from kocor.harness.error_handler import ErrorHandler, GracefulDegradation
+from kocor.harness.error_handler import ErrorHandler
 from kocor.harness.logger import Logger, get_logger, setup_logger
 
 __all__ = [
-    # 循环
-    "ToolCallRecord",
     # 预算
     "IterationBudget",
     # 事件
@@ -32,7 +29,6 @@ __all__ = [
     "SandboxResult",
     # 错误处理
     "ErrorHandler",
-    "GracefulDegradation",
     # 可观测性
     "Logger",
     "setup_logger",

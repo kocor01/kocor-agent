@@ -47,15 +47,3 @@ class ErrorHandler:
         return (False, f"LLM 错误: {error}")
 
 
-class GracefulDegradation:
-    """达到限制时的优雅降级策略。"""
-
-    def partial_result(self, tool_history: list) -> str:
-        """在预算耗尽时生成摘要消息。"""
-        if not tool_history:
-            return "Agent 在完成任何操作前已达到限制。"
-
-        lines = ["Agent 已达到执行限制。已完成的操作为："]
-        for rec in tool_history:
-            lines.append(f"  {rec.iteration}. {rec.tool_name}()")
-        return "\n".join(lines)

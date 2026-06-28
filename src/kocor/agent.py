@@ -24,7 +24,6 @@ from kocor.tools.tool_manager import ToolManager
 from kocor.harness.budget import IterationBudget
 from kocor.harness.event.event_manager import HarnessEvent, EventEmitter, EventType
 from kocor.tools.permission import PermissionManager
-from kocor.harness.loop import ToolCallRecord
 from kocor.hook.base import HookPoint, HookContext, HookResult, HookAction
 from kocor.hook.hook_manager import HookManager
 
@@ -74,12 +73,10 @@ class Agent:
         event_emitter: EventEmitter | None = None,
         budget: IterationBudget | None = None,
     ):
-        cfg = Config.load()
-
         self.llm = llm
         self.tool_manager = tool_manager or ToolManager()
         self.system_prompt = system_prompt or DEFAULT_SYSTEM_PROMPT
-        self.max_iterations = max_iterations if max_iterations is not None else cfg.max_iterations
+        self.max_iterations = max_iterations if max_iterations is not None else Config.get("max_iterations")
         self.skill_manager = skill_manager
 
         # Harness 组件
@@ -89,10 +86,10 @@ class Agent:
         self.budget = budget or IterationBudget(iterations_limit=self.max_iterations)
 
         # 上下文管理
-        resolved_strategy = context_strategy if context_strategy is not None else cfg.context_strategy
+        resolved_strategy = context_strategy if context_strategy is not None else Config.get("context_strategy")
         self.context_strategy = self._parse_strategy(resolved_strategy)
         memory: MemoryManager | None = None
-        memory_dir_resolved = memory_dir if memory_dir is not None else (cfg.memory_dir or None)
+        memory_dir_resolved = memory_dir if memory_dir is not None else (Config.get("memory_dir") or None)
         if memory_dir_resolved:
             memory = MemoryManager(memory_dir=memory_dir_resolved)
 
@@ -144,10 +141,6 @@ class Agent:
         self.ctx.build_initial_context(user_input)
         yield from self._stream_messages()
         self.ctx.extract_session_history()
-
-    def get_tool_history(self) -> list[ToolCallRecord]:
-        """返回本次会话的审计记录。"""
-        return list(self.ctx.tool_history)
 
     def reset_conversation(self) -> None:
         """清空会话历史，开始新对话。"""
@@ -266,20 +259,10 @@ class Agent:
     def _execute_one_tool(self, tool_call) -> Message | None:
         """执行单个工具调用：事件、权限检查、钩子、执行、审计。"""
         tool_name = tool_call.function.name
-        tool_arguments = tool_call.function.arguments
 
         self._emit(EventType.PRE_TOOL, iteration=self.ctx.iteration, tool_call=tool_call)
 
         if not self.permission_mgr.check(tool_call):
-            self.ctx.tool_history.append(ToolCallRecord(
-                iteration=self.ctx.iteration,
-                tool_name=tool_name,
-                arguments=tool_arguments,
-                result_summary="[Permission Denied]",
-                result_token_count=0,
-                duration_ms=0,
-                permission="denied",
-            ))
             return Message(
                 role="tool",
                 content="[Permission Denied] 用户拒绝了此工具调用，请勿再尝试使用此工具。",
@@ -304,17 +287,6 @@ class Agent:
             content = result.content or ""
             truncated = self._truncate_tool_output(content)
 
-            token_count = max(1, len(truncated) // 4)
-            self.ctx.tool_history.append(ToolCallRecord(
-                iteration=self.ctx.iteration,
-                tool_name=tool_name,
-                arguments=tool_arguments,
-                result_summary=truncated[:200],
-                result_token_count=token_count,
-                duration_ms=duration,
-                permission="auto",
-            ))
-
             self._emit(EventType.POST_TOOL, iteration=self.ctx.iteration,
                        tool_name=tool_name, duration=duration, success=True, result=result)
             self._run_hooks(HookPoint.POST_TOOL, tool_call=tool_call, tool_result=result)
@@ -332,17 +304,6 @@ class Agent:
                        component="tool", error=str(e))
             self._run_hooks(HookPoint.ON_ERROR, error=e)
 
-            duration = (time.monotonic() - start) * 1000
-            self.ctx.tool_history.append(ToolCallRecord(
-                iteration=self.ctx.iteration,
-                tool_name=tool_name,
-                arguments=tool_arguments,
-                result_summary=f"Error: {type(e).__name__}",
-                result_token_count=0,
-                duration_ms=duration,
-                permission="auto",
-                error=str(e),
-            ))
             return Message(
                 role="tool",
                 content=f"Error: {type(e).__name__}: {e}",
@@ -398,15 +359,7 @@ class Agent:
     # ── 辅助方法 ──
 
     def _budget_exhausted_message(self) -> str:
-        parts = [
-            f"Agent 在 {self.ctx.iteration} 次迭代后未完成。",
-            f"已执行 {len(self.ctx.tool_history)} 个工具调用。",
-        ]
-        if self.ctx.tool_history:
-            parts.append("已完成的操作:")
-            for rec in self.ctx.tool_history:
-                parts.append(f"  {rec.iteration}. {rec.tool_name}()")
-        return "\n".join(parts)
+        return f"Agent 在 {self.ctx.iteration} 次迭代后未完成。"
 
     @staticmethod
     def _truncate_tool_output(content: str) -> str:
