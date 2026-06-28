@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from kocor.context.types import SummaryNode
 from kocor.context.sliding_window import SlidingWindowStrategy
-from kocor.context.summarizer import HistorySummarizer
+from kocor.llm_provider.llm_manager import LlmManager
 from kocor.llm_provider.message import FunctionCall, Message, ToolCall
 
 
@@ -47,8 +47,11 @@ class TestSlidingWindowStrategy:
     """测试 SlidingWindowStrategy。"""
 
     def setup_method(self):
-        self.summarizer = HistorySummarizer(llm=FakeLLMForSummary())
-        self.strategy = SlidingWindowStrategy(summarizer=self.summarizer, preserve_last_rounds=2, preserve_first_rounds=0)
+        LlmManager._client = FakeLLMForSummary()
+        self.strategy = SlidingWindowStrategy(preserve_last_rounds=2, preserve_first_rounds=0)
+
+    def teardown_method(self):
+        LlmManager.reset()
 
     def test_no_truncation_needed(self):
         """总轮次少于保留轮次时，不截断。"""
@@ -80,7 +83,7 @@ class TestSlidingWindowStrategy:
 
     def test_aggressive_mode(self):
         """AGGRESSIVE 策略（preserve_last=1）只保留最后 1 轮（即最后的 assistant 输出）。"""
-        strategy = SlidingWindowStrategy(summarizer=self.summarizer, preserve_last_rounds=1, preserve_first_rounds=0)
+        strategy = SlidingWindowStrategy(preserve_last_rounds=1, preserve_first_rounds=0)
         all_msgs = []
         for i in range(4):
             all_msgs.extend(make_round(f"问题{i}", f"回答{i}"))
@@ -123,7 +126,6 @@ class TestSlidingWindowStrategy:
     def test_preserve_first_rounds_keeps_initial_rounds(self):
         """preserve_first_rounds>0 时最开始 N 轮应完整保留。"""
         strategy = SlidingWindowStrategy(
-            summarizer=self.summarizer,
             preserve_last_rounds=2,
             preserve_first_rounds=2,
         )
@@ -149,7 +151,6 @@ class TestSlidingWindowStrategy:
     def test_first_plus_last_exceeds_total_no_summary(self):
         """preserve_first + preserve_last >= 总轮次时不应摘要。"""
         strategy = SlidingWindowStrategy(
-            summarizer=self.summarizer,
             preserve_last_rounds=2,
             preserve_first_rounds=3,
         )
@@ -165,12 +166,10 @@ class TestSlidingWindowStrategy:
     def test_preserve_first_rounds_zero_backward_compat(self):
         """preserve_first_rounds=0 时行为与原来一致。"""
         strategy_zero = SlidingWindowStrategy(
-            summarizer=self.summarizer,
             preserve_last_rounds=2,
             preserve_first_rounds=0,
         )
         strategy_default = SlidingWindowStrategy(
-            summarizer=self.summarizer,
             preserve_last_rounds=2,
             preserve_first_rounds=0,
         )
@@ -186,7 +185,6 @@ class TestSlidingWindowStrategy:
     def test_preserve_first_middle_empty_no_summary(self):
         """first + last 刚好覆盖所有轮次，middle 为空时应无摘要。"""
         strategy = SlidingWindowStrategy(
-            summarizer=self.summarizer,
             preserve_last_rounds=2,
             preserve_first_rounds=2,
         )
@@ -202,7 +200,6 @@ class TestSlidingWindowStrategy:
     def test_preserve_first_keeps_correct_order(self):
         """三段式的消息顺序应为: first → summary → last。"""
         strategy = SlidingWindowStrategy(
-            summarizer=self.summarizer,
             preserve_last_rounds=2,
             preserve_first_rounds=2,
         )

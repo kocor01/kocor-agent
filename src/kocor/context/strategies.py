@@ -16,16 +16,12 @@ from kocor.llm_provider.message import Message
 class ContextStrategyApplier:
     """上下文策略应用器。
 
-    持有 summarizer，在每次 apply() 时根据策略类型
-    选择合适的上下文管理方式处理消息列表。
+    在每次 apply() 时根据策略类型选择合适的上下文管理方式处理消息列表。
     SLIDING_WINDOW 的 preserve_last/first_rounds 从 Config 读取。
-
-    Attributes:
-        summarizer: 历史摘要器
     """
 
-    def __init__(self, summarizer: HistorySummarizer):
-        self.summarizer = summarizer
+    def __init__(self):
+        self.summarizer = HistorySummarizer()
 
     def apply(
         self,
@@ -67,7 +63,6 @@ class ContextStrategyApplier:
             return messages, None
 
         window = SlidingWindowStrategy(
-            summarizer=self.summarizer,
             preserve_last_rounds=preserve_last,
             preserve_first_rounds=preserve_first,
         )

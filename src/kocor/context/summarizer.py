@@ -17,7 +17,6 @@ class HistorySummarizer:
     使用 LLM 将一段消息列表压缩为文本摘要。
 
     Attributes:
-        llm: LLM 客户端，用于生成摘要
         summarization_prompt: 摘要 prompt 模板，包含 {history_text} 占位符
     """
 
@@ -28,8 +27,8 @@ class HistorySummarizer:
 对话内容：
 {history_text}"""
 
-    def __init__(self, llm=None):
-        self.llm = llm if llm is not None else LlmManager.get_llm_client()
+    def __init__(self):
+        self.llm = LlmManager.get_llm_client()
         self.summarization_prompt = self.DEFAULT_PROMPT
         self._token_counter = TokenCounter()
 

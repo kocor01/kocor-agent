@@ -14,7 +14,6 @@ from kocor.context.session import AgentContext
 from kocor.context.strategies import ContextStrategyApplier
 from kocor.context.types import ContextStrategy
 from kocor.context.project_instructions import load_project_instructions
-from kocor.context.summarizer import HistorySummarizer
 from kocor.context.token_counter import TokenCounter
 from kocor.llm_provider.message import Message
 from kocor.tools.definitions import ToolDefinition
@@ -39,18 +38,12 @@ class ContextBuilder:
         identity_prompt: str,
         tools: Any,  # 鸭式类型：需要 get_definitions() 方法
         memory: Any | None = None,
-        summarizer: HistorySummarizer | None = None,
     ):
         self.identity_prompt = identity_prompt
         self.tools = tools
         self.memory = memory
         self._token_counter = TokenCounter()
-        self.summarizer = summarizer
-        self.strategy_applier = (
-            ContextStrategyApplier(summarizer=summarizer)
-            if summarizer
-            else None
-        )
+        self.strategy_applier = ContextStrategyApplier()
 
     def build_system_prompt(self) -> str:
         """构建完整的系统提示文本。

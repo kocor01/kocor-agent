@@ -10,21 +10,20 @@ from kocor.context.session import AgentContext
 from kocor.context.strategies import ContextStrategyApplier
 from kocor.context.types import ContextStrategy
 from kocor.harness.loop import ToolCallRecord
+from kocor.llm_provider.llm_manager import LlmManager
 from kocor.llm_provider.message import Message
 
 
-class FakeSummarizer:
-    """伪造的摘要器，返回固定摘要。"""
+class FakeLLM:
+    def __init__(self):
+        self.summary_text = "这是历史摘要"
 
-    def summarize(self, messages, start_index=0, end_index=0):
-        from kocor.context.types import SummaryNode
-        return SummaryNode(
-            summary="压缩后的摘要",
-            message_count=len(messages),
-            token_count=10,
-            original_start=start_index,
-            original_end=end_index,
-        )
+    @property
+    def provider(self):
+        return "fake"
+
+    def generate(self, messages, tools=None, max_tokens=4096, temperature=0.0):
+        return Message(role="assistant", content=self.summary_text)
 
 
 class FakeToolRegistry:
@@ -108,14 +107,16 @@ class TestAgentContextCompression:
     """测试上下文压缩功能。"""
 
     def setup_method(self):
-        # 创建最小 ContextBuilder 和 StrategyApplier
         fake_tools = FakeToolRegistry()
         self.builder = ContextBuilder(
             identity_prompt="test",
             tools=fake_tools,
         )
-        summarizer = FakeSummarizer()
-        self.strategy_applier = ContextStrategyApplier(summarizer=summarizer)
+        LlmManager._client = FakeLLM()
+        self.strategy_applier = ContextStrategyApplier()
+
+    def teardown_method(self):
+        LlmManager.reset()
 
     def test_compress_if_needed_default_skips(self):
         """DEFAULT 策略不压缩。"""

@@ -14,7 +14,6 @@ from kocor.context.builder import ContextBuilder
 from kocor.context.memory import MemoryManager
 from kocor.context.session import AgentContext
 from kocor.context.types import ContextStrategy
-from kocor.context.summarizer import HistorySummarizer
 from kocor.context.strategies import ContextStrategyApplier
 from kocor.llm_provider.llm_client import LLMClient
 from kocor.llm_provider.message import Message, StreamChunk
@@ -97,17 +96,12 @@ class Agent:
         if memory_dir_resolved:
             memory = MemoryManager(memory_dir=memory_dir_resolved)
 
-        summarizer: HistorySummarizer | None = None
-        strategy_applier: ContextStrategyApplier | None = None
-        if self.context_strategy != ContextStrategy.DEFAULT:
-            summarizer = HistorySummarizer(llm=llm)
-            strategy_applier = ContextStrategyApplier(summarizer=summarizer)
+        strategy_applier = ContextStrategyApplier()
 
         self.context_builder = ContextBuilder(
             identity_prompt=self.system_prompt,
             tools=self.tool_manager,
             memory=memory,
-            summarizer=summarizer,
         )
 
         # 运行时上下文管理器（替代 _messages/_iteration/_tool_history）

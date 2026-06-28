@@ -21,19 +21,16 @@ class SlidingWindowStrategy:
     - 保留最近 N 轮完整消息
 
     Attributes:
-        summarizer: 历史摘要器
         preserve_last_rounds: 保留的最近完整轮次数
         preserve_first_rounds: 保留的最开始完整轮次数
-        token_margin: token 余量（预留空间）
     """
 
     def __init__(
         self,
-        summarizer: HistorySummarizer,
         preserve_last_rounds: int = 3,
         preserve_first_rounds: int = 1,
     ):
-        self.summarizer = summarizer
+        self.summarizer = HistorySummarizer()
         self.preserve_last_rounds = preserve_last_rounds
         self.preserve_first_rounds = preserve_first_rounds
 

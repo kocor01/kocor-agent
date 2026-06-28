@@ -1,14 +1,13 @@
 """测试上下文策略应用器。"""
 
 from __future__ import annotations
-
 import os
 
 from kocor.config import Config
 from kocor.context.budget import TokenBudget
 from kocor.context.strategies import ContextStrategyApplier
 from kocor.context.types import ContextStrategy
-from kocor.context.summarizer import HistorySummarizer
+from kocor.llm_provider.llm_manager import LlmManager
 from kocor.llm_provider.message import Message
 
 
@@ -28,8 +27,11 @@ class TestContextStrategyApplier:
     """测试 ContextStrategyApplier。"""
 
     def setup_method(self):
-        summarizer = HistorySummarizer(llm=FakeLLM())
-        self.applier = ContextStrategyApplier(summarizer=summarizer)
+        LlmManager._client = FakeLLM()
+        self.applier = ContextStrategyApplier()
+
+    def teardown_method(self):
+        LlmManager.reset()
 
     def test_default_no_history(self):
         """DEFAULT 策略下空历史应原样返回。"""
@@ -56,9 +58,7 @@ class TestContextStrategyApplier:
 
     def test_sliding_window_truncates(self):
         """SLIDING_WINDOW 策略应截断超出轮次的消息。"""
-        applier = ContextStrategyApplier(
-            summarizer=HistorySummarizer(llm=FakeLLM()),
-        )
+        applier = ContextStrategyApplier()
         msgs = []
         for i in range(10):
             msgs.extend([
@@ -102,9 +102,7 @@ class TestContextStrategyApplier:
         os.environ["KOCOR_CONTEXT_MAX_TOKENS"] = "500"
         Config.reset()
         try:
-            applier = ContextStrategyApplier(
-                summarizer=HistorySummarizer(llm=FakeLLM()),
-            )
+            applier = ContextStrategyApplier()
             msgs = [Message(role="user", content=f"msg{i}") for i in range(30)]
             msgs.extend([Message(role="assistant", content=f"ans{i}") for i in range(30)])
             result, summary = applier.apply(
@@ -158,9 +156,7 @@ class TestContextStrategyApplier:
     def test_budget_truncate_overrides_sliding(self):
         """should_truncate=True 时 SLIDING_WINDOW 应降级为 AGGRESSIVE。"""
         budget = TokenBudget(limit=1000, used_prompt=950)  # ratio=0.95
-        applier = ContextStrategyApplier(
-            summarizer=HistorySummarizer(llm=FakeLLM()),
-        )
+        applier = ContextStrategyApplier()
         msgs = []
         for i in range(8):
             msgs.extend([
