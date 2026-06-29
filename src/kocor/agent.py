@@ -15,7 +15,6 @@ from kocor.context.context_manager import ContextManager
 from kocor.llm_provider.llm_client import LLMClient
 from kocor.llm_provider.message import Message, StreamChunk
 from kocor.skill.types import InvokeStrategy, SkillContext, SkillType
-from kocor.skill.skill_manager import SkillManager
 from kocor.tools.tool_manager import ToolManager
 
 from kocor.harness.budget import IterationBudget
@@ -38,11 +37,6 @@ class Agent:
         self,
         llm: LLMClient,
         tool_manager: ToolManager | None = None,
-        system_prompt: str | None = None,
-        max_iterations: int | None = None,
-        skill_manager: SkillManager | None = None,
-        # 上下文管理参数
-        memory_dir: str | None = None,
         # Harness 参数（可选）
         permission_mgr: PermissionManager | None = None,
         hook_manager: HookManager | None = None,
@@ -51,9 +45,8 @@ class Agent:
     ):
         self.llm = llm
         self.tool_manager = tool_manager or ToolManager()
-        self.system_prompt = system_prompt or Config.get("default_system_prompt")
-        self.max_iterations = max_iterations if max_iterations is not None else Config.get("max_iterations")
-        self.skill_manager = skill_manager
+        self.system_prompt = Config.get("default_system_prompt")
+        self.max_iterations = Config.get("max_iterations")
 
         # Harness 组件
         self.permission_mgr = permission_mgr or PermissionManager(policy=PermissionManager.POLICY_PERMISSIVE)
@@ -63,13 +56,12 @@ class Agent:
 
         # 上下文管理
         memory: MemoryManager | None = None
-        memory_dir_resolved = memory_dir if memory_dir is not None else (Config.get("memory_dir") or None)
-        if memory_dir_resolved:
-            memory = MemoryManager(memory_dir=memory_dir_resolved)
+        memory_dir = Config.get("memory_dir") or None
+        if memory_dir:
+            memory = MemoryManager(memory_dir=memory_dir)
 
         # 运行时上下文管理器
         self.ctx = ContextManager(
-            identity_prompt=self.system_prompt,
             tools=self.tool_manager,
             memory=memory,
         )
@@ -78,7 +70,7 @@ class Agent:
 
     def run(self, user_input: str) -> str:
         """执行一次完整的 Agent 循环。"""
-        if self.skill_manager and user_input.startswith("/"):
+        if self.tool_manager.skill_manager and user_input.startswith("/"):
             return self._handle_slash_command(user_input)
 
         self.ctx.reset()
@@ -89,7 +81,7 @@ class Agent:
 
     def stream(self, user_input: str) -> Iterator[StreamChunk]:
         """流式执行 Agent 循环。"""
-        if self.skill_manager and user_input.startswith("/"):
+        if self.tool_manager.skill_manager and user_input.startswith("/"):
             result = self._handle_slash_command(user_input)
             yield StreamChunk(content=result, is_final=True)
             return
@@ -274,7 +266,7 @@ class Agent:
         skill_name = parts[0]
         skill_args = parts[1] if len(parts) > 1 else ""
 
-        skill_def = self.skill_manager.get(skill_name)
+        skill_def = self.tool_manager.skill_manager.get(skill_name)
         if skill_def is None:
             available = self._list_slash_skills()
             return f"Unknown skill: '{skill_name}'. Available: {available}"
@@ -286,7 +278,7 @@ class Agent:
             user_input=skill_args,
             tool_manager=self.tool_manager,
         )
-        result = self.skill_manager.execute(skill_name, context)
+        result = self.tool_manager.skill_manager.execute(skill_name, context)
 
         if not result.success:
             return result.content
@@ -308,7 +300,7 @@ class Agent:
     def _list_slash_skills(self) -> str:
         names = [
             f"/{s.name}"
-            for s in self.skill_manager.list_skills(enabled_only=True)
+            for s in self.tool_manager.skill_manager.list_skills(enabled_only=True)
             if s.invoke_strategy in (InvokeStrategy.SLASH, InvokeStrategy.BOTH)
         ]
         return ", ".join(sorted(names))

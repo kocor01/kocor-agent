@@ -132,10 +132,6 @@ class TestContextManager:
         assert ctx.messages == []
         assert ctx.tool_definitions == []
 
-    def test_with_identity_prompt(self):
-        ctx = ContextManager(identity_prompt="你是助手")
-        assert ctx.identity_prompt == "你是助手"
-
     def test_with_messages(self):
         msgs = [Message(role="system", content="hi")]
         ctx = ContextManager()

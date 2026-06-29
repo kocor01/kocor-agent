@@ -243,8 +243,6 @@ def main() -> None:
     agent = Agent(
         llm=LlmManager.get_llm_client(),
         tool_manager=toolManager,
-        skill_manager=toolManager.skill_manager,
-        max_iterations=max_iterations,
         permission_mgr=permission_mgr,
         hook_manager=hook_manager,
         event_emitter=event_emitter,

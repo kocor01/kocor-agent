@@ -6,6 +6,7 @@ from kocor.config import Config
 from kocor.agent import Agent
 from kocor.llm_provider.llm_client import LLMClient
 from kocor.tools.definitions import ToolDefinition
+from kocor.harness.budget import IterationBudget
 from kocor.llm_provider.message import FunctionCall, Message, StreamChunk, ToolCall, ToolResult
 
 
@@ -38,14 +39,14 @@ class TestAgentTextResponse:
     def test_single_turn(self):
         """单次对话直接返回文本"""
         llm = FakeLLMClient([Message(role="assistant", content="你好，我是 Kocor")])
-        agent = Agent(llm=llm, max_iterations=20)
+        agent = Agent(llm=llm)
         result = agent.run("你好")
         assert result == "你好，我是 Kocor"
 
     def test_system_prompt_included(self):
         """system prompt 包含在消息中"""
         llm = FakeLLMClient([Message(role="assistant", content="hello")])
-        agent = Agent(llm=llm, max_iterations=20)
+        agent = Agent(llm=llm)
         agent.run("hi")
 
         # 验证 llm.generate 收到的第一条消息是 system prompt
@@ -77,7 +78,7 @@ class TestAgentToolCall:
             content="hello",
         )
 
-        agent = Agent(llm=llm, tool_manager=mock_tools, max_iterations=20)
+        agent = Agent(llm=llm, tool_manager=mock_tools)
         result = agent.run("读 a.txt")
         assert result == "文件内容是: hello"
         mock_tools.execute.assert_called_once()
@@ -115,7 +116,7 @@ class TestAgentToolCall:
 
         mock_tools.execute.side_effect = side_effect
 
-        agent = Agent(llm=llm, tool_manager=mock_tools, max_iterations=20)
+        agent = Agent(llm=llm, tool_manager=mock_tools)
         result = agent.run("读 a.txt 和 b.txt")
         assert result == "两个文件都读完了"
         assert mock_tools.execute.call_count == 2
@@ -145,7 +146,7 @@ class TestAgentTimeout:
             content="content",
         )
 
-        agent = Agent(llm=llm, tool_manager=mock_tools, max_iterations=3)
+        agent = Agent(llm=llm, tool_manager=mock_tools, budget=IterationBudget(iterations_limit=3))
         result = agent.run("持续调用工具")
         assert "迭代" in result and "未完成" in result
 
@@ -160,7 +161,7 @@ class TestAgentSystemPrompt:
     def test_custom_system_prompt(self):
         """自定义 system prompt"""
         llm = FakeLLMClient([Message(role="assistant", content="hi")])
-        agent = Agent(llm=llm, system_prompt="你是助手", max_iterations=20)
+        agent = Agent(llm=llm)
         agent.run("hi")
         assert llm.call_count == 1
 
@@ -208,7 +209,7 @@ class TestAgentStream:
                 StreamChunk(is_final=True),
             ]
         ])
-        agent = Agent(llm=llm, max_iterations=20)
+        agent = Agent(llm=llm)
         chunks = list(agent.stream("你好"))
 
         assert len(chunks) == 3
@@ -246,7 +247,7 @@ class TestAgentStream:
 
         mock_tools.execute.side_effect = side_effect
 
-        agent = Agent(llm=llm, tool_manager=mock_tools, max_iterations=20)
+        agent = Agent(llm=llm, tool_manager=mock_tools)
         chunks = list(agent.stream("读 a.txt"))
 
         # 文本 chunk + 工具调用 chunk + 文本 chunk + is_final
@@ -277,7 +278,7 @@ class TestAgentStream:
             content="content",
         )
 
-        agent = Agent(llm=llm, tool_manager=mock_tools, max_iterations=2)
+        agent = Agent(llm=llm, tool_manager=mock_tools, budget=IterationBudget(iterations_limit=2))
         chunks = list(agent.stream("持续调用工具"))
 
         # 最后应该有超时信息
@@ -288,6 +289,8 @@ class TestAgentStream:
 
 # 简单的 mock 类，用于 spec
 class ToolRegistryMock:
+    skill_manager = None
+
     def get_definitions(self):
         return []
 

@@ -138,7 +138,6 @@ class TestContextManagerCompression:
         with patch("kocor.context.context_manager.Config") as mock_config:
             mock_config.get.return_value = "default"
             ctx = ContextManager(
-                identity_prompt="test",
                 tools=FakeToolRegistry(),
             )
         ctx.session_history = [Message(role="user", content="prev_q"),

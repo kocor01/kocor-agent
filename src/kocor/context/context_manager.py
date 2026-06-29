@@ -34,12 +34,10 @@ class ContextManager:
 
     def __init__(
         self,
-        identity_prompt: str = "",
         tools: Any | None = None,  # 鸭式类型：需要 get_definitions() 方法
         memory: Any | None = None,
     ):
         # 核心依赖
-        self.identity_prompt = identity_prompt
         self.tools = tools
         self.memory = memory
 
@@ -47,7 +45,7 @@ class ContextManager:
         self._token_counter = TokenCounter()
 
         # 系统提示构建器
-        self._prompt_builder = SystemPromptBuilder(identity_prompt, memory)
+        self._prompt_builder = SystemPromptBuilder(memory)
 
         # 上下文策略
         resolved = Config.get("context_strategy")

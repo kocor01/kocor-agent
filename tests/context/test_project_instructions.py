@@ -5,15 +5,15 @@ from __future__ import annotations
 import os
 import tempfile
 
-from kocor.context.project_instructions import load_project_instructions
+from kocor.context.system_prompt import SystemPromptBuilder
 
 
 class TestProjectInstructions:
-    """测试 load_project_instructions()。"""
+    """测试 _load_project_instructions()。"""
 
     def test_file_not_found_returns_empty(self):
         """文件不存在应返回空字符串。"""
-        result = load_project_instructions("/tmp/nonexistent_file_KOCOR_test.md")
+        result = SystemPromptBuilder._load_project_instructions("/tmp/nonexistent_file_KOCOR_test.md")
         assert result == ""
 
     def test_empty_file_returns_empty(self):
@@ -25,7 +25,7 @@ class TestProjectInstructions:
             path = f.name
 
         try:
-            result = load_project_instructions(path)
+            result = SystemPromptBuilder._load_project_instructions(path)
             assert result == ""
         finally:
             os.unlink(path)
@@ -40,7 +40,7 @@ class TestProjectInstructions:
             path = f.name
 
         try:
-            result = load_project_instructions(path)
+            result = SystemPromptBuilder._load_project_instructions(path)
             assert "## 项目规范" in result
             assert "Python 3.12" in result
         finally:
@@ -56,7 +56,7 @@ class TestProjectInstructions:
             path = f.name
 
         try:
-            result = load_project_instructions(path)
+            result = SystemPromptBuilder._load_project_instructions(path)
             assert "项目指令" in result
         finally:
             os.unlink(path)
@@ -71,7 +71,7 @@ class TestProjectInstructions:
             cleaned = False
 
         try:
-            result = load_project_instructions()
+            result = SystemPromptBuilder._load_project_instructions()
             assert result == ""
         finally:
             if cleaned:

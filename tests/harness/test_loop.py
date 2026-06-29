@@ -49,6 +49,8 @@ class MockLLM:
 class MockToolRegistry:
     """模拟工具注册器。"""
 
+    skill_manager = None
+
     def __init__(self):
         self.executed = []
 
@@ -209,6 +211,8 @@ class TestAgentLoop:
     def test_tool_error_handling(self):
         """工具执行错误被优雅捕获。"""
         class ErrorToolRegistry:
+            skill_manager = None
+
             def get_definitions(self, filter_category=None):
                 return []
 
@@ -287,6 +291,7 @@ class TestAgentLoop:
         long_content = "x" * 100_000
 
         class LongResultToolRegistry:
+            skill_manager = None
             def get_definitions(self, filter_category=None):
                 return []
 

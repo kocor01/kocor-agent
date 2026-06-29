@@ -9,7 +9,6 @@ from kocor.config import Config
 from kocor.context.budget import TokenBudget
 from kocor.context.types import ContextStrategy, SummaryNode
 from kocor.context.sliding_window import SlidingWindowStrategy
-from kocor.context.summarizer import HistorySummarizer
 from kocor.llm_provider.message import Message
 
 
@@ -19,9 +18,6 @@ class ContextStrategyApplier:
     在每次 apply() 时根据策略类型选择合适的上下文管理方式处理消息列表。
     SLIDING_WINDOW 的 preserve_last/first_rounds 从 Config 读取。
     """
-
-    def __init__(self):
-        self.summarizer = HistorySummarizer()
 
     def apply(
         self,

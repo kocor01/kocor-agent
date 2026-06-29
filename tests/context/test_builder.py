@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from kocor.config import Config
 from kocor.context.context_manager import ContextManager
 from kocor.context.types import ContextStrategy
 from kocor.tools.definitions import ToolDefinition
@@ -23,24 +24,24 @@ class TestContextManagerBuilder:
         """默认构造应成功。"""
         tools = ToolRegistryStub()
         ctx = ContextManager(
-            identity_prompt="你是 Kocor",
             tools=tools,
         )
-        assert ctx.identity_prompt == "你是 Kocor"
 
     def test_build_system_prompt_contains_identity(self):
         """system prompt 应包含身份提示。"""
-        ctx = ContextManager(
-            identity_prompt="你是 Kocor 助手",
-            tools=ToolRegistryStub(),
-        )
-        prompt = ctx._prompt_builder.build()
-        assert "你是 Kocor 助手" in prompt
+        Config.set("default_system_prompt", "你是 Kocor 助手")
+        try:
+            ctx = ContextManager(
+                tools=ToolRegistryStub(),
+            )
+            prompt = ctx._prompt_builder.build()
+            assert "你是 Kocor 助手" in prompt
+        finally:
+            Config.set("default_system_prompt", Config.default_system_prompt)
 
     def test_build_system_prompt_includes_env_info(self):
         """system prompt 应包含环境信息。"""
         ctx = ContextManager(
-            identity_prompt="你是 Kocor",
             tools=ToolRegistryStub(),
         )
         prompt = ctx._prompt_builder.build()
@@ -48,17 +49,19 @@ class TestContextManagerBuilder:
 
     def test_build_system_prompt_with_custom_instructions(self):
         """项目指令文件不存在时不报错，只跳过 L2 层。"""
-        ctx = ContextManager(
-            identity_prompt="你是 Kocor",
-            tools=ToolRegistryStub(),
-        )
-        prompt = ctx._prompt_builder.build()
-        assert "你是 Kocor" in prompt
+        Config.set("default_system_prompt", "你是 Kocor")
+        try:
+            ctx = ContextManager(
+                tools=ToolRegistryStub(),
+            )
+            prompt = ctx._prompt_builder.build()
+            assert "你是 Kocor" in prompt
+        finally:
+            Config.set("default_system_prompt", Config.default_system_prompt)
 
     def test_build_initial_context_sets_messages(self):
         """build_initial_context 应设置消息列表。"""
         ctx = ContextManager(
-            identity_prompt="你是 Kocor",
             tools=ToolRegistryStub(),
         )
         ctx.build_initial_context(user_input="你好")
@@ -67,7 +70,6 @@ class TestContextManagerBuilder:
     def test_build_initial_context_includes_user_input(self):
         """build_initial_context 应包含用户输入作为最后一条消息。"""
         ctx = ContextManager(
-            identity_prompt="你是 Kocor",
             tools=ToolRegistryStub(),
         )
         ctx.build_initial_context(user_input="帮我读文件")
@@ -78,7 +80,6 @@ class TestContextManagerBuilder:
     def test_build_initial_context_includes_system_prompt(self):
         """build_initial_context 的第一条消息应为 system prompt。"""
         ctx = ContextManager(
-            identity_prompt="你是 Kocor 助手",
             tools=ToolRegistryStub(),
         )
         ctx.build_initial_context(user_input="你好")
@@ -90,7 +91,6 @@ class TestContextManagerBuilder:
         from kocor.llm_provider.message import Message
 
         ctx = ContextManager(
-            identity_prompt="你是 Kocor",
             tools=ToolRegistryStub(),
         )
         ctx.session_history = [
@@ -109,7 +109,6 @@ class TestContextManagerBuilder:
     def test_build_initial_context_empty_history(self):
         """空历史应只有 system + user。"""
         ctx = ContextManager(
-            identity_prompt="你是 Kocor",
             tools=ToolRegistryStub(),
         )
         ctx.build_initial_context(user_input="你好")
@@ -127,7 +126,6 @@ class TestContextManagerBuilder:
         ]
         stub = ToolRegistryStub(tools)
         ctx = ContextManager(
-            identity_prompt="你是 Kocor",
             tools=stub,
         )
         ctx.build_initial_context(user_input="读文件")
@@ -137,7 +135,6 @@ class TestContextManagerBuilder:
     def test_context_has_environment_info(self):
         """环境信息应包含在 system prompt 文本中。"""
         ctx = ContextManager(
-            identity_prompt="你是 Kocor",
             tools=ToolRegistryStub(),
         )
         ctx.build_initial_context(user_input="你好")
@@ -157,7 +154,6 @@ class TestContextManagerBuilder:
         ))
 
         ctx = ContextManager(
-            identity_prompt="你是 Kocor",
             tools=ToolRegistryStub(),
             memory=memory,
         )
