@@ -238,7 +238,7 @@ def main() -> None:
 
     EventSubscribe(event_emitter).subscribe_all()
 
-    budget = IterationBudget(iterations_limit=max_iterations)
+    budget = IterationBudget(max_iterations=max_iterations)
 
     agent = Agent(
         llm=LlmManager.get_llm_client(),

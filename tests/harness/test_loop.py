@@ -151,7 +151,7 @@ class TestAgentLoop:
             tool_calls=[ToolCall(id="call_1", function=FunctionCall(name="read_file", arguments='{"path": "x.txt"}'))],
         )
         llm = MockLLM(responses=[tool_response] * 10)
-        budget = IterationBudget(iterations_limit=3)
+        budget = IterationBudget(max_iterations=3)
         agent = Agent(
             llm=llm,
             tool_manager=MockToolRegistry(),
@@ -270,7 +270,7 @@ class TestAgentLoop:
 
     def test_max_iterations_config(self):
         """Agent 遵循预算中的最大迭代次数。"""
-        budget = IterationBudget(iterations_limit=1)
+        budget = IterationBudget(max_iterations=1)
         tool_response = Message(
             role="assistant",
             content="working...",

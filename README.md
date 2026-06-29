@@ -138,7 +138,7 @@ uv run pytest tests/
 | `ANTHROPIC_MODEL` | Anthropic 模型名 | `claude-sonnet-4-20250514` |
 | `ANTHROPIC_BASE_URL` | 兼容端点（可选） | — |
 | `KOCOR_MAX_ITERATIONS` | Agent 最大迭代次数 | `20` |
-| `KOCOR_TIMEOUT` | 工具执行超时（秒） | `30` |
+| `KOCOR_TOOL_TIMEOUT` | 工具执行超时（秒） | `30` |
 
 ## License
 

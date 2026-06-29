@@ -303,26 +303,21 @@ class HarnessConfig:
 @dataclass 
 class IterationBudget:
     """迭代预算：持续追踪关键资源的消耗。"""
-    iterations_used: int = 0
-    iterations_limit: int = 20
+    used_iterations: int = 0
+    max_iterations: int = 20
     
     tokens_prompt: int = 0
     tokens_completion: int = 0
     tokens_limit: int = 200_000
     
-    time_start: float = 0.0
-    time_elapsed: float = 0.0
-    time_limit: float = 300.0  # 5 min
-    
     @property
     def exhausted(self) -> bool:
-        return (self.iterations_used >= self.iterations_limit 
-                or self.tokens_prompt >= self.tokens_limit
-                or self.time_elapsed >= self.time_limit)
+        return (self.used_iterations >= self.max_iterations 
+                or self.tokens_prompt >= self.tokens_limit)
     
     @property
     def remaining_iterations(self) -> int:
-        return self.iterations_limit - self.iterations_used
+        return self.max_iterations - self.used_iterations
 
 
 @dataclass
@@ -542,7 +537,7 @@ class AgentLoop:
         # 2. 核心循环
         while not self.budget.exhausted:
             self._iteration += 1
-            self.budget.iterations_used = self._iteration
+            self.budget.used_iterations = self._iteration
 
             # Pre-generate hook
             self._emit("pre_generate", iteration=self._iteration, messages=messages)
@@ -581,7 +576,7 @@ class AgentLoop:
 
         while not self.budget.exhausted:
             self._iteration += 1
-            self.budget.iterations_used = self._iteration
+            self.budget.used_iterations = self._iteration
 
             # ... 流式调用 + 分段 yield ...
 
@@ -755,7 +750,7 @@ Tool (抽象)
 class ToolRegistry:
     """工具注册与执行中心（增强版）。"""
 
-    def __init__(self, allowed_dir: str = "", timeout: int = 30):
+    def __init__(self):
         self._tools: dict[str, ToolDefinition] = {}
         self._handlers: dict[str, Callable] = {}
         self._tool_metadata: dict[str, ToolMetadata] = {}

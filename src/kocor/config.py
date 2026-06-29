@@ -21,7 +21,7 @@ class Config:
 
     provider: str = "openai"                # AI 提供商（openai / anthropic）
     max_iterations: int = 20                # 最大迭代次数
-    timeout: int = 300                      # 请求超时秒数
+    tool_timeout: int = 30                  # 工具执行超时（秒）
     permission_policy: str = "default"      # 权限策略（default / strict / permissive）
     mcp_config: str = "kocor.mcp.json"      # MCP 服务器配置文件
     skills_config: str = "kocor.skills.json"  # 技能配置文件
@@ -124,13 +124,13 @@ class Config:
         if max_iterations < 1:
             raise ValueError(f"KOCOR_MAX_ITERATIONS 必须 >= 1，当前值: {max_iterations}")
 
-        timeout_raw = os.environ.get("KOCOR_TIMEOUT", str(Config.timeout))
+        tool_timeout_raw = os.environ.get("KOCOR_TOOL_TIMEOUT", str(Config.tool_timeout))
         try:
-            timeout = int(timeout_raw)
+            tool_timeout = int(tool_timeout_raw)
         except ValueError:
-            raise ValueError(f"KOCOR_TIMEOUT 必须是整数，当前值: '{timeout_raw}'")
-        if timeout < 1:
-            raise ValueError(f"KOCOR_TIMEOUT 必须 >= 1，当前值: {timeout}")
+            raise ValueError(f"KOCOR_TOOL_TIMEOUT 必须是整数，当前值: '{tool_timeout_raw}'")
+        if tool_timeout < 1:
+            raise ValueError(f"KOCOR_TOOL_TIMEOUT 必须 >= 1，当前值: {tool_timeout}")
 
         mcp_config = os.environ.get("KOCOR_MCP_CONFIG", Config.mcp_config)
         if mcp_config and not os.path.exists(mcp_config):
@@ -192,7 +192,7 @@ class Config:
         return cls(
             provider=provider,
             max_iterations=max_iterations,
-            timeout=timeout,
+            tool_timeout=tool_timeout,
             permission_policy=permission_policy,
             mcp_config=mcp_config,
             skills_config=skills_config,

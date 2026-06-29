@@ -74,7 +74,7 @@ class Loop:
 
         while not self.budget.exhausted:
             self.ctx.advance_iteration()
-            self.budget.iterations_used = self.ctx.iteration
+            self.budget.used_iterations = self.ctx.iteration
 
             self.ctx.compress_if_needed()
 
@@ -100,7 +100,7 @@ class Loop:
                     self.ctx.append(result_msg)
 
         self._emit(EventType.ON_BUDGET_EXHAUSTED, iteration=self.ctx.iteration,
-                       iterations_limit=self.budget.iterations_limit)
+                       max_iterations=self.budget.max_iterations)
         self._run_hooks(HookPoint.ON_BUDGET_EXHAUSTED)
         return self._budget_exhausted_message()
 
@@ -109,7 +109,7 @@ class Loop:
 
         while not self.budget.exhausted:
             self.ctx.advance_iteration()
-            self.budget.iterations_used = self.ctx.iteration
+            self.budget.used_iterations = self.ctx.iteration
 
             self.ctx.compress_if_needed()
 
@@ -167,7 +167,7 @@ class Loop:
                     )
 
         self._emit(EventType.ON_BUDGET_EXHAUSTED, iteration=self.ctx.iteration,
-                       iterations_limit=self.budget.iterations_limit)
+                       max_iterations=self.budget.max_iterations)
         self._run_hooks(HookPoint.ON_BUDGET_EXHAUSTED)
         yield StreamChunk(content=self._budget_exhausted_message(), is_final=True)
 

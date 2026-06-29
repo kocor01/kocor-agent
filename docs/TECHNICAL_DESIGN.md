@@ -487,7 +487,7 @@ KOCOR_MODEL=gpt-4o             # 模型名
 OPENAI_API_KEY=sk-xxx          # OpenAI API Key
 ANTHROPIC_API_KEY=sk-ant-xxx   # Anthropic API Key
 KOCOR_MAX_ITERATIONS=20        # 最大迭代次数
-KOCOR_TIMEOUT=30               # 工具执行超时（秒）
+KOCOR_TOOL_TIMEOUT=30          # 工具执行超时（秒）
 ```
 
 ---

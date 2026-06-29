@@ -2,8 +2,10 @@
 
 import os
 import tempfile
+import time
 from unittest.mock import mock_open, patch
 
+from kocor.config import Config
 from kocor.llm_provider.message import FunctionCall, ToolCall, ToolResult
 from kocor.tools.tool_manager import ToolManager
 from kocor.tools.tool_utils import resolve_safe_path
@@ -295,3 +297,57 @@ class TestCreateDefaultTools:
         )
         result = tools.execute(tool_call)
         assert "NameError" in result.content
+
+
+class TestToolTimeout:
+    """测试工具执行超时"""
+
+    def setup_method(self):
+        self._saved_timeout = Config.get("tool_timeout")
+
+    def teardown_method(self):
+        Config.set("tool_timeout", self._saved_timeout)
+
+    def test_tool_timeout(self):
+        """工具执行超时返回超时错误"""
+        Config.set("tool_timeout", 1)
+        registry = ToolManager()
+
+        def slow_handler(**kwargs):
+            time.sleep(5)
+            return "done"
+
+        registry.register(
+            name="slow_tool",
+            description="慢工具",
+            parameters={"type": "object"},
+            handler=slow_handler,
+        )
+
+        tool_call = ToolCall(
+            id="call_1",
+            function=FunctionCall(name="slow_tool", arguments="{}"),
+        )
+        result = registry.execute(tool_call)
+        assert "timed out" in result.content.lower() or "timeout" in result.content.lower()
+
+    def test_tool_normal_execution(self):
+        """正常快速工具不受影响"""
+        registry = ToolManager()
+
+        def fast_handler(**kwargs):
+            return "quick result"
+
+        registry.register(
+            name="fast_tool",
+            description="快工具",
+            parameters={"type": "object"},
+            handler=fast_handler,
+        )
+
+        tool_call = ToolCall(
+            id="call_1",
+            function=FunctionCall(name="fast_tool", arguments="{}"),
+        )
+        result = registry.execute(tool_call)
+        assert result.content == "quick result"

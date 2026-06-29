@@ -146,7 +146,7 @@ class TestAgentTimeout:
             content="content",
         )
 
-        agent = Agent(llm=llm, tool_manager=mock_tools, budget=IterationBudget(iterations_limit=3))
+        agent = Agent(llm=llm, tool_manager=mock_tools, budget=IterationBudget(max_iterations=3))
         result = agent.run("持续调用工具")
         assert "迭代" in result and "未完成" in result
 
@@ -278,7 +278,7 @@ class TestAgentStream:
             content="content",
         )
 
-        agent = Agent(llm=llm, tool_manager=mock_tools, budget=IterationBudget(iterations_limit=2))
+        agent = Agent(llm=llm, tool_manager=mock_tools, budget=IterationBudget(max_iterations=2))
         chunks = list(agent.stream("持续调用工具"))
 
         # 最后应该有超时信息

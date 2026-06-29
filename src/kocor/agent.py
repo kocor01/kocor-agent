@@ -49,7 +49,7 @@ class Agent:
         self.permission_mgr = permission_mgr or PermissionManager(policy=PermissionManager.POLICY_PERMISSIVE)
         self.hook_manager = hook_manager or HookManager()
         self.event_emitter = event_emitter or EventEmitter()
-        self.budget = budget or IterationBudget(iterations_limit=self.max_iterations)
+        self.budget = budget or IterationBudget(max_iterations=self.max_iterations)
 
         # 上下文管理
         memory: MemoryManager | None = None

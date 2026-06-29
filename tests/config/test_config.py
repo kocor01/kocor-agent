@@ -21,19 +21,17 @@ class TestConfig:
         cfg = Config()
         assert cfg.max_iterations == 20
 
-    def test_default_timeout(self):
+    def test_default_tool_timeout(self):
         cfg = Config()
-        assert cfg.timeout == 300
+        assert cfg.tool_timeout == 30
 
     def test_custom_values(self):
         cfg = Config(
             provider="anthropic",
             max_iterations=10,
-            timeout=60,
         )
         assert cfg.provider == "anthropic"
         assert cfg.max_iterations == 10
-        assert cfg.timeout == 60
 
     def test_load_returns_singleton(self):
         """Config.load() 返回全局单例，多次调用返回同一对象"""
@@ -58,7 +56,7 @@ class TestLoadConfig:
     """测试 _load 从环境变量读取"""
 
     def setup_method(self):
-        for key in ["KOCOR_PROVIDER", "KOCOR_MAX_ITERATIONS", "KOCOR_TIMEOUT"]:
+        for key in ["KOCOR_PROVIDER", "KOCOR_MAX_ITERATIONS", "KOCOR_TOOL_TIMEOUT"]:
             os.environ.pop(key, None)
 
     def test_load_default(self):
@@ -89,19 +87,19 @@ class TestLoadConfig:
         cfg = Config._load()
         assert cfg.max_iterations == 15
 
-    def test_load_from_env_timeout(self):
-        os.environ["KOCOR_TIMEOUT"] = "45"
+    def test_load_tool_timeout_from_env(self):
+        os.environ["KOCOR_TOOL_TIMEOUT"] = "60"
         cfg = Config._load()
-        assert cfg.timeout == 45
+        assert cfg.tool_timeout == 60
 
     def test_load_all_from_env(self):
         os.environ["KOCOR_PROVIDER"] = "anthropic"
         os.environ["KOCOR_MAX_ITERATIONS"] = "30"
-        os.environ["KOCOR_TIMEOUT"] = "60"
+        os.environ["KOCOR_TOOL_TIMEOUT"] = "45"
         cfg = Config._load()
         assert cfg.provider == "anthropic"
         assert cfg.max_iterations == 30
-        assert cfg.timeout == 60
+        assert cfg.tool_timeout == 45
 
 
 class TestLoadConfigValidation:
@@ -109,7 +107,7 @@ class TestLoadConfigValidation:
 
     def setup_method(self):
         self._saved = {}
-        for key in ["KOCOR_PROVIDER", "KOCOR_MAX_ITERATIONS", "KOCOR_TIMEOUT"]:
+        for key in ["KOCOR_PROVIDER", "KOCOR_MAX_ITERATIONS", "KOCOR_TOOL_TIMEOUT"]:
             self._saved[key] = os.environ.pop(key, None)
 
     def teardown_method(self):
@@ -136,15 +134,14 @@ class TestLoadConfigValidation:
         except ValueError:
             pass
 
-    def test_load_invalid_timeout_raises(self):
+    def test_load_invalid_tool_timeout_raises(self):
         os.environ["KOCOR_PROVIDER"] = "openai"
-        os.environ["KOCOR_TIMEOUT"] = "-1"
+        os.environ["KOCOR_TOOL_TIMEOUT"] = "-1"
         try:
             Config._load()
             assert False, "应抛出 ValueError"
         except ValueError:
             pass
-
 
 class TestPermissionPolicyConfig:
     """测试权限策略配置"""

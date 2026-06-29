@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import json
-import os
+from concurrent.futures import ThreadPoolExecutor
 from typing import Callable
 
+from kocor.config import Config
 from kocor.tools.definitions import ToolDefinition
 from kocor.tools.truncate import ToolOutputTruncator
 from kocor.llm_provider.message import ToolCall, ToolResult
@@ -13,18 +14,11 @@ from kocor.tools.permission import PermissionManager
 
 
 class ToolManager:
-    """工具注册与执行中心。
+    """工具注册与执行中心。"""
 
-    Attributes:
-        _tools: 工具定义映射
-        _handlers: 工具处理器映射
-        _timeout: 工具执行超时（秒）
-    """
-
-    def __init__(self, allowed_dir: str = "", timeout: int = 30):
+    def __init__(self):
         self._tools: dict[str, ToolDefinition] = {}
         self._handlers: dict[str, Callable] = {}
-        self._timeout = timeout
         self.mcp_manager = None
         self.skill_manager = None
 
@@ -43,7 +37,6 @@ class ToolManager:
         """统一注册所有工具：内置工具 → MCP 工具 → 技能工具。"""
         self.register_builtin_tools()
 
-        from kocor.config import Config
         from kocor.mcp import McpManager
         self.mcp_manager = McpManager(self, Config.get("mcp_config"))
         self.mcp_manager.register_all()
@@ -106,7 +99,10 @@ class ToolManager:
             )
 
         try:
-            result = self._handlers[name](**args)
+            with ThreadPoolExecutor(max_workers=1) as pool:
+                timeout = Config.get("tool_timeout")
+                future = pool.submit(self._handlers[name], **args)
+                result = future.result(timeout=timeout)
             truncated = ToolOutputTruncator().truncate(str(result))
             return ToolResult(tool_call_id=tool_call.id, content=truncated)
         except PermissionError as e:
