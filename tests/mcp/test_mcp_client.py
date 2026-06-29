@@ -127,7 +127,7 @@ class TestMCPClient:
         return mock_session
 
     @patch("kocor.mcp.client.ClientSession")
-    @patch("kocor.mcp.client.stdio_client")
+    @patch("mcp.client.stdio.stdio_client")
     def test_initialize_success(self, mock_stdio, mock_session_cls):
         from kocor.mcp import MCPClient, MCPConfig
 
@@ -141,7 +141,7 @@ class TestMCPClient:
         assert client._session is not None
 
     @patch("kocor.mcp.client.ClientSession")
-    @patch("kocor.mcp.client.stdio_client")
+    @patch("mcp.client.stdio.stdio_client")
     def test_initialize_protocol_version_too_old(self, mock_stdio, mock_session_cls):
         from kocor.mcp import MCPClient, MCPConfig, MCPError
 
@@ -159,7 +159,7 @@ class TestMCPClient:
             client.start()
 
     @patch("kocor.mcp.client.ClientSession")
-    @patch("kocor.mcp.client.stdio_client")
+    @patch("mcp.client.stdio.stdio_client")
     def test_list_tools(self, mock_stdio, mock_session_cls):
         from kocor.mcp import MCPClient, MCPConfig
 
@@ -185,7 +185,7 @@ class TestMCPClient:
         assert tools[0]["inputSchema"]["properties"]["path"]["type"] == "string"
 
     @patch("kocor.mcp.client.ClientSession")
-    @patch("kocor.mcp.client.stdio_client")
+    @patch("mcp.client.stdio.stdio_client")
     def test_list_tools_empty(self, mock_stdio, mock_session_cls):
         from kocor.mcp import MCPClient, MCPConfig
 
@@ -196,7 +196,7 @@ class TestMCPClient:
         assert client.list_tools() == []
 
     @patch("kocor.mcp.client.ClientSession")
-    @patch("kocor.mcp.client.stdio_client")
+    @patch("mcp.client.stdio.stdio_client")
     def test_call_tool_success(self, mock_stdio, mock_session_cls):
         from kocor.mcp import MCPClient, MCPConfig
 
@@ -215,7 +215,7 @@ class TestMCPClient:
         assert result == "hello world"
 
     @patch("kocor.mcp.client.ClientSession")
-    @patch("kocor.mcp.client.stdio_client")
+    @patch("mcp.client.stdio.stdio_client")
     def test_call_tool_error(self, mock_stdio, mock_session_cls):
         from kocor.mcp import MCPClient, MCPConfig
 
@@ -235,7 +235,7 @@ class TestMCPClient:
         assert "fail message" in result
 
     @patch("kocor.mcp.client.ClientSession")
-    @patch("kocor.mcp.client.stdio_client")
+    @patch("mcp.client.stdio.stdio_client")
     def test_call_tool_multiple_content_blocks(self, mock_stdio, mock_session_cls):
         from kocor.mcp import MCPClient, MCPConfig
 
@@ -258,7 +258,7 @@ class TestMCPClient:
         assert "part2" in result
 
     @patch("kocor.mcp.client.ClientSession")
-    @patch("kocor.mcp.client.stdio_client")
+    @patch("mcp.client.stdio.stdio_client")
     def test_shutdown(self, mock_stdio, mock_session_cls):
         from kocor.mcp import MCPClient, MCPConfig
 
@@ -278,7 +278,7 @@ class TestMCPClient:
         client.shutdown()  # should not raise
 
     @patch("kocor.mcp.client.ClientSession")
-    @patch("kocor.mcp.client.stdio_client")
+    @patch("mcp.client.stdio.stdio_client")
     def test_empty_command_raises(self, mock_stdio, mock_session_cls):
         from kocor.mcp import MCPClient, MCPConfig, MCPError
 
@@ -289,7 +289,7 @@ class TestMCPClient:
     # ── HTTP 传输 ─────────────────────────────────────────────────────────
 
     @patch("kocor.mcp.client.ClientSession")
-    @patch("kocor.mcp.client.streamable_http_client")
+    @patch("mcp.client.streamable_http.streamable_http_client")
     def test_http_transport(self, mock_http, mock_session_cls):
         from kocor.mcp import MCPClient, MCPConfig
 
@@ -321,7 +321,7 @@ class TestMCPClient:
         assert result == "pong"
 
     @patch("kocor.mcp.client.ClientSession")
-    @patch("kocor.mcp.client.streamable_http_client")
+    @patch("mcp.client.streamable_http.streamable_http_client")
     def test_http_transport_error(self, mock_http, mock_session_cls):
         from kocor.mcp import MCPClient, MCPConfig
 
@@ -359,7 +359,7 @@ class TestRegisterMCPTools:
             }
         })
 
-        with patch("kocor.mcp.client.stdio_client") as mock_stdio, \
+        with patch("mcp.client.stdio.stdio_client") as mock_stdio, \
              patch("kocor.mcp.client.ClientSession") as mock_session_cls, \
              patch("kocor.mcp.config.os.path.exists", return_value=True), \
              patch("builtins.open", mock_open(read_data=config_data)):
@@ -419,7 +419,7 @@ class TestRegisterMCPTools:
                 ))
             return mock_s
 
-        with patch("kocor.mcp.client.stdio_client") as mock_stdio, \
+        with patch("mcp.client.stdio.stdio_client") as mock_stdio, \
              patch("kocor.mcp.client.ClientSession", side_effect=mock_session_side), \
              patch("kocor.mcp.config.os.path.exists", return_value=True), \
              patch("builtins.open", mock_open(read_data=config_data)):
@@ -448,7 +448,7 @@ class TestRegisterMCPTools:
             }
         })
 
-        with patch("kocor.mcp.client.stdio_client") as mock_stdio, \
+        with patch("mcp.client.stdio.stdio_client") as mock_stdio, \
              patch("kocor.mcp.client.ClientSession") as mock_session_cls, \
              patch("kocor.mcp.config.os.path.exists", return_value=True), \
              patch("builtins.open", mock_open(read_data=config_data)):

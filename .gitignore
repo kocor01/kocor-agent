@@ -11,3 +11,4 @@ htmlcov/
 log/
 *.log
 .kocor/memories/
+.vscode/

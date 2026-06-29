@@ -7,9 +7,6 @@ from typing import Any
 
 from mcp import types as mcp_types
 from mcp.client.session import ClientSession
-from mcp.client.sse import sse_client
-from mcp.client.stdio import StdioServerParameters, stdio_client
-from mcp.client.streamable_http import streamable_http_client
 
 from kocor.mcp.config import MCPConfig
 from kocor.mcp.event_loop import MCPError, _run_async
@@ -112,9 +109,11 @@ class MCPClient:
             headers = dict(self._config.headers or {})
 
             if self._config.transport == "sse":
+                from mcp.client.sse import sse_client
                 cm = sse_client(url, headers=headers or None,
                                 sse_read_timeout=300.0)
             else:
+                from mcp.client.streamable_http import streamable_http_client
                 cm = streamable_http_client(url)
 
             read_stream, write_stream = await cm.__aenter__()
@@ -124,6 +123,7 @@ class MCPClient:
             if not cmd:
                 raise MCPError(f"Server '{self._name}': empty command")
 
+            from mcp.client.stdio import StdioServerParameters, stdio_client
             params = StdioServerParameters(
                 command=cmd,
                 args=self._config.args or [],
