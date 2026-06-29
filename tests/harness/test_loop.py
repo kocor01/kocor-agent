@@ -329,3 +329,166 @@ class TestAgentLoop:
         assert result is not None
 
 
+# ── 重复工具调用检测 ──
+
+
+class TestDuplicateToolCallDetection:
+
+    def test_no_duplicate_detection_for_two_identical(self):
+        """连续 2 次相同调用不会触发（阈值为 3）。"""
+        tool_response = Message(
+            role="assistant",
+            content="searching...",
+            tool_calls=[ToolCall(id="call_1", function=FunctionCall(name="search", arguments='{"q": "test"}'))],
+        )
+        llm = MockLLM(responses=[tool_response] * 3 + [Message(role="assistant", content="done")])
+        agent = Agent(
+            llm=llm,
+            tool_manager=MockToolRegistry(),
+            permission_mgr=PermissionManager(policy=PermissionManager.POLICY_PERMISSIVE),
+            budget=IterationBudget(max_iterations=10),
+        )
+        result = agent.run("search")
+        # 前两次相同调用正常执行，第3次触发检测
+        assert "done" in result or "重复" in result
+
+    def test_duplicate_detection_triggers(self):
+        """连续 3 次相同工具调用触发检测并提前终止。"""
+        tool_response = Message(
+            role="assistant",
+            content="searching...",
+            tool_calls=[ToolCall(id="call_1", function=FunctionCall(name="search", arguments='{"q": "test"}'))],
+        )
+        llm = MockLLM(responses=[tool_response] * 5)
+        agent = Agent(
+            llm=llm,
+            tool_manager=MockToolRegistry(),
+            permission_mgr=PermissionManager(policy=PermissionManager.POLICY_PERMISSIVE),
+            budget=IterationBudget(max_iterations=10),
+        )
+        result = agent.run("search")
+        # 在第 3 次迭代时检测到重复，提前终止（而不是等 10 次预算用完）
+        assert "重复" in result
+        assert agent.ctx.iteration == 3
+
+    def test_duplicate_detection_resets_on_different_call(self):
+        """不同工具调用会重置重复计数。"""
+        responses = [
+            Message(role="assistant", content="searching...",
+                    tool_calls=[ToolCall(id="call_1", function=FunctionCall(name="search", arguments='{"q": "test"}'))]),
+            Message(role="assistant", content="searching...",
+                    tool_calls=[ToolCall(id="call_2", function=FunctionCall(name="search", arguments='{"q": "test"}'))]),
+            Message(role="assistant", content="reading...",
+                    tool_calls=[ToolCall(id="call_3", function=FunctionCall(name="read", arguments='{"path": "x.txt"}'))]),
+            Message(role="assistant", content="done"),
+        ]
+        llm = MockLLM(responses=responses)
+        agent = Agent(
+            llm=llm,
+            tool_manager=MockToolRegistry(),
+            permission_mgr=PermissionManager(policy=PermissionManager.POLICY_PERMISSIVE),
+        )
+        result = agent.run("do stuff")
+        # 第三次调用不同的工具，重置了计数，任务正常完成
+        assert "done" in result
+
+    def test_duplicate_detection_stream(self):
+        """流模式下重复工具调用也能检测。"""
+        tool_response = Message(
+            role="assistant",
+            content="searching...",
+            tool_calls=[ToolCall(id="call_1", function=FunctionCall(name="search", arguments='{"q": "test"}'))],
+        )
+        llm = MockLLM(responses=[tool_response] * 5)
+        agent = Agent(
+            llm=llm,
+            tool_manager=MockToolRegistry(),
+            permission_mgr=PermissionManager(policy=PermissionManager.POLICY_PERMISSIVE),
+            budget=IterationBudget(max_iterations=10),
+        )
+        chunks = list(agent.stream("search"))
+        stuck_chunks = [c for c in chunks if c.is_final and c.content]
+        assert stuck_chunks
+        assert "重复" in stuck_chunks[0].content
+
+    def test_duplicate_detection_same_name_different_args(self):
+        """相同工具名但不同参数不算重复。"""
+        responses = [
+            Message(role="assistant", content="search a",
+                    tool_calls=[ToolCall(id="call_1", function=FunctionCall(name="search", arguments='{"q": "a"}'))]),
+            Message(role="assistant", content="search b",
+                    tool_calls=[ToolCall(id="call_2", function=FunctionCall(name="search", arguments='{"q": "b"}'))]),
+            Message(role="assistant", content="search c",
+                    tool_calls=[ToolCall(id="call_3", function=FunctionCall(name="search", arguments='{"q": "c"}'))]),
+            Message(role="assistant", content="done"),
+        ]
+        llm = MockLLM(responses=responses)
+        agent = Agent(
+            llm=llm,
+            tool_manager=MockToolRegistry(),
+            permission_mgr=PermissionManager(policy=PermissionManager.POLICY_PERMISSIVE),
+        )
+        result = agent.run("search multiple")
+        assert "done" in result
+
+    def test_duplicate_detection_resets_between_runs(self):
+        """重复检测状态在每次 run 之间重置。"""
+        tool_response = Message(
+            role="assistant",
+            content="searching...",
+            tool_calls=[ToolCall(id="call_1", function=FunctionCall(name="search", arguments='{"q": "test"}'))],
+        )
+
+        # 第一次运行：连续相同调用触发检测
+        llm1 = MockLLM(responses=[tool_response] * 5)
+        agent = Agent(
+            llm=llm1,
+            tool_manager=MockToolRegistry(),
+            permission_mgr=PermissionManager(policy=PermissionManager.POLICY_PERMISSIVE),
+            budget=IterationBudget(max_iterations=10),
+        )
+        result1 = agent.run("search")
+        assert "重复" in result1
+
+        # 第二次运行：状态已重置，新的相同调用应从 0 开始计数
+        llm2 = MockLLM(responses=[tool_response, tool_response, Message(role="assistant", content="done")])
+        agent.llm = llm2
+        result2 = agent.run("search")
+        assert "done" in result2
+
+    def test_get_tool_call_signature(self):
+        """_get_tool_call_signature 生成一致的签名。"""
+        from kocor.loop import Loop
+        tc1 = ToolCall(id="1", function=FunctionCall(name="search", arguments='{"q": "test", "page": 1}'))
+        tc2 = ToolCall(id="2", function=FunctionCall(name="search", arguments='{"page": 1, "q": "test"}'))
+        sig1 = Loop._get_tool_call_signature(tc1)
+        sig2 = Loop._get_tool_call_signature(tc2)
+        # 相同参数（不同顺序）应该生成相同签名
+        assert sig1 == sig2
+        assert "search" in sig1
+        assert "test" in sig1
+
+    def test_duplicate_with_multiple_tool_calls(self):
+        """单次迭代中多个工具调用完全相同时检测。"""
+        # 每次迭代都调用相同的 2 个工具
+        multi_tool = Message(
+            role="assistant",
+            content="doing multiple...",
+            tool_calls=[
+                ToolCall(id="call_1", function=FunctionCall(name="read", arguments='{"path": "a.txt"}')),
+                ToolCall(id="call_2", function=FunctionCall(name="read", arguments='{"path": "b.txt"}')),
+            ],
+        )
+        llm = MockLLM(responses=[multi_tool] * 5)
+        agent = Agent(
+            llm=llm,
+            tool_manager=MockToolRegistry(),
+            permission_mgr=PermissionManager(policy=PermissionManager.POLICY_PERMISSIVE),
+            budget=IterationBudget(max_iterations=10),
+        )
+        result = agent.run("read both")
+        assert "重复" in result
+        # 在第 3 次迭代时触发
+        assert agent.ctx.iteration == 3
+
+

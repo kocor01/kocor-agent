@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import json
 import time
 from typing import Iterator
 
@@ -46,6 +47,10 @@ class Loop:
         self.event_emitter = event_emitter
         self.budget = budget
 
+        # 重复工具调用检测
+        self._consecutive_duplicate_count = 0
+        self._last_tool_call_signature: str | None = None
+
     # ── 公开方法 ──
 
     def run(self, user_input: str) -> str:
@@ -68,6 +73,8 @@ class Loop:
     def _reset_state(self) -> None:
         self.ctx.reset()
         self.budget.reset()
+        self._consecutive_duplicate_count = 0
+        self._last_tool_call_signature = None
 
     def _run_messages(self) -> str:
         """运行 ReAct 循环（消息已由 build_initial_context 设置）。"""
@@ -93,6 +100,12 @@ class Loop:
 
             if not response.tool_calls:
                 return response.content or ""
+
+            if self._check_repetition(response):
+                self._emit(EventType.ON_BUDGET_EXHAUSTED, iteration=self.ctx.iteration,
+                           max_iterations=self.budget.max_iterations, reason="duplicate_tool_calls")
+                self._run_hooks(HookPoint.ON_BUDGET_EXHAUSTED)
+                return self._stuck_in_loop_message()
 
             for tool_call in response.tool_calls:
                 result_msg = self._execute_one_tool(tool_call)
@@ -155,6 +168,13 @@ class Loop:
             self.ctx.append(response)
 
             if not accumulated_tool_calls:
+                return
+
+            if self._check_repetition(response):
+                self._emit(EventType.ON_BUDGET_EXHAUSTED, iteration=self.ctx.iteration,
+                           max_iterations=self.budget.max_iterations, reason="duplicate_tool_calls")
+                self._run_hooks(HookPoint.ON_BUDGET_EXHAUSTED)
+                yield StreamChunk(content=self._stuck_in_loop_message(), is_final=True)
                 return
 
             for tool_call in accumulated_tool_calls:
@@ -227,10 +247,45 @@ class Loop:
                 tool_call_id=tool_call.id,
             )
 
+    # ── 重复工具调用检测 ──
+
+    @staticmethod
+    def _get_tool_call_signature(tool_call) -> str:
+        """将工具调用规范化为可比较的字符串签名。"""
+        name = tool_call.function.name
+        args = tool_call.function.arguments
+        if isinstance(args, str):
+            try:
+                args = json.loads(args)
+            except json.JSONDecodeError:
+                pass
+        return f"{name}({json.dumps(args, sort_keys=True, ensure_ascii=False)})"
+
+    def _check_repetition(self, response: Message) -> bool:
+        """检测 LLM 是否在重复调用相同的工具。"""
+        if not response.tool_calls:
+            self._consecutive_duplicate_count = 0
+            self._last_tool_call_signature = None
+            return False
+
+        signatures = [self._get_tool_call_signature(tc) for tc in response.tool_calls]
+        combined = "|".join(signatures)
+
+        if combined == self._last_tool_call_signature:
+            self._consecutive_duplicate_count += 1
+        else:
+            self._consecutive_duplicate_count = 1
+            self._last_tool_call_signature = combined
+
+        return self._consecutive_duplicate_count >= 3
+
     # ── 辅助方法 ──
 
     def _budget_exhausted_message(self) -> str:
         return f"Agent 在 {self.ctx.iteration} 次迭代后未完成。"
+
+    def _stuck_in_loop_message(self) -> str:
+        return f"Agent 在第 {self.ctx.iteration} 次迭代检测到重复工具调用（连续 {self._consecutive_duplicate_count} 次），已提前终止。"
 
     @staticmethod
     def _truncate_tool_output(content: str) -> str:
