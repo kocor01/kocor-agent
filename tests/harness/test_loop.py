@@ -297,7 +297,9 @@ class TestAgentLoop:
 
             def execute(self, tool_call):
                 from kocor.llm_provider.message import ToolResult
-                return ToolResult(tool_call_id=tool_call.id, content=long_content)
+                from kocor.tools.truncate import ToolOutputTruncator
+                truncated = ToolOutputTruncator().truncate(long_content)
+                return ToolResult(tool_call_id=tool_call.id, content=truncated)
 
         llm = MockLLM(responses=[
             Message(

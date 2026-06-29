@@ -51,7 +51,7 @@ class ContextStrategyApplier:
 
         if effective_strategy == ContextStrategy.AGGRESSIVE:
             preserve_last = 1
-            preserve_first = 0
+            preserve_first = 1
         elif effective_strategy == ContextStrategy.SLIDING_WINDOW:
             preserve_last = Config.get("preserve_last_rounds")
             preserve_first = Config.get("preserve_first_rounds")

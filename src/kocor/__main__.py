@@ -110,8 +110,8 @@ class _StreamFormatter:
         if self.tool_result_idx < len(self.tool_calls):
             tc = self.tool_calls[self.tool_result_idx]
             content = chunk.tool_result.content
-            if len(content) > 200:
-                content = content[:200] + "..."
+            if len(content) > 1000:
+                content = content[:1000] + "..."
             if self.tool_result_idx > 0:
                 print()
             print(f"{self.tool_result_idx + 1:2}. {tc.function.name}({tc.function.arguments})")

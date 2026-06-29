@@ -226,7 +226,6 @@ class Loop:
             result = self.tool_manager.execute(tool_call)
             duration = (time.monotonic() - start) * 1000
             content = result.content or ""
-            truncated = self._truncate_tool_output(content)
 
             self._emit(EventType.POST_TOOL, iteration=self.ctx.iteration,
                        tool_name=tool_name, duration=duration, success=True, result=result)
@@ -234,7 +233,7 @@ class Loop:
 
             return Message(
                 role="tool",
-                content=truncated,
+                content=content,
                 tool_call_id=getattr(result, "tool_call_id", tool_call.id),
             )
 
@@ -290,15 +289,6 @@ class Loop:
 
     def _stuck_in_loop_message(self) -> str:
         return f"Agent 在第 {self.ctx.iteration} 次迭代检测到重复工具调用（连续 {self._consecutive_duplicate_count} 次），已提前终止。"
-
-    @staticmethod
-    def _truncate_tool_output(content: str) -> str:
-        if len(content) > 50_000:
-            return content[:25_000] + "\n\n...[truncated]...\n\n" + content[-25_000:]
-        if len(content.splitlines()) > 2_000:
-            lines = content.splitlines()
-            return "\n".join(lines[:1_000] + ["...[truncated lines]..."] + lines[-1_000:])
-        return content
 
     def _run_hooks(self, point: HookPoint, **extra) -> list[HookResult]:
         ctx = HookContext(

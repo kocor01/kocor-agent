@@ -5,9 +5,15 @@
 
 from __future__ import annotations
 
+import time
+
 from kocor.config import Config
 from kocor.context.types import SummaryNode
 from kocor.context.token_counter import TokenCounter
+from kocor.harness.event.event_manager import EventType, HarnessEvent, EventEmitter
+from kocor.harness.logger import get_logger
+from kocor.hook.base import HookPoint, HookContext
+from kocor.hook.hook_manager import HookManager
 from kocor.llm_provider.llm_manager import LlmManager
 from kocor.llm_provider.message import Message
 
@@ -27,10 +33,16 @@ class HistorySummarizer:
 对话内容：
 {history_text}"""
 
-    def __init__(self):
+    def __init__(
+        self,
+        event_emitter: EventEmitter | None = None,
+        hook_manager: HookManager | None = None,
+    ):
         self.llm = LlmManager.get_llm_client()
         self.summarization_prompt = self.DEFAULT_PROMPT
         self._token_counter = TokenCounter()
+        self._event_emitter = event_emitter
+        self._hook_manager = hook_manager
 
     def summarize(
         self,
@@ -71,7 +83,14 @@ class HistorySummarizer:
         # 调用 LLM 生成摘要
         prompt = self.summarization_prompt.format(history_text=history_text)
         msg = Message(role="user", content=prompt)
+
+        self._emit(EventType.PRE_SUMMARIZE, history_length=len(history_text), message_count=len(messages))
+        self._run_hooks(HookPoint.PRE_SUMMARIZE, history_length=len(history_text))
+
         result = self.llm.generate([msg])
+
+        self._emit(EventType.POST_SUMMARIZE, summary_length=len(result.content), message_count=len(messages))
+        self._run_hooks(HookPoint.POST_SUMMARIZE, summary_length=len(result.content))
 
         return SummaryNode(
             summary=result.content,
@@ -80,6 +99,22 @@ class HistorySummarizer:
             original_start=start_index,
             original_end=end_index if end_index > start_index else len(messages),
         )
+
+    def _run_hooks(self, point: HookPoint, **extra) -> None:
+        if self._hook_manager is None:
+            return
+        ctx = HookContext(iteration=0, messages=[], **extra)
+        self._hook_manager.run(point, ctx)
+
+    def _emit(self, event_type: str, **data) -> None:
+        if self._event_emitter is None:
+            return
+        self._event_emitter.fire(HarnessEvent(
+            type=event_type,
+            iteration=0,
+            data=data,
+            timestamp=time.time(),
+        ))
 
     def _messages_to_text(self, messages: list[Message]) -> str:
         """将消息列表格式化为纯文本。"""
@@ -102,8 +137,8 @@ class HistorySummarizer:
                 # 截断超长内容，避免工具结果膨胀
                 prefix = f"  [{msg.tool_call_id}] " if msg.tool_call_id else "  "
                 content = msg.content
-                if len(content) > 1000:
-                    content = content[:1000] + "..."
+                if len(content) > 10000:
+                    content = content[:10000] + "..."
                 lines.append(f"{prefix}{content}")
 
         return "\n".join(lines)

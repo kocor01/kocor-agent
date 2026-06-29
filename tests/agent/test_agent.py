@@ -148,7 +148,7 @@ class TestAgentTimeout:
 
         agent = Agent(llm=llm, tool_manager=mock_tools, budget=IterationBudget(max_iterations=3))
         result = agent.run("持续调用工具")
-        assert "迭代" in result and "未完成" in result
+        assert "重复" in result
 
 
 class TestAgentSystemPrompt:

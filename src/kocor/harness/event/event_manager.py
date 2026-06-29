@@ -13,6 +13,8 @@ class EventType(str, Enum):
     POST_GENERATE = "post_generate"        # LLM 生成后
     PRE_TOOL = "pre_tool"                  # 工具执行前
     POST_TOOL = "post_tool"                # 工具执行后
+    PRE_SUMMARIZE = "pre_summarize"        # 摘要生成前
+    POST_SUMMARIZE = "post_summarize"      # 摘要生成后
     ON_ERROR = "on_error"                  # 发生错误时
     ON_BUDGET_EXHAUSTED = "on_budget_exhausted"  # 预算耗尽时
 
