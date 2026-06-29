@@ -63,8 +63,8 @@ class OpenAIClient(LLMClient):
 
         # OpenAI 格式 → 内部格式
         usage = Usage(
-            input=getattr(response.usage, "prompt_tokens", 0) if response.usage else 0,
-            output=getattr(response.usage, "completion_tokens", 0) if response.usage else 0,
+            input_tokens=getattr(response.usage, "prompt_tokens", 0) if response.usage else 0,
+            output_tokens=getattr(response.usage, "completion_tokens", 0) if response.usage else 0,
         )
         return self._normalize_out(response.choices[0], usage=usage)
 
@@ -110,8 +110,8 @@ class OpenAIClient(LLMClient):
                 usage_chunk = StreamChunk(
                     is_final=True,
                     usage=Usage(
-                        input=getattr(chunk.usage, "prompt_tokens", 0),
-                        output=getattr(chunk.usage, "completion_tokens", 0),
+                        input_tokens=getattr(chunk.usage, "prompt_tokens", 0),
+                        output_tokens=getattr(chunk.usage, "completion_tokens", 0),
                     ),
                 )
                 yield usage_chunk

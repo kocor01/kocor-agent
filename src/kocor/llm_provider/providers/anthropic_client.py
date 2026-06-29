@@ -182,8 +182,8 @@ class AnthropicClient(LLMClient):
                     usage_attr = getattr(event, "usage", None)
                     if usage_attr:
                         stream_chunk.usage = Usage(
-                            input=input_tokens,
-                            output=getattr(usage_attr, "output_tokens", 0),
+                            input_tokens=input_tokens,
+                            output_tokens=getattr(usage_attr, "output_tokens", 0),
                         )
 
             # 有内容时才 yield
@@ -244,8 +244,8 @@ class AnthropicClient(LLMClient):
         """Anthropic response 格式 → 内部消息格式"""
         content_blocks = response.content
         usage = Usage(
-            input=getattr(response.usage, "input_tokens", 0),
-            output=getattr(response.usage, "output_tokens", 0),
+            input_tokens=getattr(response.usage, "input_tokens", 0),
+            output_tokens=getattr(response.usage, "output_tokens", 0),
         )
 
         # 提取 thinking（思维链）

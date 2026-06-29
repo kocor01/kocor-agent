@@ -13,8 +13,8 @@ from typing import Literal
 class Usage:
     """LLM API token 用量。"""
 
-    input: int = 0
-    output: int = 0
+    input_tokens: int = 0
+    output_tokens: int = 0
 
 
 @dataclass

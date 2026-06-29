@@ -8,12 +8,27 @@ from kocor.context.budget import TokenBudget
 from kocor.context.context_manager import ContextManager
 from kocor.context.strategies import ContextStrategyApplier
 from kocor.context.types import ContextStrategy
+from kocor.llm_provider.llm_manager import LlmManager
 from kocor.llm_provider.message import Message
 
 
 class FakeToolRegistry:
     def get_definitions(self):
         return []
+
+
+class FakeLLMForSummary:
+    """伪造的 LLM 客户端，返回预设摘要。"""
+
+    def __init__(self, summary_text: str = "这是对话摘要"):
+        self.summary_text = summary_text
+
+    @property
+    def provider(self):
+        return "fake"
+
+    def generate(self, messages, tools=None, max_tokens=4096, temperature=0.0):
+        return Message(role="assistant", content=self.summary_text)
 
 
 class TestContextManager:
@@ -115,23 +130,28 @@ class TestContextManagerCompression:
 
     def test_compress_if_needed_over_threshold(self):
         """超阈值时压缩应减少消息数量。"""
-        with patch("kocor.context.context_manager.Config") as mock_config:
-            mock_config.get.return_value = "sliding"
-            ctx = ContextManager()
+        LlmManager._client = FakeLLMForSummary()
 
-            # mock token 计数，让 compress_if_needed 认为超阈值
-            ctx.count_message_tokens = MagicMock(return_value=95_000)
-            ctx.count_tool_tokens = MagicMock(return_value=50_000)
+        try:
+            with patch("kocor.context.context_manager.Config") as mock_config:
+                mock_config.get.return_value = "sliding"
+                ctx = ContextManager()
 
-            messages = [Message(role="system", content="sys")]
-            for i in range(10):
-                messages.append(Message(role="user", content=f"q{i}"))
-                messages.append(Message(role="assistant", content=f"a{i}"))
-            ctx.messages = messages
+                # mock token 计数，让 compress_if_needed 认为超阈值
+                ctx.count_message_tokens = MagicMock(return_value=95_000)
+                ctx.count_tool_tokens = MagicMock(return_value=50_000)
 
-            ctx.compress_if_needed()
+                messages = [Message(role="system", content="sys")]
+                for i in range(10):
+                    messages.append(Message(role="user", content=f"q{i}"))
+                    messages.append(Message(role="assistant", content=f"a{i}"))
+                ctx.messages = messages
 
-            assert len(ctx.messages) < len(messages)
+                ctx.compress_if_needed()
+
+                assert len(ctx.messages) < len(messages)
+        finally:
+            LlmManager.reset()
 
     def test_build_initial_context_uses_session_history(self):
         """build_initial_context 应使用 session_history 构建消息列表。"""
@@ -148,3 +168,160 @@ class TestContextManagerCompression:
         assert len(ctx.messages) == 4  # system + 2 history + current input
         assert ctx.messages[1].content == "prev_q"
         assert ctx.messages[3].content == "new_q"
+
+
+class TestSessionHistoryCompression:
+    """测试 session_history 压缩和摘要 role。
+
+    使用 sliding 策略触发压缩验证：
+    - session_history 有界
+    - 摘要以 assistant role 嵌入 processed 消息流
+    """
+
+    def _make_long_history(self, n_rounds: int = 10) -> list[Message]:
+        """构造多轮对话历史。"""
+        msgs = []
+        for i in range(n_rounds):
+            msgs.append(Message(role="user", content=f"q{i}"))
+            msgs.append(Message(role="assistant", content=f"a{i}"))
+        return msgs
+
+    def test_session_history_grows_normally(self):
+        """extract_session_history 不压缩，只过滤非 system 消息。"""
+        LlmManager._client = FakeLLMForSummary()
+
+        try:
+            with patch("kocor.context.context_manager.Config") as mock_config:
+                mock_config.get.side_effect = lambda key, **kw: {
+                    "context_strategy": "sliding",
+                    "preserve_last_rounds": 2,
+                    "preserve_first_rounds": 1,
+                    "context_max_tokens": 100_000,
+                    "context_summary_threshold": 0.5,
+                    "context_truncate_threshold": 0.9,
+                    "default_system_prompt": "你是一个助手",
+                }.get(key, kw.get("default"))
+                ctx = ContextManager(tools=FakeToolRegistry())
+
+            # 模拟多轮对话
+            for i in range(5):
+                ctx.build_initial_context(f"第{i}轮问题")
+                ctx.append(Message(role="assistant", content=f"第{i}轮回答"))
+                ctx.extract_session_history()
+
+            # extract 不压缩，只过滤
+            assert all(m.role != "system" for m in ctx.session_history)
+        finally:
+            LlmManager.reset()
+
+    def test_summary_persists_through_extract(self):
+        """通过 build_initial_context(压缩) → extract 后，摘要以 assistant role 存在于 session_history。"""
+        LlmManager._client = FakeLLMForSummary()
+
+        try:
+            with patch("kocor.context.context_manager.Config") as mock_config:
+                mock_config.get.side_effect = lambda key, **kw: {
+                    "context_strategy": "sliding",
+                    "preserve_last_rounds": 2,
+                    "preserve_first_rounds": 1,
+                    "context_max_tokens": 100_000,
+                    "context_summary_threshold": 0.5,
+                    "context_truncate_threshold": 0.9,
+                    "default_system_prompt": "你是一个助手",
+                }.get(key, kw.get("default"))
+                ctx = ContextManager(tools=FakeToolRegistry())
+
+            # 预置多轮会话历史，确保触发压缩
+            ctx.session_history = self._make_long_history(8)
+
+            ctx.build_initial_context("最新问题")
+            ctx.append(Message(role="assistant", content="最新回答"))
+            ctx.extract_session_history()
+
+            # session_history 中应包含 assistant 摘要消息
+            summary_msgs = [
+                m for m in ctx.session_history
+                if m.role == "assistant" and m.content.startswith("[历史对话摘要]")
+            ]
+            assert len(summary_msgs) == 1
+            assert summary_msgs[0].role == "assistant"
+        finally:
+            LlmManager.reset()
+
+    def test_compress_if_needed_uses_assistant_role(self):
+        """compress_if_needed 压缩后，摘要以 assistant role 存在。"""
+        LlmManager._client = FakeLLMForSummary()
+
+        try:
+            with patch("kocor.context.context_manager.Config") as mock_config:
+                mock_config.get.side_effect = lambda key, **kw: {
+                    "context_strategy": "sliding",
+                    "preserve_last_rounds": 2,
+                    "preserve_first_rounds": 1,
+                    "context_max_tokens": 100_000,
+                    "context_summary_threshold": 0.5,
+                    "context_truncate_threshold": 0.9,
+                    "default_system_prompt": "你是一个助手",
+                }.get(key, kw.get("default"))
+                ctx = ContextManager(tools=FakeToolRegistry())
+
+            messages = [Message(role="system", content="sys")]
+            messages.extend(self._make_long_history(10))
+            ctx.messages = messages
+
+            ctx.count_message_tokens = MagicMock(return_value=95_000)
+            ctx.count_tool_tokens = MagicMock(return_value=50_000)
+
+            ctx.compress_if_needed()
+
+            # 压缩后 messages[0] 应为 system
+            assert ctx.messages[0].role == "system"
+
+            # 应有 assistant 摘要消息
+            summary_msgs = [
+                m for m in ctx.messages
+                if m.role == "assistant" and m.content.startswith("[历史对话摘要]")
+            ]
+            assert len(summary_msgs) >= 1
+            assert summary_msgs[0].role == "assistant"
+        finally:
+            LlmManager.reset()
+
+    def test_compress_if_needed_uses_assistant_role(self):
+        """compress_if_needed 压缩后，摘要以 assistant role 存在。"""
+        LlmManager._client = FakeLLMForSummary()
+
+        try:
+            with patch("kocor.context.context_manager.Config") as mock_config:
+                mock_config.get.side_effect = lambda key, **kw: {
+                    "context_strategy": "sliding",
+                    "preserve_last_rounds": 2,
+                    "preserve_first_rounds": 1,
+                    "context_max_tokens": 100_000,
+                    "context_summary_threshold": 0.5,
+                    "context_truncate_threshold": 0.9,
+                    "default_system_prompt": "你是一个助手",
+                }.get(key, kw.get("default"))
+                ctx = ContextManager(tools=FakeToolRegistry())
+
+            messages = [Message(role="system", content="sys")]
+            messages.extend(self._make_long_history(10))
+            ctx.messages = messages
+
+            ctx.count_message_tokens = MagicMock(return_value=95_000)
+            ctx.count_tool_tokens = MagicMock(return_value=50_000)
+
+            ctx.compress_if_needed()
+
+            # 压缩后 messages[0] 应为 system
+            assert ctx.messages[0].role == "system"
+
+            # 应有 assistant 摘要消息
+            summary_msgs = [
+                m for m in ctx.messages
+                if m.role == "assistant" and m.content.startswith("[历史对话摘要]")
+            ]
+            assert len(summary_msgs) >= 1
+            assert summary_msgs[0].role == "assistant"
+        finally:
+            LlmManager.reset()

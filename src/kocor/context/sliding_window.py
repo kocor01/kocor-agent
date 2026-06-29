@@ -88,7 +88,7 @@ class SlidingWindowStrategy:
             end_index=len(to_summarize),
         )
         summary_msg = Message(
-            role="system",
+            role="assistant",
             content=f"[历史对话摘要]\n{summary_node.summary}",
         )
 

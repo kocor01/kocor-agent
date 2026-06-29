@@ -145,7 +145,7 @@ class TestSlidingWindowStrategy:
         assert "问题5" in result_text
         assert "回答5" in result_text
         # 摘要应嵌入在 first 和 last 之间
-        summary_msgs = [m for m in result if m.role == "system"]
+        summary_msgs = [m for m in result if m.role == "assistant" and m.content.startswith("[历史对话摘要]")]
         assert len(summary_msgs) >= 1
 
     def test_first_plus_last_exceeds_total_no_summary(self):
@@ -212,7 +212,7 @@ class TestSlidingWindowStrategy:
         assert summary is not None
         summary_idx = None
         for i, m in enumerate(result):
-            if m.role == "system":
+            if m.role == "assistant" and m.content.startswith("[历史对话摘要]"):
                 summary_idx = i
                 break
         assert summary_idx is not None

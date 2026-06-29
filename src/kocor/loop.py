@@ -83,8 +83,6 @@ class Loop:
             self.ctx.advance_iteration()
             self.budget.used_iterations = self.ctx.iteration
 
-            self.ctx.compress_if_needed()
-
             self._emit(EventType.PRE_GENERATE, iteration=self.ctx.iteration, messages=self.ctx.messages,
                        tools=self.tool_manager.get_definitions())
             self._run_hooks(HookPoint.PRE_GENERATE)
@@ -112,6 +110,10 @@ class Loop:
                 if result_msg is not None:
                     self.ctx.append(result_msg)
 
+            # 工具结果已追加，压缩上下文供下一轮迭代使用
+            self.ctx.usage = response.usage
+            self.ctx.compress_if_needed()
+
         self._emit(EventType.ON_BUDGET_EXHAUSTED, iteration=self.ctx.iteration,
                        max_iterations=self.budget.max_iterations)
         self._run_hooks(HookPoint.ON_BUDGET_EXHAUSTED)
@@ -123,8 +125,6 @@ class Loop:
         while not self.budget.exhausted:
             self.ctx.advance_iteration()
             self.budget.used_iterations = self.ctx.iteration
-
-            self.ctx.compress_if_needed()
 
             self._emit(EventType.PRE_GENERATE, iteration=self.ctx.iteration, messages=self.ctx.messages,
                        tools=self.tool_manager.get_definitions())
@@ -185,6 +185,10 @@ class Loop:
                         tool_result=result_msg,
                         is_final=False,
                     )
+
+            # 工具结果已追加，压缩上下文供下一轮迭代使用
+            self.ctx.usage = streaming_usage
+            self.ctx.compress_if_needed()
 
         self._emit(EventType.ON_BUDGET_EXHAUSTED, iteration=self.ctx.iteration,
                        max_iterations=self.budget.max_iterations)
