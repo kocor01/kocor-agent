@@ -218,7 +218,7 @@ def main() -> None:
     if args.max_iterations is not None:
         Config.set("max_iterations", args.max_iterations)
 
-    setup_logger("INFO")
+    setup_logger("INFO", log_dir=Config.get("log_dir"))
 
     toolManager = ToolManager()
     toolManager.register_all()

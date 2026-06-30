@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 
-from kocor.config import Config
+from kocor.config import Config, _resolve_data_path
 
 
 class TestConfig:
@@ -189,6 +189,7 @@ class TestContextConfig:
         for key in [
             "KOCOR_CONTEXT_STRATEGY",
             "KOCOR_MEMORY_DIR",
+            "KOCOR_LOG_DIR",
             "KOCOR_CONTEXT_MAX_TOKENS",
             "KOCOR_PRESERVE_LAST_ROUNDS",
             "KOCOR_PRESERVE_FIRST_ROUNDS",
@@ -219,7 +220,26 @@ class TestContextConfig:
     def test_load_memory_dir_from_env(self):
         os.environ["KOCOR_MEMORY_DIR"] = ".kocor/memories"
         cfg = Config._load()
-        assert cfg.memory_dir == ".kocor/memories"
+        assert cfg.memory_dir == _resolve_data_path(".kocor/memories")
+
+    def test_load_memory_dir_from_env_absolute(self):
+        os.environ["KOCOR_MEMORY_DIR"] = "/tmp/kocor_memories"
+        cfg = Config._load()
+        assert cfg.memory_dir == "/tmp/kocor_memories"
+
+    def test_default_log_dir(self):
+        cfg = Config()
+        assert cfg.log_dir == "./log"
+
+    def test_load_log_dir_from_env(self):
+        os.environ["KOCOR_LOG_DIR"] = "./log"
+        cfg = Config._load()
+        assert cfg.log_dir == _resolve_data_path("./log")
+
+    def test_load_log_dir_from_env_absolute(self):
+        os.environ["KOCOR_LOG_DIR"] = "/tmp/kocor_logs"
+        cfg = Config._load()
+        assert cfg.log_dir == "/tmp/kocor_logs"
 
     def test_load_context_max_tokens_from_env(self):
         os.environ["KOCOR_CONTEXT_MAX_TOKENS"] = "100000"

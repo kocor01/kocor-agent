@@ -25,6 +25,14 @@ def _resolve_config_path(path: str) -> str:
     return path
 
 
+def _resolve_data_path(path: str) -> str:
+    """解析数据目录路径：绝对路径直接使用，相对路径相对于包根目录。"""
+    if os.path.isabs(path):
+        return path
+    package_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    return os.path.join(package_root, path)
+
+
 @dataclass
 class Config:
     """系统配置。"""
@@ -53,6 +61,7 @@ class Config:
     # 上下文管理
     context_strategy: str = "default"       # 上下文策略（default / sliding / summary）
     memory_dir: str = ".kocor/memories"                    # 记忆持久化目录（空=不持久化）
+    log_dir: str = "./log"                                 # 日志目录
     context_max_tokens: int = 200_000       # 上下文最大 token 数
     context_summary_threshold: float = 0.70  # 触发摘要的上下文占用阈值 [0,1]
     context_truncate_threshold: float = 0.90  # 触发截断的上下文占用阈值 [0,1]
@@ -217,7 +226,8 @@ class Config:
             anthropic_model=os.environ.get("ANTHROPIC_MODEL", Config.anthropic_model),
             anthropic_base_url=os.environ.get("ANTHROPIC_BASE_URL", Config.anthropic_base_url),
             context_strategy=os.environ.get("KOCOR_CONTEXT_STRATEGY", Config.context_strategy),
-            memory_dir=Config.memory_dir,
+            memory_dir=_resolve_data_path(os.environ.get("KOCOR_MEMORY_DIR", Config.memory_dir)),
+            log_dir=_resolve_data_path(os.environ.get("KOCOR_LOG_DIR", Config.log_dir)),
             context_max_tokens=context_max_tokens,
             context_summary_threshold=context_summary_threshold,
             context_truncate_threshold=context_truncate_threshold,
