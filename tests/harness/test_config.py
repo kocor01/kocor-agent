@@ -18,7 +18,6 @@ class TestHarnessConfig:
         assert config.max_iterations == 20
         assert config.permission_policy == PermissionManager.POLICY_DEFAULT
         assert config.context_max_tokens == 200_000
-        assert config.sandbox_timeout == 30
 
     def test_custom_values(self):
         config = HarnessConfig(
@@ -27,12 +26,6 @@ class TestHarnessConfig:
         )
         assert config.max_iterations == 10
         assert config.permission_policy == PermissionManager.POLICY_STRICT
-
-    def test_sandbox_defaults(self):
-        config = HarnessConfig()
-        assert config.sandbox_timeout == 30
-        assert config.sandbox_memory_limit == "256m"
-        assert config.sandbox_network is False
 
     def test_context_thresholds(self):
         config = HarnessConfig()

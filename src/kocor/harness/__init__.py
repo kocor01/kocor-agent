@@ -6,7 +6,6 @@ from kocor.harness.event.event_subscribe import EventSubscribe
 from kocor.harness.config import HarnessConfig
 from kocor.tools.permission import PermissionManager
 from kocor.harness.file_guard import FileAccessGuard
-from kocor.harness.sandbox import Sandbox, SandboxResult
 from kocor.harness.error_handler import ErrorHandler
 from kocor.harness.logger import Logger, get_logger, setup_logger
 
@@ -24,9 +23,6 @@ __all__ = [
     "PermissionManager",
     # 文件守卫
     "FileAccessGuard",
-    # 沙箱
-    "Sandbox",
-    "SandboxResult",
     # 错误处理
     "ErrorHandler",
     # 可观测性

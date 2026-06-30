@@ -33,12 +33,6 @@ class HarnessConfig:
     preserve_last_rounds: int = 3
     preserve_first_rounds: int = 1
 
-    # 沙箱
-    sandbox_timeout: int = 30
-    sandbox_memory_limit: str = "256m"
-    sandbox_blocked_modules: list[str] | None = None
-    sandbox_network: bool = False
-
     # 工具
     allowed_dir: str = ""
 

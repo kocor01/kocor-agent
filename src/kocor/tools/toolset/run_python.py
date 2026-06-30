@@ -1,13 +1,18 @@
-"""run_python 内部工具。"""
+"""run_python 内部工具。
+
+在子进程中执行 Python 代码，提供双层安全保护：
+1. AST 静态检查：只允许标准库模块导入
+2. 运行时拦截：通过 __import__ 包装器阻断危险模块
+"""
 
 from __future__ import annotations
 
 import ast
+import os
 import subprocess
 import sys
 
 from kocor.tools.permission import PermissionManager
-from kocor.tools.tool_utils import sanitize_env
 
 
 class RunPython:
@@ -27,6 +32,12 @@ class RunPython:
     _TIMEOUT = 30
 
     _STDLIB_MODULES = sys.stdlib_module_names
+
+    _BLOCKED_MODULES: frozenset[str] = frozenset({
+        "os", "subprocess", "sys", "shutil",
+        "socket", "urllib", "http",
+        "importlib", "ctypes", "multiprocessing",
+    })
 
     @staticmethod
     def _check_stdlib(code: str) -> str | None:
@@ -63,18 +74,55 @@ class RunPython:
         return None
 
     @staticmethod
+    def _build_wrapper(code: str) -> str:
+        """包装用户代码，添加运行时模块导入拦截。"""
+        blockers = [f"'{mod}'" for mod in sorted(RunPython._BLOCKED_MODULES)]
+        return f"""\
+import builtins as __builtins__
+_original_import = __builtins__.__import__
+
+def _safe_import(name, *args, **kwargs):
+    blocked = {{{','.join(blockers)}}}
+    if name.split('.')[0] in blocked:
+        raise ImportError(f"Module '{{name}}' is blocked for security reasons")
+    return _original_import(name, *args, **kwargs)
+
+__builtins__.__import__ = _safe_import
+
+{code}
+"""
+
+    @staticmethod
+    def _build_env() -> dict[str, str]:
+        """创建不含敏感凭证的环境变量副本。"""
+        env = os.environ.copy()
+        _sensitive_keys = [
+            key
+            for key in env
+            if key.endswith(("_API_KEY", "_SECRET", "_TOKEN"))
+            or key in ("OPENAI_ORG_ID",)
+            or any(s in key.upper() for s in ("API_KEY", "SECRET", "TOKEN", "PASSWORD"))
+        ]
+        for key in _sensitive_keys:
+            env.pop(key, None)
+        env["PYTHONIOENCODING"] = "utf-8"
+        return env
+
+    @staticmethod
     def handler(code: str) -> str:
         err = RunPython._check_stdlib(code)
         if err:
             return err
 
+        wrapper = RunPython._build_wrapper(code)
+
         try:
             result = subprocess.run(
-                ["python", "-c", code],
+                ["python", "-c", wrapper],
                 capture_output=True,
                 encoding="utf-8",
                 timeout=RunPython._TIMEOUT,
-                env=sanitize_env(),
+                env=RunPython._build_env(),
             )
             output = result.stdout
             if result.stderr:
