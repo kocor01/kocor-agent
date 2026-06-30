@@ -12,7 +12,7 @@ dependencies = [
 ]
 
 [project.scripts]
-kocor = "kocor.__main__:main"
+kocor = "kocor.cli:main"
 
 [project.optional-dependencies]
 dev = [

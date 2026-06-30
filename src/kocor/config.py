@@ -12,6 +12,19 @@ from typing import Any, ClassVar, Optional
 from dotenv import load_dotenv
 
 
+def _resolve_config_path(path: str) -> str:
+    """解析配置文件路径：绝对路径直接使用，相对路径优先查找 CWD，其次包根目录。"""
+    if os.path.isabs(path):
+        return path
+    if os.path.exists(path):
+        return path
+    package_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    resolved = os.path.join(package_root, path)
+    if os.path.exists(resolved):
+        return resolved
+    return path
+
+
 @dataclass
 class Config:
     """系统配置。"""
@@ -132,11 +145,11 @@ class Config:
         if tool_timeout < 1:
             raise ValueError(f"KOCOR_TOOL_TIMEOUT 必须 >= 1，当前值: {tool_timeout}")
 
-        mcp_config = os.environ.get("KOCOR_MCP_CONFIG", Config.mcp_config)
+        mcp_config = _resolve_config_path(os.environ.get("KOCOR_MCP_CONFIG", Config.mcp_config))
         if mcp_config and not os.path.exists(mcp_config):
             raise ValueError(f"KOCOR_MCP_CONFIG 指定的文件不存在: '{mcp_config}'")
 
-        skills_config = os.environ.get("KOCOR_SKILLS_CONFIG", Config.skills_config)
+        skills_config = _resolve_config_path(os.environ.get("KOCOR_SKILLS_CONFIG", Config.skills_config))
         if skills_config and not os.path.exists(skills_config):
             raise ValueError(f"KOCOR_SKILLS_CONFIG 指定的文件不存在: '{skills_config}'")
 
