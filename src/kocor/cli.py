@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import argparse
 import sys
-from typing import Iterator
+from typing import Any, Iterator
 
 from kocor.agent import Agent
 from kocor.config import Config
@@ -27,6 +27,9 @@ from kocor.hook.hook_manager import HookManager
 from kocor.harness.event.event_manager import EventEmitter
 from kocor.harness.event.event_subscribe import EventSubscribe
 from kocor.harness.logger import setup_logger
+
+# 可选的会话管理
+from kocor.session import SessionManager, SessionResetPolicy, SessionStore
 
 W = 58
 
@@ -143,7 +146,7 @@ def _print_stream_formatted(chunks: Iterator[StreamChunk]) -> None:
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="Kocor Agent - LLM 自主 Agent 助手")
+    parser = argparse.ArgumentParser(description="Kocor Agent - 小而美的 LLM 自主 Agent 助手")
     parser.add_argument(
         "--stream",
         action="store_true",
@@ -171,6 +174,12 @@ def parse_args():
         help="最大迭代次数",
     )
     parser.add_argument(
+        "--session",
+        action="store_true",
+        default=False,
+        help="启用会话持久化（等效于 KOCOR_SESSION_ENABLED=1）",
+    )
+    parser.add_argument(
         "user_input",
         nargs="*",
         help="用户问题",
@@ -179,11 +188,27 @@ def parse_args():
     return args
 
 
-def _repl_loop(agent: Agent, stream_enabled: bool) -> None:
+def _repl_loop(
+    agent: Agent,
+    stream_enabled: bool,
+    session_manager: Any = None,
+) -> None:
     """交互式 REPL 循环。"""
+    # 会话启动提示
+    if session_manager:
+        entry = session_manager.get_or_create_session()
+        if entry.was_auto_reset:
+            print(f"⏳ 新会话（上次会话因 {entry.auto_reset_reason} 已过期）")
+        elif entry.message_count > 0:
+            title = f"「{entry.title}」" if entry.title else ""
+            print(f"📋 继续上次会话 {title}（{entry.message_count} 条消息）")
+        else:
+            print("🆕 新会话")
+        print()
+
     while True:
         try:
-            user_input = input(">>> ").strip()
+            user_input = input("\n>>> ").strip()
         except (EOFError, KeyboardInterrupt):
             print()
             break
@@ -217,6 +242,8 @@ def main() -> None:
         Config.set("permission_policy", PermissionManager.POLICY_PERMISSIVE)
     if args.max_iterations is not None:
         Config.set("max_iterations", args.max_iterations)
+    if args.session:
+        Config.set("session_enabled", True)
 
     setup_logger("INFO", log_dir=Config.get("log_dir"))
 
@@ -240,6 +267,19 @@ def main() -> None:
 
     budget = IterationBudget(max_iterations=max_iterations)
 
+    # 可选地构建会话管理器
+    session_manager = None
+    if Config.get("session_enabled"):
+        db_path = Config.get("session_db_path")
+        session_name = Config.get("session_name") or None
+        store = SessionStore(db_path=db_path)
+        policy = SessionResetPolicy(mode="none")  # 默认不自动重置，后续可配置
+        session_manager = SessionManager(
+            store=store,
+            policy=policy,
+            profile=session_name,
+        )
+
     agent = Agent(
         llm=LlmManager.get_llm_client(),
         tool_manager=toolManager,
@@ -247,6 +287,7 @@ def main() -> None:
         hook_manager=hook_manager,
         event_emitter=event_emitter,
         budget=budget,
+        session_manager=session_manager,
     )
 
     # 检测 REPL 模式：--repl 标志，或无参数且 stdin 是终端时默认进入
@@ -263,7 +304,7 @@ def main() -> None:
                            if s.invoke_strategy in (InvokeStrategy.SLASH, InvokeStrategy.BOTH)]
             print(f"Slash 命令: {', '.join(sorted(slash_names))}")
         print()
-        _repl_loop(agent, stream_enabled)
+        _repl_loop(agent, stream_enabled, session_manager)
         return
 
     if user_args:

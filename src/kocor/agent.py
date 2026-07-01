@@ -20,6 +20,9 @@ from kocor.skill.types import InvokeStrategy, SkillContext, SkillType
 from kocor.tools.permission import PermissionManager
 from kocor.tools.tool_manager import ToolManager
 
+# 可选的会话管理
+from kocor.session.manager import SessionManager as _SessionManager
+
 
 class Agent:
     """自主 Agent 核心。
@@ -28,6 +31,7 @@ class Agent:
     - slash 命令识别和调度
     - Agent 身份管理（LLM、工具、上下文）
     - 委托 Loop 执行 ReAct 循环
+    - 可选的会话管理（SessionManager）
     """
 
     def __init__(
@@ -39,6 +43,8 @@ class Agent:
         hook_manager: HookManager | None = None,
         event_emitter: EventEmitter | None = None,
         budget: IterationBudget | None = None,
+        # 会话管理（可选）
+        session_manager: _SessionManager | None = None,
     ):
         self.llm = llm
         self.tool_manager = tool_manager or ToolManager()
@@ -50,6 +56,10 @@ class Agent:
         self.hook_manager = hook_manager or HookManager()
         self.event_emitter = event_emitter or EventEmitter()
         self.budget = budget or IterationBudget(max_iterations=self.max_iterations)
+
+        # 会话管理
+        self.session_manager = session_manager
+        self._persisted_msg_idx = 0
 
         # 上下文管理
         self._memory: MemoryStore | None = None
@@ -90,24 +100,197 @@ class Agent:
 
     def run(self, user_input: str) -> str:
         """执行一次完整的 Agent 循环。"""
+        if user_input.startswith("/"):
+            cmd_result = self._handle_builtin_commands(user_input)
+            if cmd_result is not None:
+                return cmd_result
+        self._session_before_run()
         if self.tool_manager.skill_manager and user_input.startswith("/"):
             return self._handle_slash_command(user_input)
         result = self.loop.run(user_input)
+        self._session_after_run()
         self._check_nudge()
         return result
 
     def stream(self, user_input: str) -> Iterator[StreamChunk]:
         """流式执行 Agent 循环。"""
+        if user_input.startswith("/"):
+            cmd_result = self._handle_builtin_commands(user_input)
+            if cmd_result is not None:
+                yield StreamChunk(content=cmd_result, is_final=True)
+                return
+        self._session_before_run()
         if self.tool_manager.skill_manager and user_input.startswith("/"):
             result = self._handle_slash_command(user_input)
             yield StreamChunk(content=result, is_final=True)
             return
         yield from self.loop.stream(user_input)
+        self._session_after_run()
         self._check_nudge()
 
     def reset_conversation(self) -> None:
         """清空会话历史，开始新对话。"""
         self.ctx.reset_conversation()
+        self._persisted_msg_idx = 0
+        if self.session_manager:
+            self.session_manager.reset_session(self.session_manager.session_key)
+
+    # ── 会话管理 ──
+
+    def _session_before_run(self) -> None:
+        """执行一次 ReAct 循环前的会话准备工作。
+
+        1. 获取/创建会话
+        2. 自动重置时注入通知
+        3. 从 SQLite 恢复历史消息（如跨进程重启）
+        """
+        if not self.session_manager:
+            return
+
+        entry = self.session_manager.get_or_create_session()
+
+        # 自动重置时注入通知
+        if entry.was_auto_reset:
+            reason = entry.auto_reset_reason or "unknown"
+            self.ctx.append(Message(
+                role="user",
+                content=f"[会话因 {reason} 已自动重置，开始新对话]",
+            ))
+
+        # 恢复历史消息（跨进程重启时 session_history 为空）
+        if not self.ctx.session_history and self.session_manager.store.db:
+            history = self.session_manager.load_messages(entry.session_id)
+            if history:
+                self.ctx.session_history = history
+                self._persisted_msg_idx = len(self.ctx.messages) + len(history)
+
+    def _session_after_run(self) -> None:
+        """一次 ReAct 循环后的会话收尾工作。
+
+        1. 更新会话元数据（消息数、token 数）
+        2. 持久化新增消息到 SQLite
+        """
+        if not self.session_manager:
+            return
+
+        session_key = self.session_manager.session_key
+        entry = self.session_manager.get_session_info(session_key)
+        if entry is None:
+            return
+
+        # 计算本轮新增消息数（session_history 包含跨轮历史）
+        prev_count = entry.message_count
+        current_total = len(self.ctx.session_history)
+        msg_delta = max(0, current_total - prev_count)
+
+        # token 用量来自最近的 usage
+        input_delta = 0
+        output_delta = 0
+        if self.ctx.usage:
+            input_delta = self.ctx.usage.input_tokens
+            output_delta = self.ctx.usage.output_tokens
+
+        self.session_manager.update_session(
+            session_key=session_key,
+            message_count_delta=msg_delta,
+            input_tokens_delta=input_delta,
+            output_tokens_delta=output_delta,
+        )
+
+        # 持久化新增消息
+        self._persisted_msg_idx = self.session_manager.persist_messages(
+            session_key=session_key,
+            messages=self.ctx.session_history,
+            start_index=prev_count,
+        )
+
+    # ── 内置命令 ──
+
+    def _handle_builtin_commands(self, user_input: str) -> str | None:
+        """处理内置 slash 命令（会话管理相关）。返回 None 表示非内置命令。"""
+        parts = user_input[1:].strip().split(maxsplit=1)
+        cmd = parts[0]
+        args = parts[1] if len(parts) > 1 else ""
+
+        if cmd in ("reset", "new"):
+            self.reset_conversation()
+            return "✅ 会话已重置。" if cmd == "reset" else "✅ 已创建新会话。"
+        if cmd == "sessions" and self.session_manager:
+            return self._handle_list_sessions()
+        if cmd == "session" and self.session_manager:
+            return self._handle_switch_session(args)
+        return None  # 非内置命令，继续走 skill 路由
+
+    @staticmethod
+    def _format_sessions_table(sessions: list[dict]) -> str:
+        """将会话列表格式化为表格文本。"""
+        if not sessions:
+            return "📋 暂无历史会话。\n\n使用 `KOCOR_SESSION_ENABLED=1` 启用会话持久化后自动记录。"
+
+        lines = [
+            "📋 历史会话",
+            f"{'#':>3}  {'Session ID':<24}  {'创建时间':<14}  {'消息':>4}  摘要",
+            f"{'─'*3}  {'─'*24}  {'─'*14}  {'─'*4}  {'─'*20}",
+        ]
+        for i, s in enumerate(sessions, 1):
+            sid = s["session_id"]
+            created = s["created_at"][:16].replace("T", " ")
+            n = s["message_count"]
+            preview = s["title"] or "(空)"
+            lines.append(f"{i:>3}  {sid:<24}  {created:<14}  {n:>4}  {preview}")
+
+        lines.append("")
+        lines.append("使用 `/session <序号或ID>` 重新进入某个会话。")
+        return "\n".join(lines)
+
+    def _handle_list_sessions(self) -> str:
+        """处理 /sessions 命令。"""
+        if not self.session_manager:
+            return "⚠️ 会话管理未启用。"
+        sessions = self.session_manager.get_sessions_list()
+        return self._format_sessions_table(sessions)
+
+    def _handle_switch_session(self, args: str) -> str:
+        """处理 /session <id|序号> 命令。"""
+        if not self.session_manager:
+            return "⚠️ 会话管理未启用。"
+
+        if not args.strip():
+            return self._handle_list_sessions()
+
+        sessions = self.session_manager.get_sessions_list()
+        if not sessions:
+            return "⚠️ 无可切换的历史会话。"
+
+        target_id = args.strip()
+
+        # 按序号查找
+        if target_id.isdigit():
+            idx = int(target_id) - 1
+            if 0 <= idx < len(sessions):
+                target_id = sessions[idx]["session_id"]
+            else:
+                return f"⚠️ 序号 {target_id} 超出范围（共 {len(sessions)} 个会话）。"
+
+        # 按 session_id 查找
+        elif not any(s["session_id"] == target_id for s in sessions):
+            return f"⚠️ 未找到会话: {target_id}"
+
+        # 切换会话
+        session_key = self.session_manager.session_key
+        messages = self.session_manager.switch_to_session(
+            session_key=session_key,
+            target_session_id=target_id,
+        )
+        if messages is None:
+            return f"⚠️ 无法切换到会话 {target_id}。"
+
+        # 恢复上下文
+        self.ctx.reset_conversation()
+        self._persisted_msg_idx = 0
+        self.ctx.session_history = messages
+
+        return f"✅ 已切换到会话 {target_id}（{len(messages)} 条消息）。\n你可以继续之前的对话了。"
 
     # ── slash 命令 ──
 

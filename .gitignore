@@ -11,4 +11,7 @@ htmlcov/
 log/
 *.log
 .kocor/memories/
+.kocor/sessions/
+MagicMock
 .vscode/
+docs/
