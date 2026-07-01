@@ -46,7 +46,7 @@ class _StreamFormatter:
         self.has_content = False
         self.has_tool_section = False
         self.tool_result_idx = 0
-        self.content_emitted = False
+        self._content_has_printed_any = False
 
     def _round_header(self, n: int) -> None:
         title = f"⚡ 第 {n} 次请求"
@@ -81,18 +81,20 @@ class _StreamFormatter:
         print(chunk.reasoning, end="", flush=True)
 
     def _handle_content(self, chunk) -> None:
-        if not chunk.content or not chunk.content.strip():
+        if not chunk.content:
             return
+        # 去除前导空行（只在首次输出时，不处理内容中间的空行）
+        content = chunk.content
+        if not self._content_has_printed_any:
+            content = content.lstrip("\n")
+        if not content:
+            return  # 只有空行，无需展示
         if not self.has_content:
-            print("\n\U0001f4ac 回答")
+            print("\n\U0001f4ac 回答内容")
             print(f"{'─' * self.width}")
             self.has_content = True
-            self.content_emitted = False
-        if not self.content_emitted:
-            self.content_emitted = True
-            print(chunk.content.lstrip("\n"), end="", flush=True)
-        else:
-            print(chunk.content, end="", flush=True)
+            self._content_has_printed_any = True
+        print(content, end="", flush=True)
 
     def _handle_tool_calls(self, chunk) -> None:
         if not chunk.tool_calls:
@@ -103,7 +105,7 @@ class _StreamFormatter:
                 self.tool_calls.append(tc)
                 seen_ids.add(tc.id)
         if not self.has_tool_section and not chunk.tool_result:
-            print("\n\n\U0001f527 工具调用")
+            print("\n\U0001f527 工具调用")
             print(f"{'─' * self.width}")
             self.has_tool_section = True
 
@@ -128,7 +130,7 @@ class _StreamFormatter:
         self.has_reasoning = False
         self.has_content = False
         self.has_tool_section = False
-        self.content_emitted = False
+        self._content_has_printed_any = False
         if chunk.tool_result and self.tool_result_idx >= len(self.tool_calls) and self.tool_calls:
             self.tool_calls.clear()
             self.tool_result_idx = 0
@@ -327,6 +329,7 @@ def main() -> None:
             _print_stream_formatted(agent.stream(user_input))
         else:
             result = agent.run(user_input)
-            print(result)
+            if result:
+                print(result)
     finally:
         toolManager.mcp_manager.shutdown_all()

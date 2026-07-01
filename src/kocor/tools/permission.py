@@ -96,7 +96,7 @@ class PermissionManager:
         如果 stdin 不可用（非交互模式），返回 False。
         """
         try:
-            print(f"\n⚠️  工具调用需要确认: ")
+            print(f"⚠️  工具调用需要确认: ")
             print(f"   名称: {tool_name}")
             if args:
                 print(f"   参数: {args if isinstance(args, str) else json.dumps(args, ensure_ascii=False)[:200]}")
