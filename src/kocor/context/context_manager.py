@@ -108,7 +108,7 @@ class ContextManager:
 
         使用 API 返回的真实 token 数（输入+输出），无时回退本地估算。
         """
-        total_token = (self.usage.input_tokens + self.usage.output_tokens) if self.usage \
+        total_token = (self.usage.prompt_tokens + self.usage.completion_tokens) if self.usage \
             else (self.count_message_tokens() + self.count_tool_tokens())
         budget = TokenBudget()
         budget.used_prompt = total_token

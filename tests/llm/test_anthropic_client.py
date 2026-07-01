@@ -106,6 +106,44 @@ class TestAnthropicClient:
         assert "tools" in call_args.kwargs
 
     @patch("kocor.llm_provider.providers.anthropic_client.Anthropic")
+    def test_generate_uses_config_max_tokens_default(self, mock_anthropic_cls):
+        """不传 max_tokens 时使用 Config 的 max_tokens 值"""
+        Config._instance = Config(provider="anthropic", max_tokens=2048)
+        mock_client = MagicMock()
+        mock_anthropic_cls.return_value = mock_client
+
+        mock_response = MagicMock(
+            content=[MockTextBlock(text="hello")],
+            stop_reason="end_turn",
+        )
+        mock_client.messages.create.return_value = mock_response
+
+        client = AnthropicClient()
+        client.generate([Message(role="user", content="hi")])
+
+        call_args = mock_client.messages.create.call_args
+        assert call_args.kwargs["max_tokens"] == 2048
+
+    @patch("kocor.llm_provider.providers.anthropic_client.Anthropic")
+    def test_stream_uses_config_max_tokens_default(self, mock_anthropic_cls):
+        """流式调用时不传 max_tokens 使用 Config 的 max_tokens 值"""
+        Config._instance = Config(provider="anthropic", max_tokens=1024)
+        mock_client = MagicMock()
+        mock_anthropic_cls.return_value = mock_client
+
+        mock_client.messages.create.return_value = [
+            MockContentBlockDelta(delta=MockTextDelta(text="hi")),
+            MockMessageDelta(_stop_reason="end_turn"),
+            MockMessageStop(),
+        ]
+
+        client = AnthropicClient()
+        list(client.stream([Message(role="user", content="hi")]))
+
+        call_args = mock_client.messages.create.call_args
+        assert call_args.kwargs["max_tokens"] == 1024
+
+    @patch("kocor.llm_provider.providers.anthropic_client.Anthropic")
     def test_generate_system_message(self, mock_anthropic_cls):
         """测试 system 消息传递"""
         mock_client = MagicMock()

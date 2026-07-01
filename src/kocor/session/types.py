@@ -49,9 +49,10 @@ class SessionEntry:
         updated_at: 最后活动时间（用于空闲超时判定）
         title: 会话标题（从首个用户消息自动生成）
         message_count: 累计消息数（不含 system）
-        input_tokens: 累计输入 token
-        output_tokens: 累计输出 token
+        prompt_tokens: 累计输入 token
+        completion_tokens: 累计输出 token
         total_tokens: 累计总 token
+        cached_tokens: 累计缓存 token
         was_auto_reset: 是否因策略自动重置
         auto_reset_reason: 自动重置原因（"idle" / "daily"）
         is_fresh_reset: 是否显式 /reset
@@ -65,9 +66,10 @@ class SessionEntry:
         updated_at: datetime,
         title: str = "",
         message_count: int = 0,
-        input_tokens: int = 0,
-        output_tokens: int = 0,
+        prompt_tokens: int = 0,
+        completion_tokens: int = 0,
         total_tokens: int = 0,
+        cached_tokens: int = 0,
         was_auto_reset: bool = False,
         auto_reset_reason: str | None = None,
         is_fresh_reset: bool = False,
@@ -78,9 +80,10 @@ class SessionEntry:
         self.updated_at = updated_at
         self.title = title
         self.message_count = message_count
-        self.input_tokens = input_tokens
-        self.output_tokens = output_tokens
+        self.prompt_tokens = prompt_tokens
+        self.completion_tokens = completion_tokens
         self.total_tokens = total_tokens
+        self.cached_tokens = cached_tokens
         self.was_auto_reset = was_auto_reset
         self.auto_reset_reason = auto_reset_reason
         self.is_fresh_reset = is_fresh_reset
@@ -94,9 +97,10 @@ class SessionEntry:
             "updated_at": self.updated_at.isoformat(),
             "title": self.title,
             "message_count": self.message_count,
-            "input_tokens": self.input_tokens,
-            "output_tokens": self.output_tokens,
+            "prompt_tokens": self.prompt_tokens,
+            "completion_tokens": self.completion_tokens,
             "total_tokens": self.total_tokens,
+            "cached_tokens": self.cached_tokens,
             "was_auto_reset": self.was_auto_reset,
             "auto_reset_reason": self.auto_reset_reason,
             "is_fresh_reset": self.is_fresh_reset,
@@ -112,9 +116,10 @@ class SessionEntry:
             updated_at=datetime.fromisoformat(data["updated_at"]),
             title=data.get("title", ""),
             message_count=data.get("message_count", 0),
-            input_tokens=data.get("input_tokens", 0),
-            output_tokens=data.get("output_tokens", 0),
+            prompt_tokens=data.get("prompt_tokens", 0),
+            completion_tokens=data.get("completion_tokens", 0),
             total_tokens=data.get("total_tokens", 0),
+            cached_tokens=data.get("cached_tokens", 0),
             was_auto_reset=data.get("was_auto_reset", False),
             auto_reset_reason=data.get("auto_reset_reason"),
             is_fresh_reset=data.get("is_fresh_reset", False),

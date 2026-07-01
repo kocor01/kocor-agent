@@ -11,7 +11,7 @@ from datetime import datetime
 
 import pytest
 
-from kocor.llm_provider.message import FunctionCall, Message, ToolCall
+from kocor.llm_provider.message import FunctionCall, Message, ToolCall, Usage
 from kocor.session.store import SessionDB, SessionStore
 from kocor.session.types import SessionEntry
 
@@ -196,10 +196,18 @@ class TestSessionDB:
         assert messages[3].content == "file content"
         assert messages[3].tool_call_id == "call_1"
 
-    def test_append_message_with_token_count(self, db, sample_entry):
+    def test_append_message_with_usage(self, db, sample_entry):
         db.save_entry(sample_entry)
-        db.append_message(sample_entry.session_id, Message(role="user", content="Hello"), token_count=42)
-        db.append_message(sample_entry.session_id, Message(role="assistant", content="Hi!"), token_count=7)
+        db.append_message(
+            sample_entry.session_id,
+            Message(role="user", content="Hello"),
+            usage=Usage(total_tokens=42, prompt_tokens=10, completion_tokens=32),
+        )
+        db.append_message(
+            sample_entry.session_id,
+            Message(role="assistant", content="Hi!"),
+            usage=Usage(total_tokens=7, prompt_tokens=0, completion_tokens=7),
+        )
 
     def test_append_message_strips_leading_newlines(self, db, sample_entry):
         """content 开头多余的 \\n 应在持久化时被清洗。"""

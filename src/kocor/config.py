@@ -58,6 +58,9 @@ class Config:
     anthropic_model: str = "opus-4.7"       # Anthropic 模型名称
     anthropic_base_url: str = ""            # Anthropic 自定义端点
 
+    # LLM 调用
+    max_tokens: int = 50000                 # 响应最大 token 数
+
     # 上下文管理
     context_strategy: str = "default"       # 上下文策略（default / sliding / summary）
     context_max_tokens: int = 200_000       # 上下文最大 token 数
@@ -206,8 +209,8 @@ class Config:
             preserve_first_rounds = int(preserve_first_rounds_raw)
         except ValueError:
             raise ValueError(f"KOCOR_PRESERVE_FIRST_ROUNDS 必须是整数，当前值: '{preserve_first_rounds_raw}'")
-        if preserve_first_rounds < 0:
-            raise ValueError(f"KOCOR_PRESERVE_FIRST_ROUNDS 必须 >= 0，当前值: {preserve_first_rounds}")
+        if preserve_first_rounds < 1:
+            raise ValueError(f"KOCOR_PRESERVE_FIRST_ROUNDS 必须 >= 1，当前值: {preserve_first_rounds}")
 
         context_summary_threshold_raw = os.environ.get("KOCOR_CONTEXT_SUMMARY_THRESHOLD", str(Config.context_summary_threshold))
         try:
@@ -256,6 +259,14 @@ class Config:
         session_name = os.environ.get("KOCOR_SESSION_NAME", Config.session_name)
         session_db_path = _resolve_data_path(os.environ.get("KOCOR_SESSION_DB_PATH", Config.session_db_path))
 
+        max_tokens_raw = os.environ.get("KOCOR_MAX_TOKENS", str(Config.max_tokens))
+        try:
+            max_tokens = int(max_tokens_raw)
+        except ValueError:
+            raise ValueError(f"KOCOR_MAX_TOKENS 必须是整数，当前值: '{max_tokens_raw}'")
+        if max_tokens < 1:
+            raise ValueError(f"KOCOR_MAX_TOKENS 必须 >= 1，当前值: {max_tokens}")
+
         return cls(
             provider=provider,
             max_iterations=max_iterations,
@@ -264,6 +275,7 @@ class Config:
             mcp_config=mcp_config,
             skills_config=skills_config,
             skills_dir=Config.skills_dir,
+            max_tokens=max_tokens,
             openai_api_key=os.environ.get("OPENAI_API_KEY", Config.openai_api_key),
             openai_model=os.environ.get("OPENAI_MODEL", Config.openai_model),
             openai_base_url=os.environ.get("OPENAI_BASE_URL", Config.openai_base_url),

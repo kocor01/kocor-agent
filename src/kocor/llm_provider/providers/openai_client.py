@@ -29,7 +29,7 @@ class OpenAIClient(LLMClient):
         self,
         messages: list[Message],
         tools: list[ToolDefinition] | None = None,
-        max_tokens: int = 4096,
+        max_tokens: int | None = None,
         temperature: float = 0.0,
     ) -> Message:
         """调用 OpenAI API 生成响应。
@@ -37,12 +37,13 @@ class OpenAIClient(LLMClient):
         Args:
             messages: 消息列表
             tools: 工具定义列表
-            max_tokens: 最大生成长度
+            max_tokens: 最大生成长度（默认使用 Config.max_tokens）
             temperature: 采样温度
 
         Returns:
             Message: 响应消息
         """
+        actual_max_tokens = max_tokens if max_tokens is not None else self.config.max_tokens
         client = OpenAI(
             api_key=self.config.openai_api_key,
             base_url=self.config.openai_base_url or None,
@@ -56,15 +57,23 @@ class OpenAIClient(LLMClient):
         response = client.chat.completions.create(
             model=self.config.openai_model,
             messages=openai_messages,
-            max_tokens=max_tokens,
+            max_tokens=actual_max_tokens,
             temperature=temperature,
             tools=openai_tools,
         )
 
         # OpenAI 格式 → 内部格式
+        prompt_tokens = getattr(response.usage, "prompt_tokens", 0) if response.usage else 0
+        completion_tokens = getattr(response.usage, "completion_tokens", 0) if response.usage else 0
+        total_tokens = getattr(response.usage, "total_tokens", 0) if response.usage else 0
+        cached_tokens = 0
+        if response.usage and hasattr(response.usage, "prompt_tokens_details") and response.usage.prompt_tokens_details:
+            cached_tokens = getattr(response.usage.prompt_tokens_details, "cached_tokens", 0)
         usage = Usage(
-            input_tokens=getattr(response.usage, "prompt_tokens", 0) if response.usage else 0,
-            output_tokens=getattr(response.usage, "completion_tokens", 0) if response.usage else 0,
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+            total_tokens=total_tokens,
+            cached_tokens=cached_tokens,
         )
         return self._normalize_out(response.choices[0], usage=usage)
 
@@ -72,7 +81,7 @@ class OpenAIClient(LLMClient):
         self,
         messages: list[Message],
         tools: list[ToolDefinition] | None = None,
-        max_tokens: int = 4096,
+        max_tokens: int | None = None,
         temperature: float = 0.0,
     ) -> Iterator[StreamChunk]:
         """流式调用 OpenAI API 生成响应。
@@ -80,12 +89,13 @@ class OpenAIClient(LLMClient):
         Args:
             messages: 消息列表
             tools: 工具定义列表
-            max_tokens: 最大生成长度
+            max_tokens: 最大生成长度（默认使用 Config.max_tokens）
             temperature: 采样温度
 
         Yields:
             StreamChunk: 流式数据块
         """
+        actual_max_tokens = max_tokens if max_tokens is not None else self.config.max_tokens
         client = OpenAI(
             api_key=self.config.openai_api_key,
             base_url=self.config.openai_base_url or None,
@@ -99,7 +109,7 @@ class OpenAIClient(LLMClient):
         for chunk in client.chat.completions.create(
             model=self.config.openai_model,
             messages=openai_messages,
-            max_tokens=max_tokens,
+            max_tokens=actual_max_tokens,
             temperature=temperature,
             tools=openai_tools,
             stream=True,
@@ -110,8 +120,14 @@ class OpenAIClient(LLMClient):
                 usage_chunk = StreamChunk(
                     is_final=True,
                     usage=Usage(
-                        input_tokens=getattr(chunk.usage, "prompt_tokens", 0),
-                        output_tokens=getattr(chunk.usage, "completion_tokens", 0),
+                        prompt_tokens=getattr(chunk.usage, "prompt_tokens", 0),
+                        completion_tokens=getattr(chunk.usage, "completion_tokens", 0),
+                        total_tokens=getattr(chunk.usage, "total_tokens", 0),
+                        cached_tokens=(
+                            getattr(chunk.usage, "prompt_tokens_details", None)
+                            and getattr(chunk.usage.prompt_tokens_details, "cached_tokens", 0)
+                            or 0
+                        ),
                     ),
                 )
                 yield usage_chunk

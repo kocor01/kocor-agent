@@ -13,7 +13,7 @@ import threading
 from datetime import datetime
 from pathlib import Path
 
-from kocor.llm_provider.message import FunctionCall, Message, ToolCall
+from kocor.llm_provider.message import FunctionCall, Message, ToolCall, Usage
 from kocor.session.types import SessionEntry
 
 
@@ -47,9 +47,10 @@ class SessionDB:
                 session_key    TEXT NOT NULL,
                 title          TEXT DEFAULT '',
                 message_count  INTEGER DEFAULT 0,
-                input_tokens   INTEGER DEFAULT 0,
-                output_tokens  INTEGER DEFAULT 0,
+                prompt_tokens  INTEGER DEFAULT 0,
+                completion_tokens INTEGER DEFAULT 0,
                 total_tokens   INTEGER DEFAULT 0,
+                cached_tokens  INTEGER DEFAULT 0,
                 was_auto_reset INTEGER DEFAULT 0,
                 auto_reset_reason TEXT,
                 is_fresh_reset INTEGER DEFAULT 0,
@@ -70,22 +71,16 @@ class SessionDB:
                 tool_name    TEXT,
                 tool_calls   TEXT,
                 reasoning    TEXT NOT NULL DEFAULT '',
-                token_count  INTEGER DEFAULT 0,
+                total_tokens INTEGER DEFAULT 0,
+                prompt_tokens  INTEGER DEFAULT 0,
+                completion_tokens INTEGER DEFAULT 0,
+                cached_tokens  INTEGER DEFAULT 0,
                 created_at   TEXT NOT NULL
             );
 
             CREATE INDEX IF NOT EXISTS idx_messages_session_id ON messages(session_id);
         """)
         self._conn.commit()
-        self._migrate()
-
-    def _migrate(self) -> None:
-        """运行增量迁移，为旧数据库补上新增列。"""
-        cursor = self._conn.execute("PRAGMA table_info(sessions)")
-        cols = {row["name"] for row in cursor.fetchall()}
-        if "title" not in cols:
-            self._conn.execute("ALTER TABLE sessions ADD COLUMN title TEXT DEFAULT ''")
-            self._conn.commit()
 
     def close(self) -> None:
         if self._conn:
@@ -99,18 +94,20 @@ class SessionDB:
             self._conn.execute(
                 """INSERT OR REPLACE INTO sessions
                    (session_id, session_key, title,
-                    message_count, input_tokens, output_tokens, total_tokens,
+                    message_count, prompt_tokens, completion_tokens, total_tokens,
+                    cached_tokens,
                     was_auto_reset, auto_reset_reason, is_fresh_reset,
                     ended_at, end_reason, created_at, updated_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     entry.session_id,
                     entry.session_key,
                     entry.title,
                     entry.message_count,
-                    entry.input_tokens,
-                    entry.output_tokens,
+                    entry.prompt_tokens,
+                    entry.completion_tokens,
                     entry.total_tokens,
+                    entry.cached_tokens,
                     int(entry.was_auto_reset),
                     entry.auto_reset_reason,
                     int(entry.is_fresh_reset),
@@ -197,7 +194,7 @@ class SessionDB:
         self,
         session_id: str,
         message: Message,
-        token_count: int = 0,
+        usage: Usage | None = None,
     ) -> None:
         # 持久化前清洗前导换行（模型常返回 "\n\n..." 格式的内容）
         content = message.content.lstrip("\n")
@@ -222,12 +219,18 @@ class SessionDB:
                 tool_name = found["function"]["name"]
                 tool_calls_json = json.dumps(found)
 
+        prompt_tokens = usage.prompt_tokens if usage else 0
+        completion_tokens = usage.completion_tokens if usage else 0
+        cached_tokens = usage.cached_tokens if usage else 0
+        total_tokens = usage.total_tokens if usage else 0
+
         with self._lock:
             self._conn.execute(
                 """INSERT INTO messages
                    (session_id, role, content, tool_call_id, tool_name,
-                    tool_calls, reasoning, token_count, created_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    tool_calls, reasoning, total_tokens,
+                    prompt_tokens, completion_tokens, cached_tokens, created_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     session_id,
                     message.role,
@@ -236,7 +239,10 @@ class SessionDB:
                     tool_name,
                     tool_calls_json,
                     message.reasoning or "",
-                    token_count,
+                    total_tokens,
+                    prompt_tokens,
+                    completion_tokens,
+                    cached_tokens,
                     datetime.now().isoformat(),
                 ),
             )
@@ -308,9 +314,10 @@ class SessionDB:
             updated_at=datetime.fromisoformat(row["updated_at"]),
             title=row["title"],
             message_count=row["message_count"],
-            input_tokens=row["input_tokens"],
-            output_tokens=row["output_tokens"],
+            prompt_tokens=row["prompt_tokens"],
+            completion_tokens=row["completion_tokens"],
             total_tokens=row["total_tokens"],
+            cached_tokens=row["cached_tokens"],
             was_auto_reset=bool(row["was_auto_reset"]),
             auto_reset_reason=row["auto_reset_reason"],
             is_fresh_reset=bool(row["is_fresh_reset"]),

@@ -182,6 +182,48 @@ class TestPermissionPolicyConfig:
         assert Config.get("permission_policy") == "strict"
 
 
+class TestMaxTokensConfig:
+    """测试 max_tokens 配置（响应最大长度）"""
+
+    def setup_method(self):
+        Config.reset()
+        os.environ.pop("KOCOR_MAX_TOKENS", None)
+
+    def teardown_method(self):
+        os.environ.pop("KOCOR_MAX_TOKENS", None)
+
+    def test_default_max_tokens(self):
+        cfg = Config()
+        assert cfg.max_tokens == 50000
+
+    def test_custom_max_tokens(self):
+        cfg = Config(max_tokens=8192)
+        assert cfg.max_tokens == 8192
+
+    def test_load_max_tokens_from_env(self):
+        os.environ["KOCOR_MAX_TOKENS"] = "8192"
+        cfg = Config._load()
+        assert cfg.max_tokens == 8192
+
+    def test_load_max_tokens_invalid_raises(self):
+        os.environ["KOCOR_PROVIDER"] = "openai"
+        os.environ["KOCOR_MAX_TOKENS"] = "abc"
+        try:
+            Config._load()
+            assert False, "应抛出 ValueError"
+        except ValueError:
+            pass
+
+    def test_load_max_tokens_negative_raises(self):
+        os.environ["KOCOR_PROVIDER"] = "openai"
+        os.environ["KOCOR_MAX_TOKENS"] = "-1"
+        try:
+            Config._load()
+            assert False, "应抛出 ValueError"
+        except ValueError:
+            pass
+
+
 class TestContextConfig:
     """测试上下文管理配置"""
 

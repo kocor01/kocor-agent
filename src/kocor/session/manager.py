@@ -107,8 +107,10 @@ class SessionManager:
         self,
         session_key: str,
         message_count_delta: int = 0,
-        input_tokens_delta: int = 0,
-        output_tokens_delta: int = 0,
+        prompt_tokens_delta: int = 0,
+        completion_tokens_delta: int = 0,
+        total_tokens_delta: int = 0,
+        cached_tokens_delta: int = 0,
         now: datetime | None = None,
     ) -> None:
         """更新会话元数据。
@@ -116,8 +118,10 @@ class SessionManager:
         Args:
             session_key: 要更新的会话键
             message_count_delta: 新增消息数
-            input_tokens_delta: 新增输入 token 数
-            output_tokens_delta: 新增输出 token 数
+            prompt_tokens_delta: 新增输入 token 数
+            completion_tokens_delta: 新增输出 token 数
+            total_tokens_delta: 新增总 token 数
+            cached_tokens_delta: 新增缓存 token 数
             now: 当前时间（用于测试注入）
         """
         entry = self.store.get_entry(session_key)
@@ -126,9 +130,10 @@ class SessionManager:
 
         entry.updated_at = now or datetime.now()
         entry.message_count += message_count_delta
-        entry.input_tokens += input_tokens_delta
-        entry.output_tokens += output_tokens_delta
-        entry.total_tokens = entry.input_tokens + entry.output_tokens
+        entry.prompt_tokens += prompt_tokens_delta
+        entry.completion_tokens += completion_tokens_delta
+        entry.total_tokens += total_tokens_delta
+        entry.cached_tokens += cached_tokens_delta
 
         self.store.set_entry(entry)
 
@@ -286,9 +291,8 @@ class SessionManager:
             if msg.role == "system":
                 continue
 
-            # assistant 消息记录 output_tokens（该消息生成的 token 数），input 只在会话级统计
-            token_count = msg.usage.output_tokens if msg.usage else 0
-            self.store.db.append_message(entry.session_id, msg, token_count=token_count)
+            # assistant 消息记录 completion_tokens（该消息生成的 token 数），input 只在会话级统计
+            self.store.db.append_message(entry.session_id, msg, usage=msg.usage)
 
         return len(messages)
 

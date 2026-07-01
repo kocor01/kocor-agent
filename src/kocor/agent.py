@@ -183,18 +183,26 @@ class Agent:
         current_total = len(self.ctx.session_history)
         msg_delta = max(0, current_total - prev_count)
 
-        # token 用量来自最近的 usage
-        input_delta = 0
-        output_delta = 0
-        if self.ctx.usage:
-            input_delta = self.ctx.usage.input_tokens
-            output_delta = self.ctx.usage.output_tokens
+        # token 用量从新增消息的 usage 累计（ReAct 循环可能有多次 API 调用）
+        prompt_delta = 0
+        completion_delta = 0
+        total_delta = 0
+        cached_delta = 0
+        for i in range(prev_count, current_total):
+            msg = self.ctx.session_history[i]
+            if msg.usage:
+                prompt_delta += msg.usage.prompt_tokens
+                completion_delta += msg.usage.completion_tokens
+                total_delta += msg.usage.total_tokens
+                cached_delta += msg.usage.cached_tokens
 
         self.session_manager.update_session(
             session_key=session_key,
             message_count_delta=msg_delta,
-            input_tokens_delta=input_delta,
-            output_tokens_delta=output_delta,
+            prompt_tokens_delta=prompt_delta,
+            completion_tokens_delta=completion_delta,
+            total_tokens_delta=total_delta,
+            cached_tokens_delta=cached_delta,
         )
 
         # 持久化新增消息

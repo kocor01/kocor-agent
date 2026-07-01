@@ -76,15 +76,16 @@ class TestSessionManager:
         manager.update_session(
             session_key=entry.session_key,
             message_count_delta=3,
-            input_tokens_delta=100,
-            output_tokens_delta=50,
+            prompt_tokens_delta=100,
+            completion_tokens_delta=50,
+            total_tokens_delta=150,
             now=self.NOW,
         )
         updated = manager.store.get_entry(entry.session_key)
         assert updated is not None
         assert updated.message_count == 3
-        assert updated.input_tokens == 100
-        assert updated.output_tokens == 50
+        assert updated.prompt_tokens == 100
+        assert updated.completion_tokens == 50
         assert updated.total_tokens == 150
         assert updated.updated_at >= self.NOW
 
@@ -252,19 +253,19 @@ class TestSessionManagerPersistence:
 
         msgs = [
             Message(role="user", content="Hello"),                               # 无 usage
-            Message(role="assistant", content="Hi!", usage=Usage(input_tokens=10, output_tokens=5)),  # 有 usage
+            Message(role="assistant", content="Hi!", usage=Usage(prompt_tokens=10, completion_tokens=5, total_tokens=15)),  # 有 usage
         ]
         mgr.persist_messages(e.session_key, msgs, start_index=0)
 
         rows = mgr.store.db._conn.execute(
-            "SELECT role, token_count FROM messages WHERE session_id = ? ORDER BY id",
+            "SELECT role, total_tokens FROM messages WHERE session_id = ? ORDER BY id",
             (e.session_id,),
         ).fetchall()
         assert len(rows) == 2
         assert rows[0]["role"] == "user"
-        assert rows[0]["token_count"] == 0     # user 消息无 usage
+        assert rows[0]["total_tokens"] == 0     # user 消息无 usage
         assert rows[1]["role"] == "assistant"
-        assert rows[1]["token_count"] == 5     # 只存 output(5)
+        assert rows[1]["total_tokens"] == 15     # prompt(10) + completion(5)
 
     def test_persist_no_db(self, policy):
         """无 SQLite 后端时 persist 不应出错。"""

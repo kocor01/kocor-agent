@@ -103,6 +103,43 @@ class TestOpenAIClient:
         assert tools_arg[0]["function"]["name"] == "read_file"
 
     @patch("kocor.llm_provider.providers.openai_client.OpenAI")
+    def test_generate_uses_config_max_tokens_default(self, mock_openai_cls):
+        """不传 max_tokens 时使用 Config 的 max_tokens 值"""
+        Config._instance = Config(provider="openai", max_tokens=2048)
+        mock_client = MagicMock()
+        mock_openai_cls.return_value = mock_client
+
+        mock_message = MagicMock()
+        mock_message.content = "hello"
+        mock_choice = MagicMock(message=mock_message)
+        mock_response = MagicMock(choices=[mock_choice])
+        mock_client.chat.completions.create.return_value = mock_response
+
+        client = OpenAIClient()
+        client.generate([Message(role="user", content="hi")])
+
+        call_args = mock_client.chat.completions.create.call_args
+        assert call_args.kwargs["max_tokens"] == 2048
+
+    @patch("kocor.llm_provider.providers.openai_client.OpenAI")
+    def test_stream_uses_config_max_tokens_default(self, mock_openai_cls):
+        """流式调用时不传 max_tokens 使用 Config 的 max_tokens 值"""
+        Config._instance = Config(provider="openai", max_tokens=1024)
+        mock_client = MagicMock()
+        mock_openai_cls.return_value = mock_client
+
+        mock_client.chat.completions.create.return_value = [
+            MockOpenAIChunk(content="hi"),
+            MockOpenAIChunk(finish_reason="stop"),
+        ]
+
+        client = OpenAIClient()
+        list(client.stream([Message(role="user", content="hi")]))
+
+        call_args = mock_client.chat.completions.create.call_args
+        assert call_args.kwargs["max_tokens"] == 1024
+
+    @patch("kocor.llm_provider.providers.openai_client.OpenAI")
     def test_generate_with_temperature(self, mock_openai_cls):
         """测试 temperature 参数传递"""
         mock_client = MagicMock()

@@ -30,7 +30,7 @@ class AnthropicClient(LLMClient):
         self,
         messages: list[Message],
         tools: list[ToolDefinition] | None = None,
-        max_tokens: int = 4096,
+        max_tokens: int | None = None,
         temperature: float = 0.0,
     ) -> Message:
         """调用 Anthropic API 生成响应。
@@ -38,12 +38,13 @@ class AnthropicClient(LLMClient):
         Args:
             messages: 消息列表
             tools: 工具定义列表
-            max_tokens: 最大生成长度
+            max_tokens: 最大生成长度（默认使用 Config.max_tokens）
             temperature: 采样温度
 
         Returns:
             Message: 响应消息
         """
+        actual_max_tokens = max_tokens if max_tokens is not None else self.config.max_tokens
         client = Anthropic(
             api_key=self.config.anthropic_api_key,
             auth_token=self.config.anthropic_api_key,
@@ -69,7 +70,7 @@ class AnthropicClient(LLMClient):
             model=self.config.anthropic_model,
             system=system_content or None,
             messages=anthropic_messages,
-            max_tokens=max_tokens,
+            max_tokens=actual_max_tokens,
             temperature=temperature,
             tools=anthropic_tools,
         )
@@ -81,7 +82,7 @@ class AnthropicClient(LLMClient):
         self,
         messages: list[Message],
         tools: list[ToolDefinition] | None = None,
-        max_tokens: int = 4096,
+        max_tokens: int | None = None,
         temperature: float = 0.0,
     ) -> Iterator[StreamChunk]:
         """流式调用 Anthropic API 生成响应。
@@ -89,12 +90,13 @@ class AnthropicClient(LLMClient):
         Args:
             messages: 消息列表
             tools: 工具定义列表
-            max_tokens: 最大生成长度
+            max_tokens: 最大生成长度（默认使用 Config.max_tokens）
             temperature: 采样温度
 
         Yields:
             StreamChunk: 流式数据块
         """
+        actual_max_tokens = max_tokens if max_tokens is not None else self.config.max_tokens
         client = Anthropic(
             api_key=self.config.anthropic_api_key,
             auth_token=self.config.anthropic_api_key,
@@ -118,13 +120,14 @@ class AnthropicClient(LLMClient):
         accumulated_text = ""
         accumulated_tool_calls: dict[int, ToolCall] = {}
         tool_block_starts: dict[int, dict] = {}  # index → block metadata
-        input_tokens = 0
+        prompt_tokens = 0
+        cached_tokens = 0
 
         for event in client.messages.create(
             model=self.config.anthropic_model,
             system=system_content or None,
             messages=anthropic_messages,
-            max_tokens=max_tokens,
+            max_tokens=actual_max_tokens,
             temperature=temperature,
             tools=anthropic_tools,
             stream=True,
@@ -135,7 +138,8 @@ class AnthropicClient(LLMClient):
                 case "message_start":
                     usage_attr = getattr(event, "message", None)
                     if usage_attr and hasattr(usage_attr, "usage"):
-                        input_tokens = getattr(usage_attr.usage, "input_tokens", 0)
+                        prompt_tokens = getattr(usage_attr.usage, "input_tokens", 0)
+                        cached_tokens = getattr(usage_attr.usage, "cache_read_input_tokens", 0)
 
                 case "content_block_delta":
                     if event.delta.type == "text_delta":
@@ -181,9 +185,12 @@ class AnthropicClient(LLMClient):
                         stream_chunk.is_final = True
                     usage_attr = getattr(event, "usage", None)
                     if usage_attr:
+                        output_tokens = getattr(usage_attr, "output_tokens", 0)
                         stream_chunk.usage = Usage(
-                            input_tokens=input_tokens,
-                            output_tokens=getattr(usage_attr, "output_tokens", 0),
+                            prompt_tokens=prompt_tokens,
+                            completion_tokens=output_tokens,
+                            total_tokens=prompt_tokens + output_tokens,
+                            cached_tokens=cached_tokens,
                         )
 
             # 有内容时才 yield
@@ -243,9 +250,14 @@ class AnthropicClient(LLMClient):
     def _normalize_out(self, response) -> Message:
         """Anthropic response 格式 → 内部消息格式"""
         content_blocks = response.content
+        prompt = getattr(response.usage, "input_tokens", 0)
+        completion = getattr(response.usage, "output_tokens", 0)
+        cached = getattr(response.usage, "cache_read_input_tokens", 0)
         usage = Usage(
-            input_tokens=getattr(response.usage, "input_tokens", 0),
-            output_tokens=getattr(response.usage, "output_tokens", 0),
+            prompt_tokens=prompt,
+            completion_tokens=completion,
+            total_tokens=prompt + completion,
+            cached_tokens=cached,
         )
 
         # 提取 thinking（思维链）
