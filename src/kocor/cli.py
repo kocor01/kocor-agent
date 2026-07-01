@@ -11,7 +11,11 @@ from __future__ import annotations
 
 import argparse
 import sys
+from io import StringIO
 from typing import Any, Iterator
+
+from rich.console import Console
+from rich.markdown import Markdown
 
 from kocor.agent import Agent
 from kocor.config import Config
@@ -47,11 +51,28 @@ class _StreamFormatter:
         self.has_tool_section = False
         self.tool_result_idx = 0
         self._content_has_printed_any = False
+        self._content_buffer: str = ""
+        self._in_code_block: bool = False
+        self._code_block_buffer: str = ""
 
     def _round_header(self, n: int) -> None:
         title = f"⚡ 第 {n} 次请求"
         fill = self.width - 2 - len(title)
         print(f"\n── {title} {'─' * max(0, fill)}")
+
+    def _render_markdown(self, text: str) -> None:
+        """将已完整的段落文本通过 print() 输出（内部用 rich Markdown 渲染）。"""
+        text = text.strip()
+        if not text:
+            return
+        # 渲染到 StringIO，再通过 print() 输出（保持与 mock-print 测试兼容）
+        buf = StringIO()
+        Console(file=buf).print(Markdown(text))
+        rendered = buf.getvalue()
+        if rendered.endswith("\n"):
+            rendered = rendered[:-1]
+        if rendered:
+            print(rendered, end="", flush=True)
 
     def handle_chunk(self, chunk) -> None:
         if not chunk.tool_result and not self._in_round():
@@ -83,18 +104,44 @@ class _StreamFormatter:
     def _handle_content(self, chunk) -> None:
         if not chunk.content:
             return
-        # 去除前导空行（只在首次输出时，不处理内容中间的空行）
+        # 去除前导空行（只在首次输出时）
         content = chunk.content
         if not self._content_has_printed_any:
             content = content.lstrip("\n")
         if not content:
-            return  # 只有空行，无需展示
+            return
         if not self.has_content:
             print("\n\U0001f4ac 回答内容")
             print(f"{'─' * self.width}")
             self.has_content = True
             self._content_has_printed_any = True
-        print(content, end="", flush=True)
+
+        # 累积内容到缓冲区
+        self._content_buffer += content
+
+        # 按行拆分处理：普通行即时渲染，代码块累积到闭合后整块渲染
+        while "\n" in self._content_buffer:
+            line, self._content_buffer = self._content_buffer.split("\n", 1)
+            line = line.rstrip()
+
+            # 检测代码块边界（``` 开头）
+            if line.startswith("```"):
+                if self._in_code_block:
+                    # 代码块闭合——整块渲染
+                    self._code_block_buffer += line  # 保留闭合标记
+                    self._render_markdown(self._code_block_buffer)
+                    self._code_block_buffer = ""
+                    self._in_code_block = False
+                else:
+                    # 代码块开始——进入批模式
+                    self._in_code_block = True
+                    self._code_block_buffer = line + "\n"
+                continue
+
+            if self._in_code_block:
+                self._code_block_buffer += line + "\n"
+            elif line:
+                self._render_markdown(line)
 
     def _handle_tool_calls(self, chunk) -> None:
         if not chunk.tool_calls:
@@ -127,6 +174,15 @@ class _StreamFormatter:
     def _handle_end_of_round(self, chunk) -> None:
         if not chunk.is_final:
             return
+        # 刷新残留缓冲区中的内容
+        if self._content_buffer.strip():
+            self._render_markdown(self._content_buffer)
+        self._content_buffer = ""
+        # 未闭合代码块强制刷新
+        if self._code_block_buffer:
+            self._render_markdown(self._code_block_buffer)
+            self._code_block_buffer = ""
+            self._in_code_block = False
         self.has_reasoning = False
         self.has_content = False
         self.has_tool_section = False
@@ -136,6 +192,13 @@ class _StreamFormatter:
             self.tool_result_idx = 0
 
     def flush_remaining(self) -> None:
+        if self._content_buffer.strip():
+            self._render_markdown(self._content_buffer)
+            self._content_buffer = ""
+        if self._code_block_buffer:
+            self._render_markdown(self._code_block_buffer)
+            self._code_block_buffer = ""
+            self._in_code_block = False
         for tc in self.tool_calls[self.tool_result_idx:]:
             print(f"• {tc.function.name}({tc.function.arguments})")
 

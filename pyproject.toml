@@ -9,6 +9,7 @@ dependencies = [
     "python-dotenv>=1.0.0",
     "requests>=2.31.0",
     "mcp>=1.27.2",
+    "rich>=13.0.0",
 ]
 
 [project.scripts]
