@@ -28,9 +28,22 @@ class ToolManager:
         from kocor.tools.toolset.write_file import WriteFile
         from kocor.tools.toolset.run_python import RunPython
 
+        self.memory_store = None  # MemoryStore 实例，由 Agent 后续注入
         builtin_tools = [ReadFile, WriteFile, RunPython]
         for tools in builtin_tools:
             self.register(tools.NAME, tools.DESCRIPTION, tools.PARAMETERS, tools.handler, tools.SAFETY_LEVEL)
+
+        # memory 工具需要 MemoryStore，handler 延迟读取 self.memory_store
+        self._register_memory_tool()
+
+    def _register_memory_tool(self) -> None:
+        """注册 memory 工具（依赖 self.memory_store，可为 None）。"""
+        from kocor.tools.toolset.memory_tool import MemoryTool
+        self.register(
+            MemoryTool.NAME, MemoryTool.DESCRIPTION, MemoryTool.PARAMETERS,
+            lambda **kw: MemoryTool.handler(store=self.memory_store, **kw),
+            MemoryTool.SAFETY_LEVEL,
+        )
 
 
     def register_all(self) -> None:

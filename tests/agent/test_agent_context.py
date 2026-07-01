@@ -51,17 +51,13 @@ class TestContextManagerIntegration:
         assert "当前工作目录" in system_msg.content
 
     def test_agent_with_memory_dir(self):
-        """配置 memory_dir 后 Agent 应自动创建 MemoryManager。"""
+        """配置 memory_dir 后 Agent 应自动创建 MemoryStore。"""
         import tempfile
-        from kocor.context.types import MemoryItem
+        from pathlib import Path
 
         mem_dir = tempfile.mkdtemp()
-        # 预先写入一条记忆
-        from kocor.context.memory import MemoryManager
-        memory = MemoryManager(memory_dir=mem_dir)
-        memory.save(MemoryItem(
-            name="user-info", description="用户信息", content="用户: 张三", memory_type="user",
-        ))
+        # 预先写入一条记忆到 USER.md
+        Path(mem_dir, "USER.md").write_text("用户: 张三", encoding="utf-8")
 
         llm = FakeLLMClient()
         Config.set("memory_dir", mem_dir)
@@ -71,7 +67,7 @@ class TestContextManagerIntegration:
         finally:
             Config.set("memory_dir", None)
         system_msg = llm.last_messages[0]
-        assert "已记录的信息" in system_msg.content
+        assert "记忆指引" in system_msg.content
         assert "用户: 张三" in system_msg.content
 
     def test_agent_context_strategy_does_not_break(self):

@@ -144,19 +144,19 @@ class TestContextManagerBuilder:
     def test_memories_in_system_prompt(self):
         """记忆应注入到 system prompt 中。"""
         import tempfile
-        from kocor.context.memory import MemoryManager
-        from kocor.context.types import MemoryItem
+        from kocor.memory.store import MemoryStore
 
         mem_dir = tempfile.mkdtemp()
-        memory = MemoryManager(memory_dir=mem_dir)
-        memory.save(MemoryItem(
-            name="user-name", description="用户名", content="用户: 张三", memory_type="user",
-        ))
+        memory = MemoryStore(memory_dir=mem_dir, memory_limit=2200, user_limit=1375, user_enabled=True)
+        # 预先写入一条记忆，再加载（冻结快照）
+        from pathlib import Path
+        Path(mem_dir, "USER.md").write_text("用户: 张三", encoding="utf-8")
+        memory.load_from_disk()
 
         ctx = ContextManager(
             tools=ToolRegistryStub(),
             memory=memory,
         )
         prompt = ctx._prompt_builder.build()
-        assert "已记录的信息" in prompt
+        assert "记忆指引" in prompt
         assert "用户: 张三" in prompt

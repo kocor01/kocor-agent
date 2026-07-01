@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
 
 from kocor.context.budget import TokenBudget
@@ -19,18 +19,6 @@ class ContextStrategy(Enum):
     DEFAULT = "default"
     SLIDING_WINDOW = "sliding"
     AGGRESSIVE = "aggressive"
-
-
-@dataclass
-class MemoryItem:
-    """单条持久记忆。"""
-
-    name: str
-    description: str
-    content: str
-    memory_type: str = "reference"
-    created_at: str = ""
-    updated_at: str = ""
 
 
 @dataclass

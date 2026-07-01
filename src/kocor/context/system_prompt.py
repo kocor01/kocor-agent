@@ -1,6 +1,6 @@
 """系统提示构建器。
 
-组装多层系统提示（L1 身份 + L2 项目指令 + L3 环境 + L4 记忆）。
+组装多层系统提示（L1 身份 + L2 项目指令 + L3 环境 + L4 记忆引导）。
 """
 
 from __future__ import annotations
@@ -35,16 +35,34 @@ def build_environment_info() -> str:
     return "\n".join(parts)
 
 
+_MEMORY_GUIDANCE = """## 记忆指引
+
+应该记忆的（优先级从高到低）：
+1. 用户偏好和纠正
+2. 环境事实（框架版本、项目约定、工具特性）
+3. 稳定的工作流约定
+
+禁止记忆的：
+- 任务进度、会话产出、临时 TODO
+- PR 编号、issue 编号、commit SHA
+- 7 天内会过时的内容
+
+格式要求：
+- ✅ User prefers concise responses（纯文本声明）
+- ❌ Always respond concisely（祈使句会被当指令执行）"""
+
+
 class SystemPromptBuilder:
     """多层系统提示构建器。
 
-    接收可选的记忆管理器，
+    接收可选的 MemoryStore，
     组装含 L1-L4 所有层的完整系统提示文本。
     """
 
     def __init__(self, memory: Any = None):
         self.identity_prompt = Config.get("default_system_prompt")
         self.memory = memory
+
     def build(self) -> str:
         """构建完整的系统提示文本。"""
         layers = []
@@ -60,13 +78,14 @@ class SystemPromptBuilder:
         # L3: 动态环境信息
         layers.append(self._build_environment_info())
 
-        # L4: 持久记忆（如有）
-        memories_text = self._build_memories_block()
-        if memories_text:
-            layers.append(memories_text)
+        # L4: 记忆指引 + 持久快照（如有）
+        if self.memory:
+            layers.append(_MEMORY_GUIDANCE)
+            memories_text = self._build_memories_block()
+            if memories_text:
+                layers.append(memories_text)
 
         return "\n\n---\n\n".join(layers)
-
 
     @staticmethod
     def _load_project_instructions(path: str = "KOCOR.md") -> str:
@@ -89,19 +108,8 @@ class SystemPromptBuilder:
         parts.append(f"操作系统: {platform.system()} {platform.release()}")
         return "\n".join(parts)
 
-    def _build_memories_block(self, max_items: int = 20) -> str:
-        """构建持久记忆文本块。"""
+    def _build_memories_block(self) -> str:
+        """构建持久记忆文本块（来自冻结快照）。"""
         if not self.memory:
             return ""
-
-        items = self.memory.list()[:max_items]
-        if not items:
-            return ""
-
-        lines = ["## 已记录的信息\n"]
-        for item in items:
-            lines.append(f"### {item.name}")
-            lines.append(item.content)
-            lines.append("")
-
-        return "\n".join(lines)
+        return self.memory.format_for_system_prompt()

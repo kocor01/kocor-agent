@@ -9,7 +9,7 @@ from typing import Iterator
 
 from kocor.config import Config
 from kocor.context.context_manager import ContextManager
-from kocor.context.memory import MemoryManager
+from kocor.memory.store import MemoryStore
 from kocor.harness.budget import IterationBudget
 from kocor.harness.event.event_manager import EventEmitter
 from kocor.hook.hook_manager import HookManager
@@ -52,15 +52,27 @@ class Agent:
         self.budget = budget or IterationBudget(max_iterations=self.max_iterations)
 
         # 上下文管理
-        memory: MemoryManager | None = None
-        memory_dir = Config.get("memory_dir") or None
-        if memory_dir:
-            memory = MemoryManager(memory_dir=memory_dir)
+        self._memory: MemoryStore | None = None
+        self._background_reviewer = None
+        self._turns_since_memory = 0
+        if Config.get("memory_enabled"):
+            memory_dir = Config.get("memory_dir") or None
+            if memory_dir:
+                self._memory = MemoryStore(
+                    memory_dir=memory_dir,
+                    memory_limit=Config.get("memory_char_limit"),
+                    user_limit=Config.get("user_char_limit"),
+                    user_enabled=Config.get("user_profile_enabled"),
+                )
+                self._memory.load_from_disk()
+                self.tool_manager.memory_store = self._memory
+                from kocor.memory.reviewer import BackgroundReviewer
+                self._background_reviewer = BackgroundReviewer(llm=self.llm, store=self._memory)
 
         # 运行时上下文管理器
         self.ctx = ContextManager(
             tools=self.tool_manager,
-            memory=memory,
+            memory=self._memory,
         )
 
         # ReAct 循环引擎
@@ -80,7 +92,9 @@ class Agent:
         """执行一次完整的 Agent 循环。"""
         if self.tool_manager.skill_manager and user_input.startswith("/"):
             return self._handle_slash_command(user_input)
-        return self.loop.run(user_input)
+        result = self.loop.run(user_input)
+        self._check_nudge()
+        return result
 
     def stream(self, user_input: str) -> Iterator[StreamChunk]:
         """流式执行 Agent 循环。"""
@@ -89,6 +103,7 @@ class Agent:
             yield StreamChunk(content=result, is_final=True)
             return
         yield from self.loop.stream(user_input)
+        self._check_nudge()
 
     def reset_conversation(self) -> None:
         """清空会话历史，开始新对话。"""
@@ -139,3 +154,15 @@ class Agent:
             if s.invoke_strategy in (InvokeStrategy.SLASH, InvokeStrategy.BOTH)
         ]
         return ", ".join(sorted(names))
+
+    # ── 记忆审查 ──
+
+    def _check_nudge(self) -> None:
+        """检查是否需要触发后台记忆审查。"""
+        if not self._background_reviewer:
+            return
+        self._turns_since_memory += 1
+        nudge_interval = Config.get("nudge_interval")
+        if self._turns_since_memory >= nudge_interval:
+            self._background_reviewer.review(self.ctx.session_history)
+            self._turns_since_memory = 0

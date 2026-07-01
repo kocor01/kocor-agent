@@ -60,8 +60,13 @@ class Config:
 
     # 上下文管理
     context_strategy: str = "default"       # 上下文策略（default / sliding / summary）
-    memory_dir: str = ".kocor/memories"                    # 记忆持久化目录（空=不持久化）
-    log_dir: str = "./log"                                 # 日志目录
+    memory_dir: str = ".kocor/memories"     # 记忆持久化目录
+    memory_enabled: bool = True             # 启用记忆功能
+    user_profile_enabled: bool = True       # 启用用户画像
+    memory_char_limit: int = 2200           # MEMORY.md 字符上限
+    user_char_limit: int = 1375             # USER.md 字符上限
+    nudge_interval: int = 10                # 每 N 轮触发后台记忆审查（0=禁用）
+    log_dir: str = "./log"                  # 日志目录
     context_max_tokens: int = 200_000       # 上下文最大 token 数
     context_summary_threshold: float = 0.70  # 触发摘要的上下文占用阈值 [0,1]
     context_truncate_threshold: float = 0.90  # 触发截断的上下文占用阈值 [0,1]
@@ -211,6 +216,33 @@ class Config:
         if not 0.0 <= context_truncate_threshold <= 1.0:
             raise ValueError(f"KOCOR_CONTEXT_TRUNCATE_THRESHOLD 必须在 [0, 1] 范围内，当前值: {context_truncate_threshold}")
 
+        memory_char_limit_raw = os.environ.get("KOCOR_MEMORY_CHAR_LIMIT", str(Config.memory_char_limit))
+        try:
+            memory_char_limit = int(memory_char_limit_raw)
+        except ValueError:
+            raise ValueError(f"KOCOR_MEMORY_CHAR_LIMIT 必须是整数: {memory_char_limit_raw}")
+        if memory_char_limit < 1:
+            raise ValueError(f"KOCOR_MEMORY_CHAR_LIMIT 必须 >= 1: {memory_char_limit}")
+
+        user_char_limit_raw = os.environ.get("KOCOR_USER_CHAR_LIMIT", str(Config.user_char_limit))
+        try:
+            user_char_limit = int(user_char_limit_raw)
+        except ValueError:
+            raise ValueError(f"KOCOR_USER_CHAR_LIMIT 必须是整数: {user_char_limit_raw}")
+        if user_char_limit < 1:
+            raise ValueError(f"KOCOR_USER_CHAR_LIMIT 必须 >= 1: {user_char_limit}")
+
+        memory_enabled = os.environ.get("KOCOR_MEMORY_ENABLED", str(Config.memory_enabled)).lower() in ("true", "1", "yes")
+        user_profile_enabled = os.environ.get("KOCOR_USER_PROFILE_ENABLED", str(Config.user_profile_enabled)).lower() in ("true", "1", "yes")
+
+        nudge_interval_raw = os.environ.get("KOCOR_NUDGE_INTERVAL", str(Config.nudge_interval))
+        try:
+            nudge_interval = int(nudge_interval_raw)
+        except ValueError:
+            raise ValueError(f"KOCOR_NUDGE_INTERVAL 必须是整数，当前值: '{nudge_interval_raw}'")
+        if nudge_interval < 0:
+            raise ValueError(f"KOCOR_NUDGE_INTERVAL 必须 >= 0，当前值: {nudge_interval}")
+
         return cls(
             provider=provider,
             max_iterations=max_iterations,
@@ -227,6 +259,11 @@ class Config:
             anthropic_base_url=os.environ.get("ANTHROPIC_BASE_URL", Config.anthropic_base_url),
             context_strategy=os.environ.get("KOCOR_CONTEXT_STRATEGY", Config.context_strategy),
             memory_dir=_resolve_data_path(os.environ.get("KOCOR_MEMORY_DIR", Config.memory_dir)),
+            memory_enabled=memory_enabled,
+            user_profile_enabled=user_profile_enabled,
+            memory_char_limit=memory_char_limit,
+            user_char_limit=user_char_limit,
+            nudge_interval=nudge_interval,
             log_dir=_resolve_data_path(os.environ.get("KOCOR_LOG_DIR", Config.log_dir)),
             context_max_tokens=context_max_tokens,
             context_summary_threshold=context_summary_threshold,

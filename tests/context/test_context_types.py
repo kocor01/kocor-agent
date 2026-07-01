@@ -6,7 +6,6 @@ from kocor.context.budget import TokenBudget
 from kocor.context.context_manager import ContextManager
 from kocor.context.types import (
     ContextStrategy,
-    MemoryItem,
     SummaryNode,
 )
 from kocor.llm_provider.message import Message
@@ -72,37 +71,6 @@ class TestTokenBudget:
         assert budget.usage_ratio == 0.0
         assert budget.should_summarize() is False
         assert budget.should_truncate() is False
-
-
-class TestMemoryItem:
-    """测试 MemoryItem 数据模型。"""
-
-    def test_minimal_construction(self):
-        item = MemoryItem(
-            name="user-name",
-            description="用户的名称",
-            content="用户名: 张三",
-            memory_type="user",
-        )
-        assert item.name == "user-name"
-        assert item.description == "用户的名称"
-        assert item.content == "用户名: 张三"
-        assert item.memory_type == "user"
-        assert item.created_at == ""
-        assert item.updated_at == ""
-
-    def test_all_fields(self):
-        item = MemoryItem(
-            name="test-item",
-            description="测试",
-            content="测试内容",
-            memory_type="reference",
-            created_at="2026-01-01T00:00:00",
-            updated_at="2026-06-20T00:00:00",
-        )
-        assert item.name == "test-item"
-        assert item.memory_type == "reference"
-        assert item.created_at == "2026-01-01T00:00:00"
 
 
 class TestSummaryNode:

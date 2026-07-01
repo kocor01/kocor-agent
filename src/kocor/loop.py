@@ -280,6 +280,13 @@ class Loop:
             self._consecutive_duplicate_count = 1
             self._last_tool_call_signature = combined
 
+        # 第 2 次重复时注入显式警告，让模型在下一轮看到并停止
+        if self._consecutive_duplicate_count == 2:
+            self.ctx.append(Message(
+                role="user",
+                content="[SYSTEM] 检测到重复的工具调用。你正在重复调用相同的工具，请立即停止并回复用户。",
+            ))
+
         return self._consecutive_duplicate_count >= 3
 
     # ── 辅助方法 ──
