@@ -16,8 +16,13 @@ import sys
 from io import StringIO
 from typing import Any, Iterator
 
+from rich import box
 from rich.console import Console
 from rich.markdown import Markdown
+from rich.panel import Panel
+from rich.text import Text
+
+from kocor import __version__
 
 from kocor.agent import Agent
 from kocor.config import Config
@@ -229,6 +234,65 @@ class _StreamFormatter:
             print(f"• {tc.function.name}({tc.function.arguments})")
 
 
+def _print_welcome(
+    session_manager: Any = None,
+    skill_manager: Any = None,
+) -> None:
+    """打印彩色启动欢迎界面，包含品牌头部、会话信息和 Slash 命令。"""
+    console = Console()
+
+    # ── 品牌头部（使用 Rich Panel + 圆角边框 + 青色主题） ──
+    header = Text()
+    header.append("⚡ Kocor Agent", style="bold cyan")
+    header.append(" - ")
+    header.append("小而美的 LLM 自主 Agent 助手", style="italic dim white")
+    header.append("\n")
+    header.append(f" V{__version__}", style="yellow")
+
+    console.print(Panel(
+        header,
+        box=box.ROUNDED,
+        border_style="cyan",
+        padding=(1, 2),
+    ))
+
+    # ── 会话信息 ──
+    if session_manager:
+        entry = session_manager.get_or_create_session()
+        if entry.was_auto_reset:
+            reason_map = {"idle": "空闲超时", "daily": "每日重置"}
+            reason = reason_map.get(entry.auto_reset_reason or "", entry.auto_reset_reason or "")
+            print(f" ⏳  会话已重置（{reason}）")
+        elif entry.message_count > 0:
+            title = f"「{entry.title}」" if entry.title else ""
+            print(f"")
+            print(f" 📋  继续上次会话 {title} · ID: {entry.session_id} · {entry.message_count} 条消息")
+        else:
+            print(f"")
+            print(f" 📋  新会话")
+        print()
+
+    # ── Slash 命令列表 ──
+    if skill_manager:
+        skills = skill_manager.list_skills(enabled_only=True)
+        slash_names = sorted(
+            f"/{s.name}" for s in skills
+            if s.invoke_strategy in (InvokeStrategy.SLASH, InvokeStrategy.BOTH)
+        )
+        if slash_names:
+            cmd = Text(" 快速命令:  ", style="bold")
+            for i, name in enumerate(slash_names):
+                if i > 0:
+                    cmd.append("  ", style="dim")
+                cmd.append(name, style="bold green")
+            console.print(cmd)
+
+    # ── 底部提示 ──
+    print(f" {'─' * max(4, W - 2)}")
+    print(" 输入 exit 或 Ctrl+C 退出")
+    print()
+
+
 def _print_stream_formatted(chunks: Iterator[StreamChunk]) -> None:
     formatter = _StreamFormatter()
     for chunk in chunks:
@@ -282,20 +346,9 @@ def parse_args():
 def _repl_loop(
     agent: Agent,
     stream_enabled: bool,
-    session_manager: Any = None,
 ) -> None:
     """交互式 REPL 循环。"""
-    # 会话启动提示
-    if session_manager:
-        entry = session_manager.get_or_create_session()
-        if entry.was_auto_reset:
-            print(f"⏳ 新会话（上次会话因 {entry.auto_reset_reason} 已过期）")
-        elif entry.message_count > 0:
-            title = f"「{entry.title}」" if entry.title else ""
-            print(f"📋 继续上次会话 {title}（{entry.message_count} 条消息） ID: {entry.session_id}")
-        else:
-            print("🆕 新会话")
-        print()
+    # 会话启动展示已由 _print_welcome 在 main 中完成
 
     while True:
         try:
@@ -388,18 +441,13 @@ def main() -> None:
     # 检测 REPL 模式：--repl 标志，或无参数且 stdin 是终端时默认进入
     is_repl = repl_enabled or (not user_args and sys.stdin.isatty())
     if is_repl:
+        print()
         try:
             import readline  # 提供行编辑和上下键历史
         except ImportError:
             pass
-        print("Kocor Agent — 输入 exit 或 Ctrl+C 退出")
-        if toolManager.skill_manager:
-            skills = toolManager.skill_manager.list_skills(enabled_only=True)
-            slash_names = [f"/{s.name}" for s in skills
-                           if s.invoke_strategy in (InvokeStrategy.SLASH, InvokeStrategy.BOTH)]
-            print(f"Slash 命令: {', '.join(sorted(slash_names))}")
-        print()
-        _repl_loop(agent, stream_enabled, session_manager)
+        _print_welcome(session_manager, toolManager.skill_manager)
+        _repl_loop(agent, stream_enabled)
         return
 
     if user_args:

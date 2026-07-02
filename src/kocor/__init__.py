@@ -6,7 +6,7 @@ import io
 import os
 import sys
 
-__version__ = "0.1.0"
+__version__ = "0.0.1"
 
 # ── 项目全局 UTF-8 模式 ──────────────────────────────────────────────────
 # 所有文件 I/O 和子进程输出统一使用 UTF-8，避免 Windows GBK 编解码错误。
