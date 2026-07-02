@@ -51,6 +51,9 @@ class Loop:
         self._consecutive_duplicate_count = 0
         self._last_tool_call_signature: str | None = None
 
+        # 停止标志
+        self._stop_requested = False
+
     # ── 公开方法 ──
 
     def run(self, user_input: str) -> str:
@@ -70,49 +73,60 @@ class Loop:
 
     # ── 核心循环 ──
 
+    def stop(self) -> None:
+        """请求在当前迭代边界停止 ReAct 循环。"""
+        self._stop_requested = True
+
     def _reset_state(self) -> None:
         self.ctx.reset()
         self.budget.reset()
         self._consecutive_duplicate_count = 0
         self._last_tool_call_signature = None
+        self._stop_requested = False
 
     def _run_messages(self) -> str:
         """运行 ReAct 循环（消息已由 build_initial_context 设置）。"""
 
-        while not self.budget.exhausted:
-            self.ctx.advance_iteration()
-            self.budget.used_iterations = self.ctx.iteration
+        try:
+            while not self.budget.exhausted:
+                if self._stop_requested:
+                    return self._stopped_message()
 
-            self._emit(EventType.PRE_GENERATE, iteration=self.ctx.iteration, messages=self.ctx.messages,
-                       tools=self.tool_manager.get_definitions())
-            self._run_hooks(HookPoint.PRE_GENERATE)
+                self.ctx.advance_iteration()
+                self.budget.used_iterations = self.ctx.iteration
 
-            response = self.llm.generate(
-                self.ctx.messages,
-                tools=self.tool_manager.get_definitions(),
-            )
-            self.ctx.append(response)
+                self._emit(EventType.PRE_GENERATE, iteration=self.ctx.iteration, messages=self.ctx.messages,
+                           tools=self.tool_manager.get_definitions())
+                self._run_hooks(HookPoint.PRE_GENERATE)
 
-            self._emit(EventType.POST_GENERATE, iteration=self.ctx.iteration, response=response)
-            self._run_hooks(HookPoint.POST_GENERATE)
+                response = self.llm.generate(
+                    self.ctx.messages,
+                    tools=self.tool_manager.get_definitions(),
+                )
+                self.ctx.append(response)
 
-            if not response.tool_calls:
-                return response.content or ""
+                self._emit(EventType.POST_GENERATE, iteration=self.ctx.iteration, response=response)
+                self._run_hooks(HookPoint.POST_GENERATE)
 
-            if self._check_repetition(response):
-                self._emit(EventType.ON_BUDGET_EXHAUSTED, iteration=self.ctx.iteration,
-                           max_iterations=self.budget.max_iterations, reason="duplicate_tool_calls")
-                self._run_hooks(HookPoint.ON_BUDGET_EXHAUSTED)
-                return self._stuck_in_loop_message()
+                if not response.tool_calls:
+                    return response.content or ""
 
-            for tool_call in response.tool_calls:
-                result_msg = self._execute_one_tool(tool_call)
-                if result_msg is not None:
-                    self.ctx.append(result_msg)
+                if self._check_repetition(response):
+                    self._emit(EventType.ON_BUDGET_EXHAUSTED, iteration=self.ctx.iteration,
+                               max_iterations=self.budget.max_iterations, reason="duplicate_tool_calls")
+                    self._run_hooks(HookPoint.ON_BUDGET_EXHAUSTED)
+                    return self._stuck_in_loop_message()
 
-            # 工具结果已追加，压缩上下文供下一轮迭代使用
-            self.ctx.usage = response.usage
-            self.ctx.compress_if_needed()
+                for tool_call in response.tool_calls:
+                    result_msg = self._execute_one_tool(tool_call)
+                    if result_msg is not None:
+                        self.ctx.append(result_msg)
+
+                # 工具结果已追加，压缩上下文供下一轮迭代使用
+                self.ctx.usage = response.usage
+                self.ctx.compress_if_needed()
+        except KeyboardInterrupt:
+            return self._stopped_message()
 
         self._emit(EventType.ON_BUDGET_EXHAUSTED, iteration=self.ctx.iteration,
                        max_iterations=self.budget.max_iterations)
@@ -122,73 +136,83 @@ class Loop:
     def _stream_messages(self) -> Iterator[StreamChunk]:
         """以流模式运行 ReAct 循环（消息已由 build_initial_context 设置）。"""
 
-        while not self.budget.exhausted:
-            self.ctx.advance_iteration()
-            self.budget.used_iterations = self.ctx.iteration
+        try:
+            while not self.budget.exhausted:
+                if self._stop_requested:
+                    msg = self._stopped_message()
+                    yield StreamChunk(content="\n⏹️ " + msg, is_final=True)
+                    return
 
-            self._emit(EventType.PRE_GENERATE, iteration=self.ctx.iteration, messages=self.ctx.messages,
-                       tools=self.tool_manager.get_definitions())
-            self._run_hooks(HookPoint.PRE_GENERATE)
+                self.ctx.advance_iteration()
+                self.budget.used_iterations = self.ctx.iteration
 
-            accumulated_tool_calls = []
-            final_content = ""
-            final_reasoning = ""
-            streaming_usage = None
+                self._emit(EventType.PRE_GENERATE, iteration=self.ctx.iteration, messages=self.ctx.messages,
+                           tools=self.tool_manager.get_definitions())
+                self._run_hooks(HookPoint.PRE_GENERATE)
 
-            for chunk in self.llm.stream(
-                self.ctx.messages,
-                tools=self.tool_manager.get_definitions(),
-            ):
-                if chunk.tool_calls:
-                    for tc in chunk.tool_calls:
-                        if not any(t.id == tc.id for t in accumulated_tool_calls):
-                            accumulated_tool_calls.append(tc)
-                if chunk.content:
-                    final_content += chunk.content
-                if chunk.reasoning:
-                    final_reasoning += chunk.reasoning
-                if chunk.usage:
-                    streaming_usage = chunk.usage
-                if chunk.usage and not chunk.content and not chunk.reasoning and not chunk.tool_calls:
-                    continue
-                yield chunk
+                accumulated_tool_calls = []
+                final_content = ""
+                final_reasoning = ""
+                streaming_usage = None
 
-            response = Message(
-                role="assistant",
-                content=final_content,
-                reasoning=final_reasoning,
-                tool_calls=accumulated_tool_calls or None,
-                usage=streaming_usage,
-            )
+                for chunk in self.llm.stream(
+                    self.ctx.messages,
+                    tools=self.tool_manager.get_definitions(),
+                ):
+                    if chunk.tool_calls:
+                        for tc in chunk.tool_calls:
+                            if not any(t.id == tc.id for t in accumulated_tool_calls):
+                                accumulated_tool_calls.append(tc)
+                    if chunk.content:
+                        final_content += chunk.content
+                    if chunk.reasoning:
+                        final_reasoning += chunk.reasoning
+                    if chunk.usage:
+                        streaming_usage = chunk.usage
+                    if chunk.usage and not chunk.content and not chunk.reasoning and not chunk.tool_calls:
+                        continue
+                    yield chunk
 
-            self._emit(EventType.POST_GENERATE, iteration=self.ctx.iteration,
-                       response=response)
-            self._run_hooks(HookPoint.POST_GENERATE)
+                response = Message(
+                    role="assistant",
+                    content=final_content,
+                    reasoning=final_reasoning,
+                    tool_calls=accumulated_tool_calls or None,
+                    usage=streaming_usage,
+                )
 
-            self.ctx.append(response)
+                self._emit(EventType.POST_GENERATE, iteration=self.ctx.iteration,
+                           response=response)
+                self._run_hooks(HookPoint.POST_GENERATE)
 
-            if not accumulated_tool_calls:
-                return
+                self.ctx.append(response)
 
-            if self._check_repetition(response):
-                self._emit(EventType.ON_BUDGET_EXHAUSTED, iteration=self.ctx.iteration,
-                           max_iterations=self.budget.max_iterations, reason="duplicate_tool_calls")
-                self._run_hooks(HookPoint.ON_BUDGET_EXHAUSTED)
-                yield StreamChunk(content=self._stuck_in_loop_message(), is_final=True)
-                return
+                if not accumulated_tool_calls:
+                    return
 
-            for tool_call in accumulated_tool_calls:
-                result_msg = self._execute_one_tool(tool_call)
-                if result_msg is not None:
-                    self.ctx.append(result_msg)
-                    yield StreamChunk(
-                        tool_result=result_msg,
-                        is_final=False,
-                    )
+                if self._check_repetition(response):
+                    self._emit(EventType.ON_BUDGET_EXHAUSTED, iteration=self.ctx.iteration,
+                               max_iterations=self.budget.max_iterations, reason="duplicate_tool_calls")
+                    self._run_hooks(HookPoint.ON_BUDGET_EXHAUSTED)
+                    yield StreamChunk(content=self._stuck_in_loop_message(), is_final=True)
+                    return
 
-            # 工具结果已追加，压缩上下文供下一轮迭代使用
-            self.ctx.usage = streaming_usage
-            self.ctx.compress_if_needed()
+                for tool_call in accumulated_tool_calls:
+                    result_msg = self._execute_one_tool(tool_call)
+                    if result_msg is not None:
+                        self.ctx.append(result_msg)
+                        yield StreamChunk(
+                            tool_result=result_msg,
+                            is_final=False,
+                        )
+
+                # 工具结果已追加，压缩上下文供下一轮迭代使用
+                self.ctx.usage = streaming_usage
+                self.ctx.compress_if_needed()
+        except KeyboardInterrupt:
+            msg = self._stopped_message()
+            yield StreamChunk(content="\n⏹️ " + msg, is_final=True)
+            return
 
         self._emit(EventType.ON_BUDGET_EXHAUSTED, iteration=self.ctx.iteration,
                        max_iterations=self.budget.max_iterations)
@@ -296,6 +320,10 @@ class Loop:
 
     def _stuck_in_loop_message(self) -> str:
         return f"Agent 在第 {self.ctx.iteration} 次迭代检测到重复工具调用（连续 {self._consecutive_duplicate_count} 次），已提前终止。"
+
+    def _stopped_message(self) -> str:
+        self._stop_requested = False
+        return f"Agent 在第 {self.ctx.iteration} 次迭代被终止。"
 
     def _run_hooks(self, point: HookPoint, **extra) -> list[HookResult]:
         ctx = HookContext(

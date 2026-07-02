@@ -10,6 +10,8 @@
 from __future__ import annotations
 
 import argparse
+import os
+import re
 import sys
 from io import StringIO
 from typing import Any, Iterator
@@ -54,6 +56,7 @@ class _StreamFormatter:
         self._content_buffer: str = ""
         self._in_code_block: bool = False
         self._code_block_buffer: str = ""
+        self._block_buffer: str = ""
 
     def _round_header(self, n: int) -> None:
         title = f"⚡ 第 {n} 次请求"
@@ -67,12 +70,17 @@ class _StreamFormatter:
             return
         # 渲染到 StringIO，再通过 print() 输出（保持与 mock-print 测试兼容）
         buf = StringIO()
-        Console(file=buf).print(Markdown(text))
+        Console(file=buf, width=self.width).print(Markdown(text))
         rendered = buf.getvalue()
-        if rendered.endswith("\n"):
-            rendered = rendered[:-1]
         if rendered:
             print(rendered, end="", flush=True)
+
+    def _flush_block(self) -> None:
+        """刷新并渲染已累积的文本块（表格、段落等）。"""
+        block = self._block_buffer.strip()
+        self._block_buffer = ""
+        if block:
+            self._render_markdown(block)
 
     def handle_chunk(self, chunk) -> None:
         if not chunk.tool_result and not self._in_round():
@@ -119,7 +127,7 @@ class _StreamFormatter:
         # 累积内容到缓冲区
         self._content_buffer += content
 
-        # 按行拆分处理：普通行即时渲染，代码块累积到闭合后整块渲染
+        # 按行拆分处理：累积文本块，按空行边界整体渲染（支持表格等跨行结构）
         while "\n" in self._content_buffer:
             line, self._content_buffer = self._content_buffer.split("\n", 1)
             line = line.rstrip()
@@ -127,12 +135,16 @@ class _StreamFormatter:
             # 检测代码块边界（``` 开头）
             if line.startswith("```"):
                 if self._in_code_block:
+                    # 代码块闭合前先刷新未闭合的文本块
+                    self._flush_block()
                     # 代码块闭合——整块渲染
-                    self._code_block_buffer += line  # 保留闭合标记
+                    self._code_block_buffer += line
                     self._render_markdown(self._code_block_buffer)
                     self._code_block_buffer = ""
                     self._in_code_block = False
                 else:
+                    # 代码块开始前先刷新前面的文本块
+                    self._flush_block()
                     # 代码块开始——进入批模式
                     self._in_code_block = True
                     self._code_block_buffer = line + "\n"
@@ -140,7 +152,19 @@ class _StreamFormatter:
 
             if self._in_code_block:
                 self._code_block_buffer += line + "\n"
-            elif line:
+            elif line == "":
+                # 空行 = 块边界，渲染已累积的表格块
+                self._flush_block()
+            elif re.fullmatch(r"[-*_]{3,}\s*", line):
+                # Markdown 水平线（--- / *** / ___）→ 输出简洁分隔线
+                self._flush_block()
+                print(f"{'─' * max(4, self.width)}")
+            elif line.startswith("|"):
+                # 表格行——累积到缓冲区，等待整表渲染
+                self._block_buffer += line + "\n"
+            else:
+                # 普通行——先刷新未闭合的表格块，再即时渲染
+                self._flush_block()
                 self._render_markdown(line)
 
     def _handle_tool_calls(self, chunk) -> None:
@@ -175,6 +199,7 @@ class _StreamFormatter:
         if not chunk.is_final:
             return
         # 刷新残留缓冲区中的内容
+        self._flush_block()
         if self._content_buffer.strip():
             self._render_markdown(self._content_buffer)
         self._content_buffer = ""
@@ -192,6 +217,7 @@ class _StreamFormatter:
             self.tool_result_idx = 0
 
     def flush_remaining(self) -> None:
+        self._flush_block()
         if self._content_buffer.strip():
             self._render_markdown(self._content_buffer)
             self._content_buffer = ""
@@ -266,17 +292,17 @@ def _repl_loop(
             print(f"⏳ 新会话（上次会话因 {entry.auto_reset_reason} 已过期）")
         elif entry.message_count > 0:
             title = f"「{entry.title}」" if entry.title else ""
-            print(f"📋 继续上次会话 {title}（{entry.message_count} 条消息）")
+            print(f"📋 继续上次会话 {title}（{entry.message_count} 条消息） ID: {entry.session_id}")
         else:
             print("🆕 新会话")
         print()
 
     while True:
         try:
-            user_input = input("\n>>> ").strip()
+            user_input = input("\n\033[1;36m>>> \033[0m").strip()
         except (EOFError, KeyboardInterrupt):
             print()
-            break
+            os._exit(0)
 
         if not user_input:
             continue
@@ -284,11 +310,15 @@ def _repl_loop(
             break
 
         print()
-        if stream_enabled:
-            _print_stream_formatted(agent.stream(user_input))
-        else:
-            result = agent.run(user_input)
-            print(result)
+        try:
+            if stream_enabled:
+                _print_stream_formatted(agent.stream(user_input))
+            else:
+                result = agent.run(user_input)
+                print(result)
+        except KeyboardInterrupt:
+            agent.stop()
+            print("\n⏹️  Agent 已终止，你可以继续输入新指令。")
         print()
 
 

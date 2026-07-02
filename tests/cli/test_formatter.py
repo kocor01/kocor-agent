@@ -286,3 +286,42 @@ class TestRoundReset:
         output = _strip_ansi(buf.getvalue())
         assert "Round 1" in output
         assert "Round 2" in output
+
+
+class TestTableRendering:
+    """Markdown 表格渲染。"""
+
+    def test_table_renders_as_single_block(self):
+        """表格各行列（| 开头）应整体渲染，不分行割裂。"""
+        f = _StreamFormatter()
+        buf = io.StringIO()
+        with patch("sys.stdout", buf):
+            f.handle_chunk(StreamChunk(content="| 城市 | 天气 | 温度 |\n", is_final=False))
+            f.handle_chunk(StreamChunk(content="|------|------|------|\n", is_final=False))
+            f.handle_chunk(StreamChunk(content="| 北京 | ☀️ 晴 | 25°C |\n", is_final=False))
+            f.handle_chunk(StreamChunk(content="| 上海 | 🌧️ 雨 | 22°C |\n", is_final=False))
+            f.handle_chunk(StreamChunk(content="", is_final=True))
+        output = _strip_ansi(buf.getvalue())
+        # 验证所有表格内容都在输出中
+        assert "北京" in output
+        assert "上海" in output
+        assert "25°C" in output
+        assert "22°C" in output
+
+    def test_mixed_paragraph_and_table(self):
+        """段落文字应以流式即时渲染，表格行应累积渲染。"""
+        f = _StreamFormatter()
+        buf = io.StringIO()
+        with patch("sys.stdout", buf):
+            f.handle_chunk(StreamChunk(content="天气情况：\n\n", is_final=False))
+            f.handle_chunk(StreamChunk(content="| 城市 | 温度 |\n", is_final=False))
+            f.handle_chunk(StreamChunk(content="|------|------|\n", is_final=False))
+            f.handle_chunk(StreamChunk(content="| 北京 | 25°C |\n", is_final=False))
+            f.handle_chunk(StreamChunk(content="\n\n", is_final=False))
+            f.handle_chunk(StreamChunk(content="以上就是天气数据。", is_final=True))
+        output = _strip_ansi(buf.getvalue())
+        # 段落内容和表格内容都应在输出中
+        assert "天气情况" in output
+        assert "北京" in output
+        assert "25°C" in output
+        assert "以上就是天气数据" in output

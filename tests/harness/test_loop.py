@@ -494,3 +494,129 @@ class TestDuplicateToolCallDetection:
         assert agent.ctx.iteration == 3
 
 
+# ── 停止/中断机制 ──
+
+
+class TestAgentStop:
+    """测试 Agent 停止/中断机制。"""
+
+    def test_stop_flag_stops_loop(self):
+        """通过钩子触发 stop() 后循环停止，且未触达预算上限。"""
+        tool_response = Message(
+            role="assistant",
+            content="working...",
+            tool_calls=[ToolCall(id="call_1", function=FunctionCall(name="read_file", arguments='{"path": "x.txt"}'))],
+        )
+        llm = MockLLM(responses=[tool_response] * 10)
+        hook_manager = HookManager()
+        agent = Agent(
+            llm=llm,
+            tool_manager=MockToolRegistry(),
+            permission_mgr=PermissionManager(policy=PermissionManager.POLICY_PERMISSIVE),
+            hook_manager=hook_manager,
+            budget=IterationBudget(max_iterations=10),
+        )
+
+        triggered = [False]
+
+        class StopHook:
+            hook_point = HookPoint.POST_TOOL
+
+            def run(self, ctx):
+                if not triggered[0]:
+                    triggered[0] = True
+                    agent.stop()
+                return HookResult(action=HookAction.CONTINUE)
+
+        hook_manager.register(StopHook())
+        result = agent.run("do work")
+
+        # 应在预算耗尽前停止
+        assert "终止" in result or "已停止" in result or "stop" in result.lower()
+        assert agent.ctx.iteration < 10
+        # 停止后 agent 应可再次运行
+        assert agent.loop._stop_requested is False
+
+    def test_agent_stop_does_not_break_next_run(self):
+        """stop() 不会影响下一次正常执行。"""
+        llm = MockLLM(responses=[Message(role="assistant", content="第二次运行正常")])
+        agent = Agent(
+            llm=llm,
+            tool_manager=MockToolRegistry(),
+            permission_mgr=PermissionManager(policy=PermissionManager.POLICY_PERMISSIVE),
+        )
+        # 先 stop 再 run
+        agent.stop()
+        result = agent.run("hi")
+        assert result == "第二次运行正常"
+
+    def test_stop_flag_stops_stream(self):
+        """流模式也受 stop() 控制。"""
+        tool_response = Message(
+            role="assistant",
+            content="working...",
+            tool_calls=[ToolCall(id="call_1", function=FunctionCall(name="read_file", arguments='{"path": "x.txt"}'))],
+        )
+        llm = MockLLM(responses=[tool_response] * 10)
+        hook_manager = HookManager()
+        agent = Agent(
+            llm=llm,
+            tool_manager=MockToolRegistry(),
+            permission_mgr=PermissionManager(policy=PermissionManager.POLICY_PERMISSIVE),
+            hook_manager=hook_manager,
+            budget=IterationBudget(max_iterations=10),
+        )
+
+        triggered = [False]
+
+        class StopHook:
+            hook_point = HookPoint.POST_TOOL
+
+            def run(self, ctx):
+                if not triggered[0]:
+                    triggered[0] = True
+                    agent.stop()
+                return HookResult(action=HookAction.CONTINUE)
+
+        hook_manager.register(StopHook())
+        chunks = list(agent.stream("do work"))
+        final_chunks = [c for c in chunks if c.is_final]
+        assert final_chunks
+        # 最后一个 is_final chunk 应包含终止信息
+        assert "终止" in final_chunks[-1].content or "已停止" in final_chunks[-1].content
+        assert agent.loop._stop_requested is False
+
+    def test_keyboard_interrupt_in_loop(self):
+        """KeyboardInterrupt 在循环中被捕获并返回终止信息。"""
+
+        class InterruptingLLM(MockLLM):
+            def generate(self, messages, tools=None):
+                raise KeyboardInterrupt()
+
+        agent = Agent(
+            llm=InterruptingLLM(responses=[]),
+            tool_manager=MockToolRegistry(),
+            permission_mgr=PermissionManager(policy=PermissionManager.POLICY_PERMISSIVE),
+        )
+        result = agent.run("hi")
+        assert "终止" in result or "中断" in result or "interrupt" in result.lower()
+
+    def test_keyboard_interrupt_in_stream(self):
+        """流模式下 KeyboardInterrupt 被捕获。"""
+
+        class InterruptingStreamLLM(MockLLM):
+            def generate(self, messages, tools=None):
+                raise KeyboardInterrupt()
+
+            def stream(self, messages, tools=None):
+                raise KeyboardInterrupt()
+
+        agent = Agent(
+            llm=InterruptingStreamLLM(responses=[]),
+            tool_manager=MockToolRegistry(),
+            permission_mgr=PermissionManager(policy=PermissionManager.POLICY_PERMISSIVE),
+        )
+        chunks = list(agent.stream("hi"))
+        final_chunks = [c for c in chunks if c.is_final]
+        assert final_chunks
+        assert "终止" in final_chunks[0].content or "中断" in final_chunks[0].content

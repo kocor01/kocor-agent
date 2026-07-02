@@ -98,6 +98,10 @@ class Agent:
 
     # ── 公开方法 ──
 
+    def stop(self) -> None:
+        """请求在当前迭代边界停止 ReAct 循环。"""
+        self.loop.stop()
+
     def run(self, user_input: str) -> str:
         """执行一次完整的 Agent 循环。"""
         if user_input.startswith("/"):
