@@ -12,6 +12,7 @@ from __future__ import annotations
 import argparse
 import os
 import re
+import shutil
 import sys
 from io import StringIO
 from typing import Any, Iterator
@@ -42,7 +43,16 @@ from kocor.harness.logger import setup_logger
 # 可选的会话管理
 from kocor.session import SessionManager, SessionResetPolicy, SessionStore
 
-W = 58
+def _detect_width() -> int:
+    """检测终端宽度，设置合理的下限和上限。"""
+    try:
+        cols = shutil.get_terminal_size().columns
+        return max(58, min(cols, 150))
+    except Exception:
+        return 58
+
+
+W = _detect_width()
 
 
 class _StreamFormatter:
@@ -67,6 +77,17 @@ class _StreamFormatter:
         title = f"⚡ 第 {n} 次请求"
         fill = self.width - 2 - len(title)
         print(f"\n── {title} {'─' * max(0, fill)}")
+
+    @staticmethod
+    def _console() -> Console:
+        """缓存一个共享 Console 实例，避免反复构造。"""
+        if not hasattr(_StreamFormatter, "_console_inst"):
+            _StreamFormatter._console_inst = Console()
+        return _StreamFormatter._console_inst
+
+    def _sep(self, style: str = "dim") -> None:
+        """打印一条自适应宽度的彩色分隔线。"""
+        self._console().print(Text("─" * self.width, style=style))
 
     def _render_markdown(self, text: str) -> None:
         """将已完整的段落文本通过 print() 输出（内部用 rich Markdown 渲染）。"""
@@ -110,7 +131,7 @@ class _StreamFormatter:
             return
         if not self.has_reasoning:
             print("\n\U0001f9e0 思维过程")
-            print(f"{'─' * self.width}")
+            self._sep("dim yellow")
             self.has_reasoning = True
         print(chunk.reasoning, end="", flush=True)
 
@@ -125,7 +146,7 @@ class _StreamFormatter:
             return
         if not self.has_content:
             print("\n\U0001f4ac 回答内容")
-            print(f"{'─' * self.width}")
+            self._sep("dim cyan")
             self.has_content = True
             self._content_has_printed_any = True
 
@@ -163,7 +184,7 @@ class _StreamFormatter:
             elif re.fullmatch(r"[-*_]{3,}\s*", line):
                 # Markdown 水平线（--- / *** / ___）→ 输出简洁分隔线
                 self._flush_block()
-                print(f"{'─' * max(4, self.width)}")
+                self._sep("dim white")
             elif line.startswith("|"):
                 # 表格行——累积到缓冲区，等待整表渲染
                 self._block_buffer += line + "\n"
@@ -182,7 +203,7 @@ class _StreamFormatter:
                 seen_ids.add(tc.id)
         if not self.has_tool_section and not chunk.tool_result:
             print("\n\U0001f527 工具调用")
-            print(f"{'─' * self.width}")
+            self._sep("dim green")
             self.has_tool_section = True
 
     def _handle_tool_results(self, chunk) -> None:
@@ -196,7 +217,7 @@ class _StreamFormatter:
             if self.tool_result_idx > 0:
                 print()
             print(f"{self.tool_result_idx + 1:2}. {tc.function.name}({tc.function.arguments})")
-            print(f"{'─' * (self.width - 4)}")
+            self._sep("dim magenta")
             print(f"{content}")
             self.tool_result_idx += 1
 
@@ -288,7 +309,7 @@ def _print_welcome(
             console.print(cmd)
 
     # ── 底部提示 ──
-    print(f" {'─' * max(4, W - 2)}")
+    console.print(Text("─" * max(4, W - 2), style="dim"))
     print(" 输入 exit 或 Ctrl+C 退出")
     print()
 

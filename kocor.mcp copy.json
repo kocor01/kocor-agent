@@ -1,0 +1,41 @@
+{
+  "mcpServers": {
+    "fs": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-filesystem",
+        "."
+      ],
+      "env": {}
+    },
+    "fetch": {
+      "command": "uvx",
+      "args": [
+        "mcp-server-fetch"
+      ]
+    },
+    "bing-search": {
+      "command": "cmd",
+      "args": [
+        "/c",
+        "npx",
+        "-y",
+        "bing-cn-mcp"
+      ]
+    }
+  },
+
+  "permissions": {
+    "fs": {
+      "safe": ["mcp_fs_read_file", "mcp_fs_read_text_file"],
+      "dangerous": ["mcp_fs_write_file"]
+    },
+    "fetch": {
+      "safe": ["mcp_fetch_fetch"]
+    },
+    "bing-search": {
+      "safe": ["mcp_bing_search_bing_search", "mcp_bing_search_crawl_webpage"]
+    }
+  }
+}
