@@ -10,6 +10,7 @@ from kocor.context.strategies import ContextStrategyApplier
 from kocor.context.types import ContextStrategy
 from kocor.llm_provider.llm_manager import LlmManager
 from kocor.llm_provider.message import Message
+from kocor.tools.toolset.todo_tool import TodoStore
 
 
 class FakeToolRegistry:

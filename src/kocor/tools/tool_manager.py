@@ -32,12 +32,15 @@ class ToolManager:
         from kocor.tools.toolset.bash_tool import BashTool, ProcessTool
 
         self.memory_store = None
+        self.todo_store = None
         builtin_tools = [ReadFile, WriteFile, PatchFile, SearchFiles, RunPython, BashTool, ProcessTool]
         for tools in builtin_tools:
             self.register(tools.NAME, tools.DESCRIPTION, tools.PARAMETERS, tools.handler, tools.SAFETY_LEVEL)
 
         # memory 工具需要 MemoryStore，handler 延迟读取 self.memory_store
         self._register_memory_tool()
+        # todo 工具需要 TodoStore，handler 延迟读取 self.todo_store
+        self._register_todo_tool()
 
     def _register_memory_tool(self) -> None:
         """注册 memory 工具（依赖 self.memory_store，可为 None）。"""
@@ -46,6 +49,15 @@ class ToolManager:
             MemoryTool.NAME, MemoryTool.DESCRIPTION, MemoryTool.PARAMETERS,
             lambda **kw: MemoryTool.handler(store=self.memory_store, **kw),
             MemoryTool.SAFETY_LEVEL,
+        )
+
+    def _register_todo_tool(self) -> None:
+        """注册 todo 工具（依赖 self.todo_store，可为 None）。"""
+        from kocor.tools.toolset.todo_tool import TodoTool
+        self.register(
+            TodoTool.NAME, TodoTool.DESCRIPTION, TodoTool.PARAMETERS,
+            lambda **kw: TodoTool.handler(store=self.todo_store, **kw),
+            TodoTool.SAFETY_LEVEL,
         )
 
 

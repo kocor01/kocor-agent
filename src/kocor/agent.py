@@ -79,10 +79,16 @@ class Agent:
                 from kocor.memory.reviewer import BackgroundReviewer
                 self._background_reviewer = BackgroundReviewer(llm=self.llm, store=self._memory)
 
+        # 任务规划（todo）：零依赖、零风险，始终启用
+        from kocor.tools.toolset.todo_tool import TodoStore
+        self._todo_store = TodoStore()
+        self.tool_manager.todo_store = self._todo_store
+
         # 运行时上下文管理器
         self.ctx = ContextManager(
             tools=self.tool_manager,
             memory=self._memory,
+            todo_store=self._todo_store,
         )
 
         # ReAct 循环引擎
@@ -167,6 +173,7 @@ class Agent:
             if history:
                 self.ctx.session_history = history
                 self._persisted_msg_idx = len(self.ctx.messages) + len(history)
+                self._hydrate_todo_store(history)
 
     def _session_after_run(self) -> None:
         """一次 ReAct 循环后的会话收尾工作。
@@ -301,6 +308,7 @@ class Agent:
         self.ctx.reset_conversation()
         self._persisted_msg_idx = 0
         self.ctx.session_history = messages
+        self._hydrate_todo_store(messages)
 
         return f"✅ 已切换到会话 {target_id}（{len(messages)} 条消息）。\n你可以继续之前的对话了。"
 
@@ -351,6 +359,11 @@ class Agent:
         return ", ".join(sorted(names))
 
     # ── 记忆审查 ──
+
+    def _hydrate_todo_store(self, history) -> None:
+        """从历史消息回填 TodoStore（仅在 store 为空时，避免覆盖实时状态）。"""
+        if not self._todo_store.has_items():
+            self._todo_store.hydrate_from_history(history)
 
     def _check_nudge(self) -> None:
         """检查是否需要触发后台记忆审查。"""

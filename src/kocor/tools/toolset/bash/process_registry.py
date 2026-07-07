@@ -213,7 +213,7 @@ class ProcessRegistry:
             if stdout is None:
                 return
             raw_read = getattr(getattr(stdout, "buffer", None), "read1", None)
-            while True:
+            while not session.exited:
                 if raw_read is not None:
                     raw = raw_read(4096)
                     if not raw:

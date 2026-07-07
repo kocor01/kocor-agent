@@ -2,8 +2,8 @@
 
 import pytest
 from kocor.tools.permission import PermissionManager
-from kocor.tools.toolset.read_file import ReadFile
-from kocor.tools.toolset.write_file import WriteFile
+from kocor.tools.toolset.read_file_tool import ReadFile
+from kocor.tools.toolset.write_file_tool import WriteFile
 from kocor.tools.toolset.run_python import RunPython
 from kocor.llm_provider.message import ToolCall, FunctionCall
 

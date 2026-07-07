@@ -38,6 +38,14 @@ class TestProcessRegistry:
     def setup_method(self):
         self.registry = ProcessRegistry()
 
+    def teardown_method(self):
+        """清理后台线程，避免 daemon 线程累积导致死锁。"""
+        for sid in list(self.registry._running):
+            self.registry._running[sid].exited = True
+            self.registry._move_to_finished(self.registry._running[sid])
+        self.registry._running.clear()
+        self.registry._finished.clear()
+
     def test_spawn_via_env(self):
         """通过 env 接口启动后台进程。"""
         env = MagicMock()
@@ -52,7 +60,11 @@ class TestProcessRegistry:
         """通过本地 Popen 启动后台进程。"""
         mock_proc = MagicMock()
         mock_proc.pid = 99999
-        mock_proc.stdout = MagicMock()
+        # 让 buffer.read1 返回 b""（EOF），让 _reader_loop 自然退出
+        mock_stdout = MagicMock()
+        mock_stdout.buffer.read1.return_value = b""
+        mock_stdout.read.return_value = ""
+        mock_proc.stdout = mock_stdout
         with patch("kocor.tools.toolset.bash.process_registry.subprocess.Popen",
                    return_value=mock_proc) as mock_popen:
             session = self.registry.spawn_local("echo hello")
@@ -125,11 +137,21 @@ class TestProcessRegistry:
 class TestProcessRegistryIntegration:
     """ProcessRegistry 与 ProcessTool 集成测试。"""
 
+    def setup_method(self):
+        self.registry = ProcessRegistry()
+
+    def teardown_method(self):
+        """清理后台线程。"""
+        for sid in list(self.registry._running):
+            self.registry._running[sid].exited = True
+            self.registry._move_to_finished(self.registry._running[sid])
+        self.registry._running.clear()
+        self.registry._finished.clear()
+
     def test_poll_after_spawn(self):
-        registry = ProcessRegistry()
         env = MagicMock()
         env.execute.return_value = _MOCK_ENV_RESULT
-        session = registry.spawn(env, "sleep 10")
-        result = registry.poll(session.id)
+        session = self.registry.spawn(env, "sleep 10")
+        result = self.registry.poll(session.id)
         assert result["status"] in ("running", "exited")
         assert result["session_id"] == session.id
