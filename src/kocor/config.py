@@ -61,6 +61,12 @@ class Config:
     # LLM 调用
     max_tokens: int = 50000                 # 响应最大 token 数
 
+    # 文件工具
+    file_read_max_chars: int = 100_000      # 读文件单次最大字符数
+    file_read_max_lines: int = 500          # 读文件默认最大行数
+    file_search_max_results: int = 200      # 搜索结果最大条数
+    file_search_timeout: int = 15           # 搜索超时秒数
+
     # 上下文管理
     context_strategy: str = "default"       # 上下文策略（default / sliding / summary）
     context_max_tokens: int = 200_000       # 上下文最大 token 数
@@ -259,6 +265,11 @@ class Config:
         session_name = os.environ.get("KOCOR_SESSION_NAME", Config.session_name)
         session_db_path = _resolve_data_path(os.environ.get("KOCOR_SESSION_DB_PATH", Config.session_db_path))
 
+        file_read_max_chars = int(os.environ.get("KOCOR_FILE_READ_MAX_CHARS", str(Config.file_read_max_chars)))
+        file_read_max_lines = int(os.environ.get("KOCOR_FILE_READ_MAX_LINES", str(Config.file_read_max_lines)))
+        file_search_max_results = int(os.environ.get("KOCOR_FILE_SEARCH_MAX_RESULTS", str(Config.file_search_max_results)))
+        file_search_timeout = int(os.environ.get("KOCOR_FILE_SEARCH_TIMEOUT", str(Config.file_search_timeout)))
+
         max_tokens_raw = os.environ.get("KOCOR_MAX_TOKENS", str(Config.max_tokens))
         try:
             max_tokens = int(max_tokens_raw)
@@ -276,6 +287,10 @@ class Config:
             skills_config=skills_config,
             skills_dir=Config.skills_dir,
             max_tokens=max_tokens,
+            file_read_max_chars=file_read_max_chars,
+            file_read_max_lines=file_read_max_lines,
+            file_search_max_results=file_search_max_results,
+            file_search_timeout=file_search_timeout,
             openai_api_key=os.environ.get("OPENAI_API_KEY", Config.openai_api_key),
             openai_model=os.environ.get("OPENAI_MODEL", Config.openai_model),
             openai_base_url=os.environ.get("OPENAI_BASE_URL", Config.openai_base_url),

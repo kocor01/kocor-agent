@@ -8,6 +8,9 @@ import os
 def resolve_safe_path(path: str, allowed_dir: str) -> str:
     """解析并校验路径是否在允许目录内，防止路径遍历攻击。
 
+    如果 path 是绝对路径，直接使用（跳过 allowed_dir 锚定）；
+    如果是相对路径，基于 allowed_dir 解析并验证。
+
     Args:
         path: 用户传入的路径
         allowed_dir: 允许的根目录
@@ -18,9 +21,12 @@ def resolve_safe_path(path: str, allowed_dir: str) -> str:
     Raises:
         PermissionError: 路径尝试逃逸到允许目录外
     """
-    resolved = os.path.realpath(os.path.join(allowed_dir, path))
-    if resolved != allowed_dir and not resolved.startswith(allowed_dir + os.sep):
-        raise PermissionError(f"Path traversal denied: {path}")
+    if os.path.isabs(path):
+        resolved = os.path.realpath(path)
+    else:
+        resolved = os.path.realpath(os.path.join(allowed_dir, path))
+        if resolved != allowed_dir and not resolved.startswith(allowed_dir + os.sep):
+            raise PermissionError(f"Path traversal denied: {path}")
     return resolved
 
 

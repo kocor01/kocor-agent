@@ -23,14 +23,16 @@ class ToolManager:
         self.skill_manager = None
 
     def register_builtin_tools(self) -> None:
-        """向当前 ToolManager 注册内置工具（读文件、写文件、沙盒执行 Python、bash、process）。"""
-        from kocor.tools.toolset.read_file import ReadFile
-        from kocor.tools.toolset.write_file import WriteFile
+        """向当前 ToolManager 注册内置工具（文件操作、沙盒执行、bash）。"""
+        from kocor.tools.toolset.read_file_tool import ReadFile
+        from kocor.tools.toolset.write_file_tool import WriteFile
+        from kocor.tools.toolset.patch_file_tool import PatchFile
+        from kocor.tools.toolset.search_file_tool import SearchFiles
         from kocor.tools.toolset.run_python import RunPython
         from kocor.tools.toolset.bash_tool import BashTool, ProcessTool
 
-        self.memory_store = None  # MemoryStore 实例，由 Agent 后续注入
-        builtin_tools = [ReadFile, WriteFile, RunPython, BashTool, ProcessTool]
+        self.memory_store = None
+        builtin_tools = [ReadFile, WriteFile, PatchFile, SearchFiles, RunPython, BashTool, ProcessTool]
         for tools in builtin_tools:
             self.register(tools.NAME, tools.DESCRIPTION, tools.PARAMETERS, tools.handler, tools.SAFETY_LEVEL)
 

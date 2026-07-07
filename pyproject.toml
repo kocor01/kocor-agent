@@ -1,6 +1,6 @@
 [project]
 name = "kocor-agent"
-version = "0.1.0"
+version = "0.0.1"
 description = "小而美的 LLM 自主 Agent 助手"
 requires-python = ">=3.12"
 dependencies = [
