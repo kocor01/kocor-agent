@@ -356,6 +356,12 @@ def parse_args():
         help="启用会话持久化（等效于 KOCOR_SESSION_ENABLED=1）",
     )
     parser.add_argument(
+        "--debug",
+        action="store_true",
+        default=False,
+        help="启用 DEBUG 日志级别",
+    )
+    parser.add_argument(
         "user_input",
         nargs="*",
         help="用户问题",
@@ -413,8 +419,10 @@ def main() -> None:
         Config.set("max_iterations", args.max_iterations)
     if args.session:
         Config.set("session_enabled", True)
+    if args.debug:
+        Config.set("log_level", "DEBUG")
 
-    setup_logger("INFO", log_dir=Config.get("log_dir"))
+    setup_logger(Config.get("log_level"), log_dir=Config.get("log_dir"))
 
     toolManager = ToolManager()
     toolManager.register_all()

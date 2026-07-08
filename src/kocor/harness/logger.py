@@ -14,15 +14,6 @@ class Logger:
     日志按天写入对应日期的子目录：实际写入路径为 ``{log_dir}/{日期}/kocor.log``。
     """
 
-    _EVENT_LEVELS = {
-        EventType.PRE_GENERATE: logging.INFO,
-        EventType.POST_GENERATE: logging.INFO,
-        EventType.PRE_TOOL: logging.INFO,
-        EventType.POST_TOOL: logging.INFO,
-        EventType.ON_ERROR: logging.ERROR,
-        EventType.ON_BUDGET_EXHAUSTED: logging.WARNING,
-    }
-
     def __init__(self, level: str = "INFO", log_dir: str = "./log"):
         today = date.today().isoformat()
         daily_dir = os.path.join(log_dir, today)
@@ -38,11 +29,13 @@ class Logger:
             ))
             self.logger.addHandler(handler)
 
-    def event(self, event_type: EventType, **data) -> None:
-        """按事件类型记录日志，自动选择日志级别。"""
-        level = self._EVENT_LEVELS.get(event_type, logging.INFO)
+    def event(self, event_type: EventType, level: int = logging.INFO, **data) -> None:
+        """按事件类型记录日志，由调用方指定日志级别。"""
         parts = " ".join(f"【{k}】={v}" for k, v in data.items())
         self.logger.log(level, "%s %s", event_type.value, parts)
+
+    def debug(self, message: str) -> None:
+        self.logger.debug(message)
 
     def info(self, message: str) -> None:
         self.logger.info(message)

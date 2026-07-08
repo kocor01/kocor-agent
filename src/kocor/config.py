@@ -85,6 +85,7 @@ class Config:
 
     # 日志
     log_dir: str = "./log"                  # 日志目录
+    log_level: str = "INFO"                  # 日志级别（DEBUG/INFO/WARNING/ERROR）
     default_system_prompt: str = """\
 你是一个名为 Kocor 的 AI 助手，擅长通过调用工具来完成任务。
 
@@ -305,6 +306,7 @@ class Config:
             user_char_limit=user_char_limit,
             nudge_interval=nudge_interval,
             log_dir=_resolve_data_path(os.environ.get("KOCOR_LOG_DIR", Config.log_dir)),
+            log_level=os.environ.get("KOCOR_LOG_LEVEL", Config.log_level).upper(),
             session_enabled=session_enabled,
             session_db_path=session_db_path,
             session_name=session_name,

@@ -1,5 +1,7 @@
 """Logger 测试。"""
 
+import logging
+
 import pytest
 
 from kocor.harness.event.event_manager import EventType
@@ -24,12 +26,12 @@ class TestLogger:
 
     def test_event_error_level(self, caplog):
         logger = Logger(level="DEBUG")
-        logger.event(EventType.ON_ERROR, component="tool", error="timeout")
+        logger.event(EventType.ON_ERROR, level=logging.ERROR, component="tool", error="timeout")
         assert len(caplog.records) >= 1
 
     def test_event_warning_level(self, caplog):
         logger = Logger(level="DEBUG")
-        logger.event(EventType.ON_BUDGET_EXHAUSTED, iteration=5, budget_ratio=1.0)
+        logger.event(EventType.ON_BUDGET_EXHAUSTED, level=logging.WARNING, iteration=5, budget_ratio=1.0)
         assert len(caplog.records) >= 1
 
     def test_info_shortcut(self, caplog):
