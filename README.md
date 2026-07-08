@@ -8,12 +8,11 @@
 
 - **ReAct 自主循环** — 推理 → 调用工具 → 观察结果 → 迭代直至完成
 - **双 LLM 后端** — OpenAI 与 Anthropic 一键切换，统一 Protocol 接口
-- **内置工具** — 安全文件读写、沙盒 Python 执行
+- **内置工具** — 安全文件读写
 - **MCP 集成** — 通过 [Model Context Protocol](https://github.com/modelcontextprotocol) 接入外部服务器（文件系统、搜索等）
 - **Skill 系统** — slash 命令 (`/summarize`) 或 LLM 可调用的插件化能力
 - **上下文管理** — 分层系统提示词（身份 + 项目指令 + 环境 + 持久记忆），支持滑动窗口与激进压缩策略
 - **三级权限管控** — `permissive` / `default` / `strict`，危险操作需确认
-- **沙盒执行** — 子进程隔离的 Python 执行，限制危险模块导入
 - **文件访问防护** — 路径穿越防护与敏感文件（`.env` 等）读取拦截
 - **事件与 Hook 系统** — 生命周期事件发布订阅 + 可中断的拦截器链
 - **流式输出** — 实时展示推理过程、回答与工具调用
@@ -135,8 +134,7 @@ src/kocor/
 │   ├── tool_utils.py        # 路径安全与环境变量脱敏
 │   └── toolset/             # 内置工具
 │       ├── read_file.py     # read_file（安全）
-│       ├── write_file.py    # write_file（危险）
-│       └── run_python.py    # run_python（危险，沙盒执行）
+│       └── write_file.py    # write_file（危险）
 │
 ├── context/                 # 上下文管理系统
 │   ├── context_manager.py   # ContextManager — 消息组装与历史管理

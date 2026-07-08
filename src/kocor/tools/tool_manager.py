@@ -29,13 +29,12 @@ class ToolManager:
         from kocor.tools.toolset.write_file_tool import WriteFile
         from kocor.tools.toolset.patch_file_tool import PatchFile
         from kocor.tools.toolset.search_file_tool import SearchFiles
-        from kocor.tools.toolset.run_python import RunPython
         from kocor.tools.toolset.bash_tool import BashTool, ProcessTool
         from kocor.tools.toolset.cron_tool import CronTool
 
         self.memory_store = None
         self.todo_store = None
-        builtin_tools = [ReadFile, WriteFile, PatchFile, SearchFiles, RunPython, BashTool, ProcessTool]
+        builtin_tools = [ReadFile, WriteFile, PatchFile, SearchFiles, BashTool, ProcessTool]
         for tools in builtin_tools:
             self.register(tools.NAME, tools.DESCRIPTION, tools.PARAMETERS, tools.handler, tools.SAFETY_LEVEL)
 

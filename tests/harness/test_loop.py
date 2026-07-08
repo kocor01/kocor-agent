@@ -237,14 +237,14 @@ class TestAgentLoop:
             Message(
                 role="assistant",
                 content="running...",
-                tool_calls=[ToolCall(id="call_e1", function=FunctionCall(name="run_python", arguments='{"code": "bad"}'))],
+                tool_calls=[ToolCall(id="call_e1", function=FunctionCall(name="write_file", arguments='{"path": "test.txt"}'))],
             ),
             Message(role="assistant", content="There was an error."),
         ])
         agent = Agent(
             llm=llm,
             tool_manager=ErrorToolRegistry(),
-            permission_mgr=PermissionManager(policy=PermissionManager.POLICY_PERMISSIVE, always_allow={"run_python"}),
+            permission_mgr=PermissionManager(policy=PermissionManager.POLICY_PERMISSIVE, always_allow={"write_file"}),
         )
         result = agent.run("run")
         assert "error" in result.lower() or "Error" in result or "There was" in result

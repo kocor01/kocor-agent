@@ -71,9 +71,9 @@ class TestFunctionCall:
     """测试 FunctionCall 数据类"""
 
     def test_create_function_call(self):
-        fc = FunctionCall(name="run_python", arguments='{"code": "print(1)"}')
-        assert fc.name == "run_python"
-        assert fc.arguments == '{"code": "print(1)"}'
+        fc = FunctionCall(name="read_file", arguments='{"path": "test.txt"}')
+        assert fc.name == "read_file"
+        assert fc.arguments == '{"path": "test.txt"}'
 
 
 class TestToolResult:

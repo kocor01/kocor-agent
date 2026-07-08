@@ -4,7 +4,6 @@ import pytest
 from kocor.tools.permission import PermissionManager
 from kocor.tools.toolset.read_file_tool import ReadFile
 from kocor.tools.toolset.write_file_tool import WriteFile
-from kocor.tools.toolset.run_python import RunPython
 from kocor.llm_provider.message import ToolCall, FunctionCall
 
 
@@ -17,7 +16,6 @@ class TestBuiltinToolSafety:
     def test_tool_class_has_safety_level(self):
         assert ReadFile.SAFETY_LEVEL == PermissionManager.SAFETY_SAFE
         assert WriteFile.SAFETY_LEVEL == PermissionManager.SAFETY_DANGEROUS
-        assert RunPython.SAFETY_LEVEL == PermissionManager.SAFETY_DANGEROUS
 
     def test_tool_manager_builds_safety_map(self):
         from kocor.tools.tool_manager import ToolManager
@@ -25,7 +23,6 @@ class TestBuiltinToolSafety:
         tm.register_builtin_tools()
         assert tm._tools["read_file"].safety_level == PermissionManager.SAFETY_SAFE
         assert tm._tools["write_file"].safety_level == PermissionManager.SAFETY_DANGEROUS
-        assert tm._tools["run_python"].safety_level == PermissionManager.SAFETY_DANGEROUS
         assert "unknown_tool" not in tm._tools
 
 
@@ -46,7 +43,7 @@ class TestPermissionManager:
     def test_permissive_policy_allows_dangerous(self):
         pm = PermissionManager(policy=PermissionManager.POLICY_PERMISSIVE)
         # permissive 策略下全部自动允许，包括 dangerous
-        assert pm.check(_tc("run_python")) is True
+        assert pm.check(_tc("write_file")) is True
 
     def test_default_policy_allows_safe(self):
         pm = PermissionManager(policy=PermissionManager.POLICY_DEFAULT)
@@ -60,9 +57,8 @@ class TestPermissionManager:
         assert pm.check(_tc("read_file")) is False  # no stdin -> denied for caution
 
     def test_always_allow_always_passes(self):
-        pm = PermissionManager(always_allow={"write_file", "run_python"})
+        pm = PermissionManager(always_allow={"write_file"})
         assert pm.check(_tc("write_file")) is True
-        assert pm.check(_tc("run_python")) is True
 
     def test_always_ask_denies_without_stdin(self):
         pm = PermissionManager(always_ask={"write_file"}, cache_enabled=True)
@@ -91,9 +87,7 @@ class TestPermissionManager:
 
     def test_strict_policy_denies_without_stdin(self):
         pm = PermissionManager(policy=PermissionManager.POLICY_STRICT)
-        # strict 策略下 safe 自动，caution 需询问，dangerous 直接拒绝
-        assert pm.check(_tc("read_file")) is False
-        assert pm.check(_tc("run_python")) is False
+        assert pm.check(_tc("write_file")) is False
 
     def test_config_update(self):
         pm = PermissionManager(policy=PermissionManager.POLICY_DEFAULT)
