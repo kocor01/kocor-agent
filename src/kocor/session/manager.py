@@ -9,20 +9,11 @@ import uuid
 from datetime import datetime
 from typing import Any
 
+from kocor.config import Config
 from kocor.session.reset_policy import should_reset
-from kocor.session.session_key import build_session_key
 from kocor.session.store import SessionStore
 from kocor.session.types import SessionEntry, SessionResetPolicy
 from kocor.llm_provider.message import Message
-
-
-def _generate_session_id(now: datetime | None = None) -> str:
-    """生成会话 ID。
-
-    格式: ``YYYYMMDD_HHMMSS_<8hex>``
-    """
-    now = now or datetime.now()
-    return f"{now.strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:8]}"
 
 
 class SessionManager:
@@ -51,8 +42,9 @@ class SessionManager:
 
     @property
     def session_key(self) -> str:
-        """当前会话键。"""
-        return build_session_key(profile=self.profile)
+        """当前会话键，格式: ``kocor:{namespace}:cli``。"""
+        profile = self.profile or Config.get("session_name")
+        return f"kocor:{profile}:cli"
 
     # -- 公开 API --
 
@@ -298,6 +290,12 @@ class SessionManager:
 
     # -- 内部辅助 --
 
+    @staticmethod
+    def _generate_session_id(now: datetime | None = None) -> str:
+        """生成会话 ID，格式: ``YYYYMMDD_HHMMSS_<8hex>``。"""
+        now = now or datetime.now()
+        return f"{now.strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:8]}"
+
     def _create_entry(
         self,
         session_key: str,
@@ -306,7 +304,7 @@ class SessionManager:
         auto_reset_reason: str | None = None,
         is_fresh_reset: bool = False,
     ) -> SessionEntry:
-        session_id = _generate_session_id(now)
+        session_id = self._generate_session_id(now)
         entry = SessionEntry(
             session_key=session_key,
             session_id=session_id,

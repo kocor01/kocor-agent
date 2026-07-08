@@ -21,6 +21,7 @@ class ToolManager:
         self._handlers: dict[str, Callable] = {}
         self.mcp_manager = None
         self.skill_manager = None
+        self._cron_scheduler = None
 
     def register_builtin_tools(self) -> None:
         """向当前 ToolManager 注册内置工具（文件操作、沙盒执行、bash、cron）。"""
@@ -34,7 +35,6 @@ class ToolManager:
 
         self.memory_store = None
         self.todo_store = None
-        self._cron_scheduler = None
         builtin_tools = [ReadFile, WriteFile, PatchFile, SearchFiles, RunPython, BashTool, ProcessTool]
         for tools in builtin_tools:
             self.register(tools.NAME, tools.DESCRIPTION, tools.PARAMETERS, tools.handler, tools.SAFETY_LEVEL)
