@@ -2,8 +2,8 @@
 
 使用:
     python -m kocor "你的问题"
-    python -m kocor --stream "你的问题"
-    python -m kocor --repl           # 交互模式
+    python -m kocor --no-stream "你的问题"
+    python -m kocor           # 交互模式（默认流式输出、会话持久化）
     echo "你的问题" | python -m kocor
 """
 
@@ -324,14 +324,11 @@ def _print_stream_formatted(chunks: Iterator[StreamChunk]) -> None:
 def parse_args():
     parser = argparse.ArgumentParser(description="Kocor Agent - 小而美的 LLM 自主 Agent 助手")
     parser.add_argument(
-        "--stream",
-        action="store_true",
-        help="启用流式输出",
-    )
-    parser.add_argument(
-        "--repl",
-        action="store_true",
-        help="交互式 REPL 模式",
+        "--no-stream",
+        action="store_false",
+        dest="stream",
+        default=True,
+        help="禁用流式输出",
     )
     parser.add_argument(
         "--permissive",
@@ -342,18 +339,6 @@ def parse_args():
         "--strict",
         action="store_true",
         help="严格模式（每次工具调用都确认）",
-    )
-    parser.add_argument(
-        "--max-iterations",
-        type=int,
-        default=None,
-        help="最大迭代次数",
-    )
-    parser.add_argument(
-        "--session",
-        action="store_true",
-        default=False,
-        help="启用会话持久化（等效于 KOCOR_SESSION_ENABLED=1）",
     )
     parser.add_argument(
         "--debug",
@@ -405,7 +390,6 @@ def _repl_loop(
 def main() -> None:
     args = parse_args()
     stream_enabled = args.stream
-    repl_enabled = args.repl
     user_args = args.user_input
 
     Config.load()
@@ -415,12 +399,15 @@ def main() -> None:
         Config.set("permission_policy", PermissionManager.POLICY_STRICT)
     elif args.permissive:
         Config.set("permission_policy", PermissionManager.POLICY_PERMISSIVE)
-    if args.max_iterations is not None:
-        Config.set("max_iterations", args.max_iterations)
-    if args.session:
-        Config.set("session_enabled", True)
     if args.debug:
         Config.set("log_level", "DEBUG")
+
+    # 检测 REPL 模式：无参数且 stdin 是终端时默认进入
+    is_repl = not user_args and sys.stdin.isatty()
+
+    # 一次性模式默认关闭会话持久化
+    if not is_repl:
+        Config.set("session_enabled", False)
 
     setup_logger(Config.get("log_level"), log_dir=Config.get("log_dir"))
 
@@ -467,8 +454,6 @@ def main() -> None:
         session_manager=session_manager,
     )
 
-    # 检测 REPL 模式：--repl 标志，或无参数且 stdin 是终端时默认进入
-    is_repl = repl_enabled or (not user_args and sys.stdin.isatty())
     if is_repl:
         print()
         try:
@@ -488,10 +473,6 @@ def main() -> None:
             user_input = ""
 
     if not user_input:
-        print("用法: python -m kocor \"你的问题\"")
-        print("   或: python -m kocor --stream \"你的问题\"")
-        print("   或: python -m kocor --repl")
-        print("   或: echo \"你的问题\" | python -m kocor")
         sys.exit(1)
 
     try:

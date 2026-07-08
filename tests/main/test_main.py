@@ -10,7 +10,8 @@ def _mock_cli_main_stack(argv: list[str]) -> ExitStack:
     """创建 main() 所需的通用 mock 上下文栈。"""
     stack = ExitStack()
     mock_cfg = MagicMock(skills_config="", mcp_config="", max_iterations=20,
-                          memory_dir="", context_strategy="default")
+                          memory_dir="", context_strategy="default",
+                          log_level="INFO", log_dir="./log")
     stack.enter_context(patch("kocor.config.Config.load", return_value=mock_cfg))
     stack.enter_context(patch("kocor.cli.LlmManager"))
     stack.enter_context(patch("kocor.cli.ToolManager"))
@@ -22,8 +23,8 @@ class TestCLIParseArgs:
     """测试 CLI 参数解析"""
 
     @patch("kocor.cli.argparse.ArgumentParser")
-    def test_parse_stream_flag(self, mock_parser_cls):
-        """测试 --stream 参数解析"""
+    def test_parse_default_stream(self, mock_parser_cls):
+        """测试默认流式输出为 True"""
         from kocor.cli import parse_args
 
         mock_parser = MagicMock()
@@ -38,8 +39,8 @@ class TestCLIParseArgs:
         assert args.user_input == ["hello"]
 
     @patch("kocor.cli.argparse.ArgumentParser")
-    def test_parse_no_stream(self, mock_parser_cls):
-        """测试不带 --stream 参数"""
+    def test_parse_no_stream_flag(self, mock_parser_cls):
+        """测试 --no-stream 参数解析"""
         from kocor.cli import parse_args
 
         mock_parser = MagicMock()
@@ -60,13 +61,13 @@ class TestCLIMain:
     @patch("kocor.cli.LlmManager")
     @patch("kocor.cli.ToolManager")
     @patch("kocor.cli.Agent")
-    @patch("sys.argv", ["kocor", "--stream", "你好"])
+    @patch("sys.argv", ["kocor", "你好"])
     def test_main_with_stream(self, mock_agent_cls, mock_tools,
                               mock_llm, mock_config):
-        """测试 --stream 模式"""
+        """测试默认流式输出模式"""
         from kocor.cli import main
 
-        mock_config.return_value = MagicMock(skills_config="", max_iterations=20)
+        mock_config.return_value = MagicMock(skills_config="", max_iterations=20, log_level="INFO", log_dir="./log")
         mock_agent = MagicMock()
         mock_agent.stream.return_value = iter([
             StreamChunk(content="你"),
@@ -85,13 +86,13 @@ class TestCLIMain:
     @patch("kocor.cli.LlmManager")
     @patch("kocor.cli.ToolManager")
     @patch("kocor.cli.Agent")
-    @patch("sys.argv", ["kocor", "你好"])
+    @patch("sys.argv", ["kocor", "--no-stream", "你好"])
     def test_main_without_stream(self, mock_agent_cls, mock_tools,
                                  mock_llm, mock_config):
-        """测试非流式模式"""
+        """测试 --no-stream 模式"""
         from kocor.cli import main
 
-        mock_config.return_value = MagicMock(skills_config="", max_iterations=20)
+        mock_config.return_value = MagicMock(skills_config="", max_iterations=20, log_level="INFO", log_dir="./log")
         mock_agent = MagicMock()
         mock_agent.run.return_value = "非流式结果"
         mock_agent_cls.return_value = mock_agent
@@ -112,7 +113,7 @@ class TestCLIMain:
         """测试无输入时打印用法"""
         from kocor.cli import main
 
-        mock_config.return_value = MagicMock(skills_config="", max_iterations=20)
+        mock_config.return_value = MagicMock(skills_config="", max_iterations=20, log_level="INFO", log_dir="./log")
         mock_agent_cls.return_value = MagicMock()
 
         mock_stdin = MagicMock()
@@ -131,13 +132,13 @@ class TestCLIMain:
     @patch("kocor.cli.LlmManager")
     @patch("kocor.cli.ToolManager")
     @patch("kocor.cli.Agent")
-    @patch("sys.argv", ["kocor", "--stream", "你好"])
+    @patch("sys.argv", ["kocor", "你好"])
     def test_stream_prints_tool_calls(self, mock_agent_cls, mock_tools,
                                       mock_llm, mock_config):
         """测试流式模式下工具调用输出"""
         from kocor.cli import main
 
-        mock_config.return_value = MagicMock(skills_config="", max_iterations=20)
+        mock_config.return_value = MagicMock(skills_config="", max_iterations=20, log_level="INFO", log_dir="./log")
         mock_agent = MagicMock()
         mock_agent.stream.return_value = iter([
             StreamChunk(
@@ -186,7 +187,7 @@ class TestCLIMain:
         def fake_print(*args, **kwargs):
             captured.append("".join(str(a) for a in args))
 
-        with _mock_cli_main_stack(["kocor", "--stream", "你好"]), \
+        with _mock_cli_main_stack(["kocor", "你好"]), \
              patch("kocor.cli.Agent", return_value=mock_agent), \
              patch("kocor.cli.print", side_effect=fake_print):
             main()
@@ -206,14 +207,14 @@ class TestCLIReasoning:
     @patch("kocor.cli.LlmManager")
     @patch("kocor.cli.ToolManager")
     @patch("kocor.cli.Agent")
-    @patch("sys.argv", ["kocor", "--stream", "你好"])
+    @patch("sys.argv", ["kocor", "你好"])
     def test_stream_prints_reasoning(self, mock_agent_cls,
                                      mock_tools, mock_llm,
                                      mock_config):
         """测试流式模式下 reasoning 内容输出"""
         from kocor.cli import main
 
-        mock_config.return_value = MagicMock(skills_config="", max_iterations=20)
+        mock_config.return_value = MagicMock(skills_config="", max_iterations=20, log_level="INFO", log_dir="./log")
         mock_agent = MagicMock()
         mock_agent.stream.return_value = iter([
             StreamChunk(content="让我"),
@@ -276,7 +277,7 @@ class TestCLIFormattedOutput:
         def fake_print(*args, **kwargs):
             captured.append("".join(str(a) for a in args))
 
-        with _mock_cli_main_stack(["kocor", "--stream", "读文件"]), \
+        with _mock_cli_main_stack(["kocor", "读文件"]), \
              patch("kocor.cli.Agent", return_value=mock_agent), \
              patch("kocor.cli.print", side_effect=fake_print):
             main()
@@ -300,7 +301,7 @@ class TestCLIFormattedOutput:
         def fake_print(*args, **kwargs):
             captured.append("".join(str(a) for a in args))
 
-        with _mock_cli_main_stack(["kocor", "--stream", "读文件"]), \
+        with _mock_cli_main_stack(["kocor", "读文件"]), \
              patch("kocor.cli.Agent", return_value=mock_agent), \
              patch("kocor.cli.print", side_effect=fake_print):
             main()
@@ -324,7 +325,7 @@ class TestCLIFormattedOutput:
         def fake_print(*args, **kwargs):
             captured.append("".join(str(a) for a in args))
 
-        with _mock_cli_main_stack(["kocor", "--stream", "读文件"]), \
+        with _mock_cli_main_stack(["kocor", "读文件"]), \
              patch("kocor.cli.Agent", return_value=mock_agent), \
              patch("kocor.cli.print", side_effect=fake_print):
             main()
@@ -347,7 +348,7 @@ class TestCLIFormattedOutput:
         def fake_print(*args, **kwargs):
             captured.append("".join(str(a) for a in args))
 
-        with _mock_cli_main_stack(["kocor", "--stream", "读文件"]), \
+        with _mock_cli_main_stack(["kocor", "读文件"]), \
              patch("kocor.cli.Agent", return_value=mock_agent), \
              patch("kocor.cli.print", side_effect=fake_print):
             main()
@@ -376,7 +377,7 @@ class TestCLIFormattedOutput:
         def fake_print(*args, **kwargs):
             captured.append("".join(str(a) for a in args))
 
-        with _mock_cli_main_stack(["kocor", "--stream", "读文件"]), \
+        with _mock_cli_main_stack(["kocor", "读文件"]), \
              patch("kocor.cli.Agent", return_value=mock_agent), \
              patch("kocor.cli.print", side_effect=fake_print):
             main()
@@ -408,7 +409,7 @@ class TestCLIFormattedOutput:
         def fake_print(*args, **kwargs):
             captured.append("".join(str(a) for a in args))
 
-        with _mock_cli_main_stack(["kocor", "--stream", "读文件"]), \
+        with _mock_cli_main_stack(["kocor", "读文件"]), \
              patch("kocor.cli.Agent", return_value=mock_agent), \
              patch("kocor.cli.print", side_effect=fake_print):
             main()

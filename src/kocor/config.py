@@ -107,7 +107,7 @@ class Config:
 """  # 默认系统提示
 
     # 会话管理
-    session_enabled: bool = False           # 启用会话持久化
+    session_enabled: bool = True            # 启用会话持久化（REPL 模式默认开启，一次性模式由 CLI 关闭）
     session_db_path: str = ".kocor/sessions/sessions.db"  # SQLite 会话数据库路径
     session_name: str = ""                  # 会话名称（对应 session_key 的 profile）
 
