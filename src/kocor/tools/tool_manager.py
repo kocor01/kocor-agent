@@ -23,16 +23,18 @@ class ToolManager:
         self.skill_manager = None
 
     def register_builtin_tools(self) -> None:
-        """向当前 ToolManager 注册内置工具（文件操作、沙盒执行、bash）。"""
+        """向当前 ToolManager 注册内置工具（文件操作、沙盒执行、bash、cron）。"""
         from kocor.tools.toolset.read_file_tool import ReadFile
         from kocor.tools.toolset.write_file_tool import WriteFile
         from kocor.tools.toolset.patch_file_tool import PatchFile
         from kocor.tools.toolset.search_file_tool import SearchFiles
         from kocor.tools.toolset.run_python import RunPython
         from kocor.tools.toolset.bash_tool import BashTool, ProcessTool
+        from kocor.tools.toolset.cron_tool import CronTool
 
         self.memory_store = None
         self.todo_store = None
+        self._cron_scheduler = None
         builtin_tools = [ReadFile, WriteFile, PatchFile, SearchFiles, RunPython, BashTool, ProcessTool]
         for tools in builtin_tools:
             self.register(tools.NAME, tools.DESCRIPTION, tools.PARAMETERS, tools.handler, tools.SAFETY_LEVEL)
@@ -41,6 +43,8 @@ class ToolManager:
         self._register_memory_tool()
         # todo 工具需要 TodoStore，handler 延迟读取 self.todo_store
         self._register_todo_tool()
+        # cron 工具
+        self._register_cron_tool()
 
     def _register_memory_tool(self) -> None:
         """注册 memory 工具（依赖 self.memory_store，可为 None）。"""
@@ -59,6 +63,35 @@ class ToolManager:
             lambda **kw: TodoTool.handler(store=self.todo_store, **kw),
             TodoTool.SAFETY_LEVEL,
         )
+
+    def _register_cron_tool(self) -> None:
+        """注册 cronjob 工具。"""
+        from kocor.tools.toolset.cron_tool import CronTool
+        from kocor.tools.toolset.cron.scheduler import CronScheduler
+
+        if self._cron_scheduler is None:
+            self._cron_scheduler = CronScheduler()
+
+        self.register(
+            CronTool.NAME, CronTool.DESCRIPTION, CronTool.PARAMETERS,
+            lambda **kw: CronTool.handler(**kw),
+            CronTool.SAFETY_LEVEL,
+        )
+
+    def start_cron_scheduler(self) -> None:
+        """启动 cron 调度器。"""
+        if self._cron_scheduler is not None:
+            self._cron_scheduler.start()
+
+    def stop_cron_scheduler(self) -> None:
+        """停止 cron 调度器。"""
+        if self._cron_scheduler is not None:
+            self._cron_scheduler.stop()
+
+    @property
+    def cron_scheduler(self):
+        """获取 cron 调度器实例。"""
+        return self._cron_scheduler
 
 
     def register_all(self) -> None:

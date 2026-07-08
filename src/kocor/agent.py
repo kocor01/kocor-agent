@@ -61,6 +61,9 @@ class Agent:
         self.session_manager = session_manager
         self._persisted_msg_idx = 0
 
+        # Cron 调度器标志（首次使用时启动）
+        self._cron_started = False
+
         # 上下文管理
         self._memory: MemoryStore | None = None
         self._background_reviewer = None
@@ -106,10 +109,15 @@ class Agent:
 
     def stop(self) -> None:
         """请求在当前迭代边界停止 ReAct 循环。"""
+        self.tool_manager.stop_cron_scheduler()
         self.loop.stop()
 
     def run(self, user_input: str) -> str:
         """执行一次完整的 Agent 循环。"""
+        # 首次运行时启动 cron 调度器
+        if not self._cron_started:
+            self.tool_manager.start_cron_scheduler()
+            self._cron_started = True
         if user_input.startswith("/"):
             cmd_result = self._handle_builtin_commands(user_input)
             if cmd_result is not None:
