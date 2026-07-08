@@ -296,3 +296,11 @@ class ToolRegistryMock:
 
     def execute(self, tool_call):
         return ToolResult(tool_call_id="call_1", content="")
+
+    def start_cron_scheduler(self):
+        """cron 调度器，测试中为空操作。"""
+        pass
+
+    def stop_cron_scheduler(self):
+        """cron 调度器，测试中为空操作。"""
+        pass

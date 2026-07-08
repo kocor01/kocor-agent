@@ -65,6 +65,14 @@ class MockToolRegistry:
             content=f"Result of {tool_call.function.name}",
         )
 
+    def start_cron_scheduler(self):
+        """cron 调度器，测试中为空操作。"""
+        pass
+
+    def stop_cron_scheduler(self):
+        """cron 调度器，测试中为空操作。"""
+        pass
+
 
 # ── 测试 ──
 
@@ -219,6 +227,12 @@ class TestAgentLoop:
             def execute(self, tool_call):
                 raise RuntimeError("something broke")
 
+            def start_cron_scheduler(self):
+                pass
+
+            def stop_cron_scheduler(self):
+                pass
+
         llm = MockLLM(responses=[
             Message(
                 role="assistant",
@@ -300,6 +314,12 @@ class TestAgentLoop:
                 from kocor.tools.truncate import ToolOutputTruncator
                 truncated = ToolOutputTruncator().truncate(long_content)
                 return ToolResult(tool_call_id=tool_call.id, content=truncated)
+
+            def start_cron_scheduler(self):
+                pass
+
+            def stop_cron_scheduler(self):
+                pass
 
         llm = MockLLM(responses=[
             Message(
