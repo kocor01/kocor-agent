@@ -376,7 +376,7 @@ action='update'、'pause'、'resume'、'remove' 或 'run' 管理已有任务。
             },
             "schedule": {
                 "type": "string",
-                "description": "create 必填。'30m'（30分钟后）、'every 2h'（每2小时）、'0 9 * * *'（cron 表达式）、或 '2026-07-08T14:00:00'（ISO 时间戳）",
+                "description": "create 必填。'2 22 * * *'（cron 表达式，覆盖所有重复场景）或 '2026-07-08T14:00:00'（ISO 时间戳，单次定时）。只支持这两种格式。",
             },
             "name": {
                 "type": "string",

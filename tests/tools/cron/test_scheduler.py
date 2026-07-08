@@ -87,7 +87,7 @@ class TestCronScheduler:
     def test_tick_processes_due_jobs(self):
         """tick 处理到期作业。"""
         # 创建间隔作业，手动设置 next_run_at 到过去
-        job = create_job(prompt="test job", schedule="every 10m")
+        job = create_job(prompt="test job", schedule="*/10 * * * *")
         job_id = job["id"]
 
         from kocor.tools.toolset.cron.scheduler import CronScheduler
@@ -113,7 +113,7 @@ class TestCronScheduler:
 
     def test_claim_job_prevents_duplicate(self):
         """claim_job_for_fire 防止重复执行。"""
-        job = create_job(prompt="dup test", schedule="every 10m")
+        job = create_job(prompt="dup test", schedule="*/10 * * * *")
         job_id = job["id"]
 
         first = claim_job_for_fire(job_id)
@@ -124,7 +124,7 @@ class TestCronScheduler:
 
     def test_get_due_jobs_returns_due(self):
         """get_due_jobs 返回到期作业。"""
-        job = create_job(prompt="due test", schedule="every 10m")
+        job = create_job(prompt="due test", schedule="*/10 * * * *")
 
         from kocor.tools.toolset.cron.jobs import get_due_jobs, load_jobs
 
@@ -146,13 +146,13 @@ class TestCronScheduler:
         """无到期作业时返回空列表。"""
         from kocor.tools.toolset.cron.jobs import get_due_jobs
 
-        create_job(prompt="future job", schedule="every 10m")
+        create_job(prompt="future job", schedule="*/10 * * * *")
         due = get_due_jobs()
         assert len(due) == 0  # next_run_at 在将来
 
     def test_mark_job_run_tracks_status(self):
         """mark_job_run 更新作业状态。"""
-        job = create_job(prompt="track test", schedule="every 10m")
+        job = create_job(prompt="track test", schedule="*/10 * * * *")
         job_id = job["id"]
 
         from kocor.tools.toolset.cron.jobs import mark_job_run, get_job

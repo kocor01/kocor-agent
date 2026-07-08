@@ -181,55 +181,23 @@ def _generate_job_id() -> str:
 # =============================================================================
 
 
-def parse_duration(s: str) -> int:
-    """解析时长字符串为分钟数。
-
-    示例：
-        "30m" → 30
-        "2h" → 120
-        "1d" → 1440
-    """
-    s = s.strip().lower()
-    match = re.match(r'^(\d+)\s*(m|min|mins|minute|minutes|h|hr|hrs|hour|hours|d|day|days)$', s)
-    if not match:
-        raise ValueError(f"Invalid duration: '{s}'. Use format like '30m', '2h', or '1d'.")
-
-    value = int(match.group(1))
-    unit = match.group(2)[0]
-    multipliers = {'m': 1, 'h': 60, 'd': 1440}
-    return value * multipliers[unit]
-
-
 def parse_schedule(schedule: str) -> dict[str, Any]:
     """解析调度字符串为结构化格式。
 
     返回 dict 包含：
-        - kind: "once" | "interval" | "cron"
+        - kind: "once" | "cron"
         - display: 显示用字符串
         - 各类别特定字段
 
-    示例：
-        "30m"          → 一次性，30 分钟后
-        "every 30m"    → 循环，每 30 分钟
-        "0 9 * * *"    → cron 表达式
-        "2026-07-08T14:00:00" → 一次性定时
+    支持的格式：
+        "2 22 * * *"       → cron 表达式（覆盖所有重复场景）
+        "2026-07-08T14:00:00" → ISO 时间戳（单次定时）
     """
     schedule = schedule.strip()
     original = schedule
-    schedule_lower = schedule.lower()
 
     if not schedule:
         raise ValueError("调度计划不能为空。")
-
-    # "every X" 模式 → 循环间隔
-    if schedule_lower.startswith("every "):
-        duration_str = schedule[6:].strip()
-        minutes = parse_duration(duration_str)
-        return {
-            "kind": "interval",
-            "minutes": minutes,
-            "display": f"every {minutes}m",
-        }
 
     # cron 表达式（5 个空格分隔的字段）
     parts = schedule.split()
@@ -264,24 +232,10 @@ def parse_schedule(schedule: str) -> dict[str, Any]:
         except ValueError as e:
             raise ValueError(f"无效的时间戳 '{schedule}': {e}")
 
-    # 纯时长 → 一次性从当前时间起
-    try:
-        minutes = parse_duration(schedule)
-        run_at = _now() + timedelta(minutes=minutes)
-        return {
-            "kind": "once",
-            "run_at": run_at.isoformat(),
-            "display": f"once in {original}",
-        }
-    except ValueError:
-        pass
-
     raise ValueError(
         f"无效的调度计划 '{original}'。请使用:\n"
-        f"  - 时长: '30m', '2h', '1d'（一次性）\n"
-        f"  - 间隔: 'every 30m', 'every 2h'（循环）\n"
-        f"  - Cron: '0 9 * * *'（cron 表达式）\n"
-        f"  - 时间戳: '2026-07-08T14:00:00'（一次性定时）"
+        f"  - Cron 表达式: '2 22 * * *'（循环，每天 22:02）\n"
+        f"  - 时间戳: '2026-07-08T22:00:00'（单次定时）"
     )
 
 
@@ -450,7 +404,7 @@ def _save_jobs_unlocked(jobs: list[dict[str, Any]]) -> None:
     fd, tmp_path = tempfile.mkstemp(dir=str(JOBS_FILE.parent), suffix=".tmp", prefix=".jobs_")
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as f:
-            json.dump({"jobs": jobs, "updated_at": _now().isoformat()}, f, indent=2)
+            json.dump({"jobs": jobs, "updated_at": _now().isoformat()}, f, indent=2, ensure_ascii=False)
             f.flush()
             os.fsync(f.fileno())
         os.replace(tmp_path, JOBS_FILE)

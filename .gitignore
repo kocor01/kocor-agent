@@ -12,6 +12,7 @@ log/
 *.log
 .kocor/memories/
 .kocor/sessions/
+.kocor/cron/
 MagicMock
 .vscode/
 docs/
