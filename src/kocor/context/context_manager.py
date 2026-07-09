@@ -99,7 +99,7 @@ class ContextManager:
         self.messages.extend(processed_history)
         # 上下文压缩发生时，注入 active todos 快照，防止 LLM 重做已完成任务
         if summary_node is not None:
-            self._inject_todo_snapshot(before_input=True)
+            self._inject_todo_snapshot()
         self.messages.append(Message(role="user", content=user_input))
         self.token_budget.used_prompt = self._token_counter.count_messages(self.messages) + tool_tokens
 
@@ -134,13 +134,14 @@ class ContextManager:
         self.messages = system + processed
         # 压缩发生时，在末尾注入 active todos 快照
         if summary_node is not None:
-            self._inject_todo_snapshot(before_input=False)
+            self._inject_todo_snapshot()
 
-    def _inject_todo_snapshot(self, before_input: bool) -> None:
-        """压缩发生时把 active todos 作为 user 消息注入。
+    def _inject_todo_snapshot(self) -> None:
+        """把 active todos 作为 user 消息追加以提示 LLM。
 
-        - before_input=True：插入在当前 user_input 之前（build_initial_context 路径）
-        - before_input=False：追加到 messages 末尾（compress_if_needed 路径）
+        调用方负责在正确的时机追加：
+        - build_initial_context：在 user_input 前追加 → 快照出现在 user_input 之前
+        - compress_if_needed：在末尾追加 → 快照出现在所有消息之后
 
         active 项为空（format_for_injection 返回 None）时不注入，避免冗余。
         """
@@ -149,11 +150,7 @@ class ContextManager:
         snapshot = self.todo_store.format_for_injection()
         if snapshot is None:
             return
-        if before_input:
-            # 当前 user_input 是 messages 末尾，插入其前
-            self.messages.insert(len(self.messages) - 1, Message(role="user", content=snapshot))
-        else:
-            self.messages.append(Message(role="user", content=snapshot))
+        self.messages.append(Message(role="user", content=snapshot))
 
     def extract_session_history(self) -> None:
         """从本轮 messages 提取非 system 消息作为跨轮历史。"""

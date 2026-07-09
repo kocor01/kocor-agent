@@ -136,57 +136,63 @@ class _StreamFormatter:
     def _handle_content(self, chunk) -> None:
         if not chunk.content:
             return
-        # 去除前导空行（只在首次输出时）
-        content = chunk.content
-        if not self._content_has_printed_any:
-            content = content.lstrip("\n")
+        content = self._prepare_content(chunk.content)
         if not content:
             return
+        self._ensure_content_section()
+
+        self._content_buffer += content
+        while "\n" in self._content_buffer:
+            line, self._content_buffer = self._content_buffer.split("\n", 1)
+            self._process_line(line.rstrip())
+
+    def _prepare_content(self, content: str) -> str:
+        """去除前导空行（只在首次输出时）。"""
+        if not self._content_has_printed_any:
+            content = content.lstrip("\n")
+        return content
+
+    def _ensure_content_section(self) -> None:
+        """确保内容区块头部已输出（仅首次调用时打印）。"""
         if not self.has_content:
             self._output("\n\U0001f4ac 回答内容")
             self._sep("dim cyan")
             self.has_content = True
             self._content_has_printed_any = True
 
-        # 累积内容到缓冲区
-        self._content_buffer += content
+    def _process_line(self, line: str) -> None:
+        """处理一行内容，根据行上下文分发到不同渲染路径。"""
+        # 代码块闭合检测：在代码块中时，仅精确匹配 ``` 才闭合
+        if self._in_code_block and line == "```":
+            self._flush_block()
+            self._code_block_buffer += line
+            self._render_markdown(self._code_block_buffer)
+            self._code_block_buffer = ""
+            self._in_code_block = False
+            return
+        # 代码块开启检测：``` 或 ```lang 标准 fence 格式
+        if not self._in_code_block and re.fullmatch(r"```\S*", line):
+            self._flush_block()
+            self._in_code_block = True
+            self._code_block_buffer = line + "\n"
+            return
 
-        # 按行拆分处理：累积文本块，按空行边界整体渲染（支持表格等跨行结构）
-        while "\n" in self._content_buffer:
-            line, self._content_buffer = self._content_buffer.split("\n", 1)
-            line = line.rstrip()
-
-            # 代码块闭合检测：在代码块中时，仅精确匹配 ``` 才闭合
-            if self._in_code_block and line == "```":
-                self._flush_block()
-                self._code_block_buffer += line
-                self._render_markdown(self._code_block_buffer)
-                self._code_block_buffer = ""
-                self._in_code_block = False
-                continue
-            # 代码块开启检测：``` 或 ```lang 标准 fence 格式
-            if not self._in_code_block and re.fullmatch(r"```\S*", line):
-                self._flush_block()
-                self._in_code_block = True
-                self._code_block_buffer = line + "\n"
-                continue
-
-            if self._in_code_block:
-                self._code_block_buffer += line + "\n"
-            elif line == "":
-                # 空行 = 块边界，渲染已累积的表格块
-                self._flush_block()
-            elif re.fullmatch(r"[-*_]{3,}\s*", line):
-                # Markdown 水平线（--- / *** / ___）→ 输出简洁分隔线
-                self._flush_block()
-                self._sep("dim white")
-            elif line.startswith("|"):
-                # 表格行——累积到缓冲区，等待整表渲染
-                self._block_buffer += line + "\n"
-            else:
-                # 普通行——先刷新未闭合的表格块，再即时渲染
-                self._flush_block()
-                self._render_markdown(line)
+        if self._in_code_block:
+            self._code_block_buffer += line + "\n"
+        elif line == "":
+            # 空行 = 块边界，渲染已累积的表格块
+            self._flush_block()
+        elif re.fullmatch(r"[-*_]{3,}\s*", line):
+            # Markdown 水平线（--- / *** / ___）→ 输出简洁分隔线
+            self._flush_block()
+            self._sep("dim white")
+        elif line.startswith("|"):
+            # 表格行——累积到缓冲区，等待整表渲染
+            self._block_buffer += line + "\n"
+        else:
+            # 普通行——先刷新未闭合的表格块，再即时渲染
+            self._flush_block()
+            self._render_markdown(line)
 
     def _handle_tool_calls(self, chunk) -> None:
         if not chunk.tool_calls:

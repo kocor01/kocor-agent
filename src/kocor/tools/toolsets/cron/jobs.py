@@ -110,33 +110,40 @@ def _jobs_lock():
 
     with _jobs_file_lock:
         _jobs_lock_state.depth = 1
-        lock_fd = None
         try:
-            try:
-                ensure_dirs()
-                lock_fd = open(_jobs_lock_file(), "a+", encoding="utf-8")
-                lock_fd.seek(0)
-                if fcntl is not None:
-                    fcntl.flock(lock_fd, fcntl.LOCK_EX)
-                elif msvcrt is not None:
-                    msvcrt.locking(lock_fd.fileno(), msvcrt.LK_LOCK, 1)
-            except (OSError, IOError) as e:
-                logger.warning("跨进程文件锁不可用 (%s)，仅使用线程锁", e)
-            try:
+            with _acquire_file_lock():
                 yield
-            finally:
-                if lock_fd is not None:
-                    try:
-                        if fcntl is not None:
-                            fcntl.flock(lock_fd, fcntl.LOCK_UN)
-                        elif msvcrt is not None:
-                            msvcrt.locking(lock_fd.fileno(), msvcrt.LK_UNLCK, 1)
-                    except (OSError, IOError):
-                        pass
-                    finally:
-                        lock_fd.close()
         finally:
             _jobs_lock_state.depth = 0
+
+
+@contextlib.contextmanager
+def _acquire_file_lock():
+    """获取跨进程文件锁（失败时降级为仅线程锁）。"""
+    lock_fd = None
+    try:
+        try:
+            ensure_dirs()
+            lock_fd = open(_jobs_lock_file(), "a+", encoding="utf-8")
+            lock_fd.seek(0)
+            if fcntl is not None:
+                fcntl.flock(lock_fd, fcntl.LOCK_EX)
+            elif msvcrt is not None:
+                msvcrt.locking(lock_fd.fileno(), msvcrt.LK_LOCK, 1)
+        except (OSError, IOError) as e:
+            logger.warning("跨进程文件锁不可用 (%s)，仅使用线程锁", e)
+        yield
+    finally:
+        if lock_fd is not None:
+            try:
+                if fcntl is not None:
+                    fcntl.flock(lock_fd, fcntl.LOCK_UN)
+                elif msvcrt is not None:
+                    msvcrt.locking(lock_fd.fileno(), msvcrt.LK_UNLCK, 1)
+            except (OSError, IOError):
+                pass
+            finally:
+                lock_fd.close()
 
 
 def _secure_dir(path: Path) -> None:
