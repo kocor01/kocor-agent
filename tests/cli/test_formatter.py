@@ -249,6 +249,22 @@ class TestCodeBlock:
         assert "Done." in output
 
 
+class TestCodeBlockBoundary:
+    """代码块边界检测的精确性。"""
+
+    def test_non_fence_not_opening(self):
+        """以 ``` 开头但后跟空格的行不应被当作代码块边界（不进入累积分支）。
+        验证方式：非最终 chunk 中，非 fence 行后的内容应立即渲染而非被缓冲。"""
+        f = _StreamFormatter()
+        buf = io.StringIO()
+        with patch("sys.stdout", buf):
+            f.handle_chunk(StreamChunk(content="``` text\ncontent should appear now\n"))
+        output = _strip_ansi(buf.getvalue())
+        # 旧行为：``` text 误判为代码块开头 → "content should appear now" 被缓冲不输出
+        # 新行为：``` text 不被看作 fence → 正常渲染
+        assert "content should appear now" in output
+
+
 class TestHeaderDisplay:
     """回答内容头部的显示逻辑。"""
 

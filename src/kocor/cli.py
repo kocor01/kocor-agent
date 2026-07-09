@@ -155,22 +155,19 @@ class _StreamFormatter:
             line, self._content_buffer = self._content_buffer.split("\n", 1)
             line = line.rstrip()
 
-            # 检测代码块边界（``` 开头）
-            if line.startswith("```"):
-                if self._in_code_block:
-                    # 代码块闭合前先刷新未闭合的文本块
-                    self._flush_block()
-                    # 代码块闭合——整块渲染
-                    self._code_block_buffer += line
-                    self._render_markdown(self._code_block_buffer)
-                    self._code_block_buffer = ""
-                    self._in_code_block = False
-                else:
-                    # 代码块开始前先刷新前面的文本块
-                    self._flush_block()
-                    # 代码块开始——进入批模式
-                    self._in_code_block = True
-                    self._code_block_buffer = line + "\n"
+            # 代码块闭合检测：在代码块中时，仅精确匹配 ``` 才闭合
+            if self._in_code_block and line == "```":
+                self._flush_block()
+                self._code_block_buffer += line
+                self._render_markdown(self._code_block_buffer)
+                self._code_block_buffer = ""
+                self._in_code_block = False
+                continue
+            # 代码块开启检测：``` 或 ```lang 标准 fence 格式
+            if not self._in_code_block and re.fullmatch(r"```\S*", line):
+                self._flush_block()
+                self._in_code_block = True
+                self._code_block_buffer = line + "\n"
                 continue
 
             if self._in_code_block:
