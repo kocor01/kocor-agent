@@ -1,5 +1,8 @@
 """HookManager — 钩子注册与执行管理器。"""
 
+from __future__ import annotations
+
+from kocor.harness.logger import Logger
 from kocor.hook.base import HookPoint, HookContext, HookResult, HookAction, Hook
 
 
@@ -9,10 +12,14 @@ class HookManager:
     def __init__(self):
         self._hooks: dict[HookPoint, list] = {}
 
-    def register_all(self) -> None:
-        """注册默认钩子。"""
+    def register_all(self, logger: Logger) -> None:
+        """注册默认钩子。
+
+        Args:
+            logger: Logger 实例，注入到各钩子中。
+        """
         from kocor.hook.hooks.audit_log import AuditLogHook
-        self.register(AuditLogHook())
+        self.register(AuditLogHook(logger=logger))
 
     def register(self, hook: Hook) -> None:
         """注册一个钩子实例。"""

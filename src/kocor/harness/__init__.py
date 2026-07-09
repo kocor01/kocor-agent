@@ -7,7 +7,7 @@ from kocor.harness.config import HarnessConfig
 from kocor.tools.permission import PermissionManager
 from kocor.harness.file_guard import FileAccessGuard
 from kocor.harness.error_handler import ErrorHandler
-from kocor.harness.logger import Logger, get_logger, setup_logger
+from kocor.harness.logger import Logger
 
 __all__ = [
     # 预算
@@ -27,6 +27,4 @@ __all__ = [
     "ErrorHandler",
     # 可观测性
     "Logger",
-    "setup_logger",
-    "get_logger",
 ]

@@ -3,14 +3,20 @@
 import json
 from datetime import datetime
 
-from kocor.harness.logger import get_logger
+from kocor.harness.logger import Logger
 from kocor.hook.base import HookPoint, HookContext, HookResult, HookAction
 
 
 class AuditLogHook:
-    """将所有工具调用记录到 Logger 审计日志。"""
+    """将所有工具调用记录到 Logger 审计日志。
+
+    通过依赖注入接收 Logger 实例，不依赖全局单例。
+    """
 
     hook_point = HookPoint.POST_TOOL
+
+    def __init__(self, logger: Logger):
+        self._logger = logger
 
     def run(self, context: HookContext) -> HookResult:
         entry = {
@@ -24,6 +30,6 @@ class AuditLogHook:
         if context.error:
             entry["error"] = str(context.error)
 
-        get_logger().info(json.dumps(entry, ensure_ascii=False))
+        self._logger.info(json.dumps(entry, ensure_ascii=False))
 
         return HookResult(action=HookAction.CONTINUE)

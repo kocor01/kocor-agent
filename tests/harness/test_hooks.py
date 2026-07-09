@@ -1,6 +1,6 @@
 """钩子系统测试。"""
 
-from kocor.harness.logger import setup_logger
+from kocor.harness.logger import Logger
 from kocor.hook.base import HookPoint, HookContext, HookResult, HookAction
 from kocor.hook.hook_manager import HookManager
 from kocor.hook.hooks import AuditLogHook
@@ -170,14 +170,14 @@ class TestHookManager:
 
 class TestAuditLogHook:
     def setup_method(self):
-        setup_logger("INFO")
+        self._logger = Logger("INFO")
 
     def test_hook_point(self):
-        hook = AuditLogHook()
+        hook = AuditLogHook(logger=self._logger)
         assert hook.hook_point == HookPoint.POST_TOOL
 
     def test_run_returns_continue(self):
-        hook = AuditLogHook()
+        hook = AuditLogHook(logger=self._logger)
         from kocor.llm_provider.message import ToolCall, FunctionCall
 
         result = hook.run(HookContext(
@@ -191,6 +191,6 @@ class TestAuditLogHook:
         assert result.action == HookAction.CONTINUE
 
     def test_run_without_tool_call(self):
-        hook = AuditLogHook()
+        hook = AuditLogHook(logger=self._logger)
         result = hook.run(HookContext(iteration=1, messages=[]))
         assert result.action == HookAction.CONTINUE

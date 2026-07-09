@@ -38,7 +38,7 @@ from kocor.tools.permission import PermissionManager
 from kocor.hook.hook_manager import HookManager
 from kocor.harness.event.event_manager import EventEmitter
 from kocor.harness.event.event_subscribe import EventSubscribe
-from kocor.harness.logger import setup_logger
+from kocor.harness.logger import Logger
 
 # 可选的会话管理
 from kocor.session import SessionManager, SessionResetPolicy, SessionStore
@@ -409,7 +409,7 @@ def main() -> None:
     if not is_repl:
         Config.load().session_enabled = False
 
-    setup_logger(Config.load().log_level, log_dir=Config.load().log_dir)
+    logger = Logger(Config.load().log_level, log_dir=Config.load().log_dir)
 
     toolManager = ToolManager()
     toolManager.register_all()
@@ -423,11 +423,11 @@ def main() -> None:
     max_iterations = Config.load().max_iterations
 
     hook_manager = HookManager()
-    hook_manager.register_all()
+    hook_manager.register_all(logger=logger)
 
     event_emitter = EventEmitter()
 
-    EventSubscribe(event_emitter).subscribe_all()
+    EventSubscribe(event_emitter).subscribe_all(logger=logger)
 
     budget = IterationBudget(max_iterations=max_iterations)
 

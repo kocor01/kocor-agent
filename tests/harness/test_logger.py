@@ -5,7 +5,7 @@ import logging
 import pytest
 
 from kocor.harness.event.event_manager import EventType
-from kocor.harness.logger import Logger, get_logger, setup_logger
+from kocor.harness.logger import Logger
 
 
 class TestLogger:
@@ -52,19 +52,3 @@ class TestLogger:
     def test_name(self):
         logger = Logger()
         assert logger.logger.name == "kocor.harness"
-
-    def test_setup_and_get_logger(self):
-        logger = setup_logger("DEBUG", log_dir="./log")
-        assert logger is get_logger()
-        assert get_logger().logger.level == 10  # DEBUG
-
-    def test_get_logger_before_setup_raises(self):
-        from kocor.harness.logger import _logger_instance, get_logger
-        saved = _logger_instance
-        try:
-            import kocor.harness.logger as mod
-            mod._logger_instance = None
-            with pytest.raises(RuntimeError, match="not initialized"):
-                get_logger()
-        finally:
-            mod._logger_instance = saved
