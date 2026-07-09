@@ -97,3 +97,80 @@ class TestProcessTool:
     def test_process_kill_nonexistent(self):
         result = ProcessTool.handler(action="kill", session_id="nonexistent")
         assert "not_found" in result.lower() or "error" in result.lower()
+
+
+# =============================================================================
+# 阶段 2 重构测试：显式 env 注入 + 隔离性
+# =============================================================================
+
+
+class TestBashToolEnvInjection:
+    """显式 env 参数注入测试。"""
+
+    def test_handler_with_explicit_env(self, tmp_path):
+        """传入显式的 LocalEnvironment 实例应能正常执行。"""
+        env = LocalEnvironment(cwd=str(tmp_path), timeout=10)
+        result = BashTool.handler(command="echo hello", env=env)
+        assert "hello" in result
+        env.cleanup()
+
+    def test_handler_env_with_workdir(self, tmp_path):
+        """注入 env + 指定 workdir 应正常工作。"""
+        env = LocalEnvironment(timeout=10)
+        marker = tmp_path / "marker.txt"
+        marker.write_text("injected")
+        result = BashTool.handler(command="cat marker.txt", workdir=str(tmp_path), env=env)
+        assert "injected" in result
+        env.cleanup()
+
+    def test_handler_env_fallback_when_none(self):
+        """不传 env 时，应回退到模块级全局 _env（向后兼容）。"""
+        result = BashTool.handler(command="echo fallback_ok")
+        assert "fallback_ok" in result
+
+
+class TestBashToolEnvIsolation:
+    """两个独立的 LocalEnvironment 实例不应互相干扰。"""
+
+    def test_cwd_isolation(self, tmp_path):
+        """两个 env 实例的 CWD 应彼此独立。"""
+        dir_a = tmp_path / "dir_a"
+        dir_b = tmp_path / "dir_b"
+        dir_a.mkdir()
+        dir_b.mkdir()
+
+        env_a = LocalEnvironment(cwd=str(dir_a), timeout=10)
+        env_b = LocalEnvironment(cwd=str(dir_b), timeout=10)
+
+        # 验证各自 CWD 独立
+        assert env_a.cwd == str(dir_a)
+        assert env_b.cwd == str(dir_b)
+
+        # 在 env_a 中 cd 到 /，不应影响 env_b
+        BashTool.handler(command="cd /", env=env_a)
+        assert env_b.cwd == str(dir_b)  # env_b 的 CWD 不变
+
+        env_a.cleanup()
+        env_b.cleanup()
+
+    def test_background_env_isolation(self, tmp_path):
+        """后台进程使用不同的 env 实例应互不干扰。"""
+        env = LocalEnvironment(cwd=str(tmp_path), timeout=10)
+        result = BashTool.handler(command="echo isolated_bg", background=True, env=env)
+        assert "proc_" in result
+        assert "running" in result
+        env.cleanup()
+
+    def test_concurrent_env_instances(self, tmp_path):
+        """两个 env 实例能同时存在且独立工作。"""
+        env_a = LocalEnvironment(cwd=str(tmp_path), timeout=10)
+        env_b = LocalEnvironment(cwd=str(tmp_path), timeout=10)
+
+        result_a = BashTool.handler(command="echo aaa", env=env_a)
+        result_b = BashTool.handler(command="echo bbb", env=env_b)
+
+        assert "aaa" in result_a
+        assert "bbb" in result_b
+
+        env_a.cleanup()
+        env_b.cleanup()

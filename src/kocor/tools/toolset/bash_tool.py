@@ -106,6 +106,7 @@ class BashTool:
         background: bool = False,
         workdir: str = "",
         timeout: int = 180,
+        env: LocalEnvironment | None = None,
     ) -> str:
         # 安全检查：空命令
         if not command:
@@ -129,16 +130,16 @@ class BashTool:
             }, ensure_ascii=False)
 
         if background:
-            return BashTool._handle_background(command, workdir)
+            return BashTool._handle_background(command, workdir, env)
         else:
-            return BashTool._handle_foreground(command, workdir, timeout)
+            return BashTool._handle_foreground(command, workdir, timeout, env)
 
     @staticmethod
-    def _handle_foreground(command: str, workdir: str, timeout: int) -> str:
+    def _handle_foreground(command: str, workdir: str, timeout: int, env: LocalEnvironment | None = None) -> str:
         """处理前台命令执行。"""
-        env = _get_env()
+        effective_env = env or _get_env()
         try:
-            result = env.execute(command, cwd=workdir, timeout=timeout)
+            result = effective_env.execute(command, cwd=workdir, timeout=timeout)
             stdout = result.get("stdout", "")
             exit_code = result.get("exit_code", 0)
 
@@ -164,14 +165,14 @@ class BashTool:
             }, ensure_ascii=False)
 
     @staticmethod
-    def _handle_background(command: str, workdir: str) -> str:
+    def _handle_background(command: str, workdir: str, env: LocalEnvironment | None = None) -> str:
         """处理后台上进程启动。"""
-        env = _get_env()
+        effective_env = env or _get_env()
         try:
             session = process_registry.spawn(
-                env,
+                effective_env,
                 command,
-                cwd=workdir or env.cwd,
+                cwd=workdir or effective_env.cwd,
             )
             return json.dumps({
                 "session_id": session.id,

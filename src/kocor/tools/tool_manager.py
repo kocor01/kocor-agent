@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 from concurrent.futures import ThreadPoolExecutor
 from typing import Callable
 
@@ -10,6 +11,7 @@ from kocor.config import Config
 from kocor.tools.definitions import ToolDefinition
 from kocor.tools.truncate import ToolOutputTruncator
 from kocor.tools.toolset.file_state import FileStateTracker
+from kocor.tools.toolset.bash.environment import LocalEnvironment
 from kocor.llm_provider.message import ToolCall, ToolResult
 from kocor.tools.permission import PermissionManager
 
@@ -21,9 +23,25 @@ class ToolManager:
         self._tools: dict[str, ToolDefinition] = {}
         self._handlers: dict[str, Callable] = {}
         self.file_state = FileStateTracker()
+        self._env: LocalEnvironment | None = None
         self.mcp_manager = None
         self.skill_manager = None
         self._cron_scheduler = None
+
+    def get_or_create_env(self) -> LocalEnvironment:
+        """获取或创建 LocalEnvironment 实例（延迟初始化）。
+
+        每个 ToolManager 拥有独立的执行环境，天然支持多 Agent 隔离。
+        """
+        if self._env is None:
+            self._env = LocalEnvironment(cwd=os.getcwd(), timeout=180)
+        return self._env
+
+    def reset_env(self) -> None:
+        """重置执行环境（清理快照文件并重建）。"""
+        if self._env is not None:
+            self._env.cleanup()
+        self._env = None
 
     def register_builtin_tools(self) -> None:
         """向当前 ToolManager 注册内置工具（文件操作、沙盒执行、bash、cron）。"""
@@ -54,19 +72,20 @@ class ToolManager:
             PatchFile.SAFETY_LEVEL,
         )
 
-        # 其余内置工具直接注册
-        for tools in [SearchFiles, BashTool, ProcessTool]:
-            self.register(tools.NAME, tools.DESCRIPTION, tools.PARAMETERS, tools.handler, tools.SAFETY_LEVEL)
+        # BashTool 通过闭包注入 env，ProcessTool 保持直接注册
+        self.register(
+            BashTool.NAME, BashTool.DESCRIPTION, BashTool.PARAMETERS,
+            lambda **kw: BashTool.handler(env=self.get_or_create_env(), **kw),
+            BashTool.SAFETY_LEVEL,
+        )
+        self.register(
+            SearchFiles.NAME, SearchFiles.DESCRIPTION, SearchFiles.PARAMETERS, SearchFiles.handler, SearchFiles.SAFETY_LEVEL,
+        )
+        self.register(
+            ProcessTool.NAME, ProcessTool.DESCRIPTION, ProcessTool.PARAMETERS, ProcessTool.handler, ProcessTool.SAFETY_LEVEL,
+        )
 
-        # memory 工具需要 MemoryStore，handler 延迟读取 self.memory_store
-        self._register_memory_tool()
-        # todo 工具需要 TodoStore，handler 延迟读取 self.todo_store
-        self._register_todo_tool()
-        # cron 工具
-        self._register_cron_tool()
-
-    def _register_memory_tool(self) -> None:
-        """注册 memory 工具（依赖 self.memory_store，可为 None）。"""
+        # memory 工具依赖 self.memory_store，handler 在调用时读取
         from kocor.tools.toolset.memory_tool import MemoryTool
         self.register(
             MemoryTool.NAME, MemoryTool.DESCRIPTION, MemoryTool.PARAMETERS,
@@ -74,8 +93,7 @@ class ToolManager:
             MemoryTool.SAFETY_LEVEL,
         )
 
-    def _register_todo_tool(self) -> None:
-        """注册 todo 工具（依赖 self.todo_store，可为 None）。"""
+        # todo 工具依赖 self.todo_store，handler 在调用时读取
         from kocor.tools.toolset.todo_tool import TodoTool
         self.register(
             TodoTool.NAME, TodoTool.DESCRIPTION, TodoTool.PARAMETERS,
@@ -83,14 +101,10 @@ class ToolManager:
             TodoTool.SAFETY_LEVEL,
         )
 
-    def _register_cron_tool(self) -> None:
-        """注册 cronjob 工具。"""
-        from kocor.tools.toolset.cron_tool import CronTool
+        # cron 工具
         from kocor.tools.toolset.cron.scheduler import CronScheduler
-
         if self._cron_scheduler is None:
             self._cron_scheduler = CronScheduler()
-
         self.register(
             CronTool.NAME, CronTool.DESCRIPTION, CronTool.PARAMETERS,
             lambda **kw: CronTool.handler(**kw),
