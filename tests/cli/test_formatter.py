@@ -344,13 +344,6 @@ class TestTableRendering:
 
 
 class TestConsoleCaching:
-    """_console 不应在类级别缓存 Console 实例。"""
-
-    def test_console_not_cached_at_class_level(self):
-        """类级别缓存可能导致状态泄漏，每次调用应返回新实例。"""
-        c1 = _StreamFormatter._console()
-        c2 = _StreamFormatter._console()
-        assert c1 is not c2, "_console() 不应返回同一个缓存的 Console 实例"
 
     def test_separator_uses_current_stdout(self):
         """分隔线应写入当前 sys.stdout。"""

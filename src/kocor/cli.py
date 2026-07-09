@@ -72,31 +72,32 @@ class _StreamFormatter:
         self._code_block_buffer: str = ""
         self._block_buffer: str = ""
 
+    @staticmethod
+    def _output(*args, **kwargs) -> None:
+        """统一的输出出口。所有输出通过此方法，便于测试拦截和后续重构。"""
+        print(*args, **kwargs)
+
     def _round_header(self, n: int) -> None:
         title = f"⚡ 第 {n} 次请求"
         fill = self.width - 2 - len(title)
-        print(f"\n── {title} {'─' * max(0, fill)}")
-
-    @staticmethod
-    def _console() -> Console:
-        """创建 Console 实例。不缓存——避免类级别状态泄漏。"""
-        return Console()
+        self._output(f"\n── {title} {'─' * max(0, fill)}")
 
     def _sep(self, style: str = "dim") -> None:
         """打印一条自适应宽度的彩色分隔线。"""
-        self._console().print(Text("─" * self.width, style=style))
+        buf = StringIO()
+        Console(file=buf, width=self.width).print(Text("─" * self.width, style=style))
+        self._output(buf.getvalue())
 
     def _render_markdown(self, text: str) -> None:
-        """将已完整的段落文本通过 print() 输出（内部用 rich Markdown 渲染）。"""
+        """将已完整的段落文本通过 rich Markdown 渲染后输出。"""
         text = text.strip()
         if not text:
             return
-        # 渲染到 StringIO，再通过 print() 输出（保持与 mock-print 测试兼容）
         buf = StringIO()
         Console(file=buf, width=self.width).print(Markdown(text))
         rendered = buf.getvalue()
         if rendered:
-            print(rendered, end="", flush=True)
+            self._output(rendered, end="", flush=True)
 
     def _flush_block(self) -> None:
         """刷新并渲染已累积的文本块（表格、段落等）。"""
@@ -127,10 +128,10 @@ class _StreamFormatter:
         if not chunk.reasoning:
             return
         if not self.has_reasoning:
-            print("\n\U0001f9e0 思维过程")
+            self._output("\n\U0001f9e0 思维过程")
             self._sep("dim yellow")
             self.has_reasoning = True
-        print(chunk.reasoning, end="", flush=True)
+        self._output(chunk.reasoning, end="", flush=True)
 
     def _handle_content(self, chunk) -> None:
         if not chunk.content:
@@ -142,7 +143,7 @@ class _StreamFormatter:
         if not content:
             return
         if not self.has_content:
-            print("\n\U0001f4ac 回答内容")
+            self._output("\n\U0001f4ac 回答内容")
             self._sep("dim cyan")
             self.has_content = True
             self._content_has_printed_any = True
@@ -196,7 +197,7 @@ class _StreamFormatter:
                 self.tool_calls.append(tc)
                 seen_ids.add(tc.id)
         if not self.has_tool_section and not chunk.tool_result:
-            print("\n\U0001f527 工具调用")
+            self._output("\n\U0001f527 工具调用")
             self._sep("dim green")
             self.has_tool_section = True
 
@@ -212,10 +213,10 @@ class _StreamFormatter:
                 tail = content[-400:]
                 content = f"{head}\n...\n{tail}"
             if self.tool_result_idx > 0:
-                print()
-            print(f"{self.tool_result_idx + 1:2}. {tc.function.name}({tc.function.arguments})")
+                self._output()
+            self._output(f"{self.tool_result_idx + 1:2}. {tc.function.name}({tc.function.arguments})")
             self._sep("dim magenta")
-            print(f"{content}")
+            self._output(f"{content}")
             self.tool_result_idx += 1
 
     def _flush_all_buffers(self) -> None:
@@ -244,7 +245,7 @@ class _StreamFormatter:
     def flush_remaining(self) -> None:
         self._flush_all_buffers()
         for tc in self.tool_calls[self.tool_result_idx:]:
-            print(f"• {tc.function.name}({tc.function.arguments})")
+            self._output(f"• {tc.function.name}({tc.function.arguments})")
 
 
 def _print_welcome(
