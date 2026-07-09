@@ -117,9 +117,6 @@ class Loop:
                     return response.content or ""
 
                 if self._check_repetition(response):
-                    self._emit(EventType.ON_BUDGET_EXHAUSTED, iteration=self.ctx.iteration,
-                               max_iterations=self.budget.max_iterations, reason="duplicate_tool_calls")
-                    self._run_hooks(HookPoint.ON_BUDGET_EXHAUSTED)
                     return self._stuck_in_loop_message()
 
                 for tool_call in response.tool_calls:
@@ -202,9 +199,6 @@ class Loop:
                     return
 
                 if self._check_repetition(response):
-                    self._emit(EventType.ON_BUDGET_EXHAUSTED, iteration=self.ctx.iteration,
-                               max_iterations=self.budget.max_iterations, reason="duplicate_tool_calls")
-                    self._run_hooks(HookPoint.ON_BUDGET_EXHAUSTED)
                     yield StreamChunk(content=self._stuck_in_loop_message(), is_final=True)
                     return
 
@@ -303,7 +297,11 @@ class Loop:
         return f"{name}({json.dumps(args, sort_keys=True, ensure_ascii=False)})"
 
     def _check_repetition(self, response: Message) -> bool:
-        """检测 LLM 是否在重复调用相同的工具。"""
+        """检测 LLM 是否在重复调用相同的工具。
+
+        检测到第 2 次重复时注入显式警告让模型自行纠正；
+        第 3 次重复时触发 ON_BUDGET_EXHAUSTED 事件和钩子并返回 True。
+        """
         if not response.tool_calls:
             self._consecutive_duplicate_count = 0
             self._last_tool_call_signature = None
@@ -325,7 +323,13 @@ class Loop:
                 content="[SYSTEM] 检测到重复的工具调用。你正在重复调用相同的工具，请立即停止并回复用户。",
             ))
 
-        return self._consecutive_duplicate_count >= 3
+        if self._consecutive_duplicate_count >= 3:
+            self._emit(EventType.ON_BUDGET_EXHAUSTED, iteration=self.ctx.iteration,
+                       max_iterations=self.budget.max_iterations, reason="duplicate_tool_calls")
+            self._run_hooks(HookPoint.ON_BUDGET_EXHAUSTED)
+            return True
+
+        return False
 
     # ── 辅助方法 ──
 

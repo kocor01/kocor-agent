@@ -47,28 +47,18 @@ class AnthropicClient(LLMClient):
         actual_max_tokens = max_tokens if max_tokens is not None else self.config.max_tokens
         client = Anthropic(
             api_key=self.config.anthropic_api_key,
-            auth_token=self.config.anthropic_api_key, # anthropic 兼容不同厂商模型
+            auth_token=self.config.anthropic_api_key,  # anthropic 兼容不同厂商模型
             base_url=self.config.anthropic_base_url or None,
         )
 
-        # 提取 system 消息（Anthropic 用顶层参数，多个 system 消息拼接）
-        system_parts: list[str] = []
-        filtered_messages = []
-        for msg in messages:
-            if msg.role == "system":
-                if msg.content:
-                    system_parts.append(msg.content)
-            else:
-                filtered_messages.append(msg)
-        system_content = "\n\n---\n\n".join(system_parts)
-
+        system_content, filtered_messages = self._extract_system(messages)
         anthropic_messages = self._normalize_in(filtered_messages)
         anthropic_tools = [self._normalize_tool(t) for t in tools] if tools else None
 
         # 调用 API
         response = client.messages.create(
             model=self.config.anthropic_model,
-            system=system_content or None,
+            system=system_content,
             messages=anthropic_messages,
             max_tokens=actual_max_tokens,
             temperature=temperature,
@@ -99,21 +89,11 @@ class AnthropicClient(LLMClient):
         actual_max_tokens = max_tokens if max_tokens is not None else self.config.max_tokens
         client = Anthropic(
             api_key=self.config.anthropic_api_key,
-            auth_token=self.config.anthropic_api_key, # anthropic 兼容不同厂商模型
+            auth_token=self.config.anthropic_api_key,  # anthropic 兼容不同厂商模型
             base_url=self.config.anthropic_base_url or None,
         )
 
-        # 提取 system 消息
-        system_parts: list[str] = []
-        filtered_messages = []
-        for msg in messages:
-            if msg.role == "system":
-                if msg.content:
-                    system_parts.append(msg.content)
-            else:
-                filtered_messages.append(msg)
-        system_content = "\n\n---\n\n".join(system_parts)
-
+        system_content, filtered_messages = self._extract_system(messages)
         anthropic_messages = self._normalize_in(filtered_messages)
         anthropic_tools = [self._normalize_tool(t) for t in tools] if tools else None
 
@@ -125,7 +105,7 @@ class AnthropicClient(LLMClient):
 
         for event in client.messages.create(
             model=self.config.anthropic_model,
-            system=system_content or None,
+            system=system_content,
             messages=anthropic_messages,
             max_tokens=actual_max_tokens,
             temperature=temperature,
@@ -196,6 +176,26 @@ class AnthropicClient(LLMClient):
             # 有内容时才 yield
             if stream_chunk.content or stream_chunk.reasoning or stream_chunk.tool_calls or stream_chunk.is_final:
                 yield stream_chunk
+
+    # ── 格式转换 ──
+
+    @staticmethod
+    def _extract_system(messages: list[Message]) -> tuple[str | None, list[Message]]:
+        """从消息列表中提取 system 消息并过滤。
+
+        Anthropic 将 system 消息作为顶层参数传入，不支持在 messages 数组中
+        包含 role=system 的消息。多个 system 消息用分隔符拼接。
+        """
+        system_parts: list[str] = []
+        filtered_messages = []
+        for msg in messages:
+            if msg.role == "system":
+                if msg.content:
+                    system_parts.append(msg.content)
+            else:
+                filtered_messages.append(msg)
+        system_content = "\n\n---\n\n".join(system_parts)
+        return system_content or None, filtered_messages
 
     def _normalize_in(self, messages: list[Message]) -> list[dict]:
         """内部消息格式 → Anthropic 消息格式"""
