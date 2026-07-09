@@ -47,9 +47,19 @@ class TestSlidingWindowStrategy:
     """测试 SlidingWindowStrategy。"""
 
     def setup_method(self):
+        # setup_method 在 @patch 装饰器生效前执行，需自行 patch LlmFactory.create，
+        # 否则 SlidingWindowStrategy -> HistorySummarizer 构造时会创建真实 LLM 客户端
+        self._factory_patch = patch(
+            "kocor.llm_provider.llm_factory.LlmFactory.create",
+            return_value=FakeLLMForSummary(),
+        )
+        self._factory_patch.start()
         self.strategy = SlidingWindowStrategy(
             preserve_last_rounds=2, preserve_first_rounds=0,
         )
+
+    def teardown_method(self):
+        self._factory_patch.stop()
 
     def test_no_truncation_needed(self, mock_create):
         """总轮次少于保留轮次时，不截断。"""

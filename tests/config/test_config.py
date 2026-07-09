@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+from unittest.mock import patch
 
 from kocor.config import Config, _resolve_data_path
 
@@ -58,6 +59,16 @@ class TestLoadConfig:
     def setup_method(self):
         for key in ["KOCOR_PROVIDER", "KOCOR_MAX_ITERATIONS", "KOCOR_TOOL_TIMEOUT"]:
             os.environ.pop(key, None)
+        # 隔离本地 .env 文件：_load() 内部会调用 load_dotenv() 重新载入 .env，
+        # 会把开发环境配置（如 KOCOR_PROVIDER）回填进 os.environ，污染默认值测试
+        self._dotenv_patch = patch("kocor.config.load_dotenv")
+        self._dotenv_patch.start()
+        Config.reset()
+
+    def teardown_method(self):
+        self._dotenv_patch.stop()
+        # 清除单例，避免本类的隔离配置泄漏到后续依赖 .env 的测试
+        Config.reset()
 
     def test_load_default(self):
         cfg = Config._load()

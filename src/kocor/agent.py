@@ -364,7 +364,11 @@ class Agent:
                 messages.append(Message(role="user", content=result.content))
             self.ctx.reset()
             self.ctx.messages = messages
-            return self.loop._run_messages()
+            result = self.loop._run_messages()
+            # 与 loop.run() 保持一致：将本轮 messages 提取为 session_history，
+            # 否则 _session_after_run 拿不到新增消息，PROMPT 技能的 LLM 回复不会被持久化
+            self.ctx.extract_session_history()
+            return result
         else:
             return result.content
 
