@@ -218,19 +218,21 @@ class _StreamFormatter:
             print(f"{content}")
             self.tool_result_idx += 1
 
-    def _handle_end_of_round(self, chunk) -> None:
-        if not chunk.is_final:
-            return
-        # 刷新残留缓冲区中的内容
+    def _flush_all_buffers(self) -> None:
+        """刷新所有残留缓冲区中的内容。"""
         self._flush_block()
         if self._content_buffer.strip():
             self._render_markdown(self._content_buffer)
         self._content_buffer = ""
-        # 未闭合代码块强制刷新
         if self._code_block_buffer:
             self._render_markdown(self._code_block_buffer)
             self._code_block_buffer = ""
             self._in_code_block = False
+
+    def _handle_end_of_round(self, chunk) -> None:
+        if not chunk.is_final:
+            return
+        self._flush_all_buffers()
         self.has_reasoning = False
         self.has_content = False
         self.has_tool_section = False
@@ -240,14 +242,7 @@ class _StreamFormatter:
             self.tool_result_idx = 0
 
     def flush_remaining(self) -> None:
-        self._flush_block()
-        if self._content_buffer.strip():
-            self._render_markdown(self._content_buffer)
-            self._content_buffer = ""
-        if self._code_block_buffer:
-            self._render_markdown(self._code_block_buffer)
-            self._code_block_buffer = ""
-            self._in_code_block = False
+        self._flush_all_buffers()
         for tc in self.tool_calls[self.tool_result_idx:]:
             print(f"• {tc.function.name}({tc.function.arguments})")
 
