@@ -72,12 +72,12 @@ class TestPermissionManager:
 
     def test_cache_hits(self):
         pm = PermissionManager(cache_enabled=True)
-        pm._cache.add("write_file")
+        pm._add_to_cache("write_file")
         assert pm.check(_tc("write_file")) is True
 
     def test_cache_disabled(self):
         pm = PermissionManager(cache_enabled=False)
-        pm._cache.add("write_file")
+        pm._add_to_cache("write_file")
         # 缓存禁用，需重新检查 -> 无 stdin -> 拒绝
         assert pm.check(_tc("write_file")) is False
 
@@ -101,7 +101,7 @@ class TestPermissionManager:
 
     def test_clear_cache(self):
         pm = PermissionManager()
-        pm._cache.add("write_file")
+        pm._add_to_cache("write_file")
         pm.clear_cache()
         assert len(pm._cache) == 0
 
@@ -112,6 +112,20 @@ class TestPermissionManager:
         pm._add_to_cache("tool3")
         pm._add_to_cache("tool4")
         assert len(pm._cache) <= 2
+
+    def test_cache_fifo_eviction(self):
+        # 缓存满后应淘汰最早添加的元素（FIFO），而非 set.pop() 的随机淘汰。
+        # t1..t8 这组字符串在 CPython 的 set 哈希表布局下，set.pop() 会错误地
+        # 保留 t6 而淘汰 t7，可确定性复现“非 FIFO”行为。
+        pm = PermissionManager(cache_enabled=True, cache_max_size=2)
+        for i in range(1, 9):
+            pm._add_to_cache(f"t{i}")
+        # 最旧的 t1..t6 被淘汰，仅保留最近添加的 t7、t8
+        assert "t7" in pm._cache
+        assert "t8" in pm._cache
+        assert len(pm._cache) == 2
+        for i in range(1, 7):
+            assert f"t{i}" not in pm._cache
 
     def test_ask_user_always_option(self, monkeypatch):
         monkeypatch.setattr("builtins.input", lambda prompt="": "a")

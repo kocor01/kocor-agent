@@ -5,6 +5,7 @@
 """
 
 import json
+from collections import OrderedDict
 
 
 class PermissionManager:
@@ -45,7 +46,7 @@ class PermissionManager:
         self.policy = policy
         self._always_allow = always_allow or set()
         self._always_ask = always_ask or set()
-        self._cache: set[str] = set()
+        self._cache: OrderedDict[str, None] = OrderedDict()
         self.cache_enabled = cache_enabled
         self.cache_max_size = cache_max_size
         self._tool_manager = tool_manager
@@ -113,10 +114,17 @@ class PermissionManager:
         return False
 
     def _add_to_cache(self, tool_name: str) -> None:
-        """将工具添加到会话缓存，遵守最大大小限制。"""
+        """将工具添加到会话缓存，遵守最大大小限制（FIFO 淘汰）。
+
+        缓存满时淘汰最早添加的条目，而非随机条目，保证高频工具不会
+        因随机淘汰被意外移除。
+        """
+        if tool_name in self._cache:
+            return  # 已缓存，重复添加不应触发淘汰
         if len(self._cache) >= self.cache_max_size:
-            self._cache.pop()
-        self._cache.add(tool_name)
+            # FIFO：OrderedDict 按插入顺序排列，移除最旧条目
+            self._cache.popitem(last=False)
+        self._cache[tool_name] = None
 
     def clear_cache(self) -> None:
         """清除会话级别的批准缓存。"""
