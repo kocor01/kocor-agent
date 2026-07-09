@@ -1,6 +1,6 @@
 """测试模糊匹配模块。"""
 
-from kocor.tools.toolset.fuzzy_match import fuzzy_find_and_replace, match_strategies
+from kocor.tools.toolsets.file.fuzzy_match import fuzzy_find_and_replace, match_strategies
 
 
 class TestFuzzyMatch:

@@ -4,7 +4,7 @@ import os
 import tempfile
 import time
 
-from kocor.tools.toolset.file_state import FileStateTracker
+from kocor.tools.toolsets.file.file_state import FileStateTracker
 
 
 class TestFileStateTrackerIsolation:

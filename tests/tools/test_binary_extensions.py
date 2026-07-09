@@ -1,6 +1,6 @@
 """测试二进制扩展名工具。"""
 
-from kocor.tools.toolset.binary_extensions import BINARY_EXTENSIONS, has_binary_extension
+from kocor.tools.toolsets.file.binary_extensions import BINARY_EXTENSIONS, has_binary_extension
 
 
 class TestBinaryExtensions:

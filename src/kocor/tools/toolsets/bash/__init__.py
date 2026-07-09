@@ -8,28 +8,28 @@
 - process_registry: 后台进程注册表
 """
 
-from kocor.tools.toolset.bash.constants import (
+from kocor.tools.toolsets.bash.constants import (
     IS_WINDOWS,
     _find_bash,
     _make_run_env,
     _resolve_safe_cwd,
     _quote_cwd_for_cd,
 )
-from kocor.tools.toolset.bash.environment import (
+from kocor.tools.toolsets.bash.environment import (
     BaseEnvironment,
     LocalEnvironment,
 )
-from kocor.tools.toolset.bash.command_safety import (
+from kocor.tools.toolsets.bash.command_safety import (
     detect_dangerous_command,
     validate_workdir,
 )
-from kocor.tools.toolset.bash.output import (
+from kocor.tools.toolsets.bash.output import (
     OutputProcessor,
     strip_ansi,
     truncate_output,
     redact_sensitive,
 )
-from kocor.tools.toolset.bash.process_registry import (
+from kocor.tools.toolsets.bash.process_registry import (
     ProcessRegistry,
     ProcessSession,
     process_registry,

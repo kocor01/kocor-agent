@@ -4,7 +4,7 @@ import json
 import os
 import tempfile
 
-from kocor.tools.toolset.read_extract import (
+from kocor.tools.toolsets.file.read_extract import (
     extract_document_text,
     is_extractable_document,
 )
@@ -162,7 +162,7 @@ class TestExtractNotebook:
         f.close()
         try:
             import pytest
-            from kocor.tools.toolset.read_extract import ExtractionError
+            from kocor.tools.toolsets.file.read_extract import ExtractionError
             with pytest.raises(ExtractionError):
                 extract_document_text(f.name)
         finally:

@@ -1,6 +1,6 @@
 """测试内联 Lint 模块。"""
 
-from kocor.tools.toolset.inline_lint import lint_content
+from kocor.tools.toolsets.file.inline_lint import lint_content
 
 
 class TestPythonLint:

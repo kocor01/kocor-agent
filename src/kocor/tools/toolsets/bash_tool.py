@@ -15,13 +15,13 @@ import os
 from typing import Optional
 
 from kocor.tools.permission import PermissionManager
-from kocor.tools.toolset.bash.command_safety import (
+from kocor.tools.toolsets.bash.command_safety import (
     detect_dangerous_command,
     validate_workdir,
 )
-from kocor.tools.toolset.bash.environment import LocalEnvironment
-from kocor.tools.toolset.bash.output import OutputProcessor
-from kocor.tools.toolset.bash.process_registry import process_registry
+from kocor.tools.toolsets.bash.environment import LocalEnvironment
+from kocor.tools.toolsets.bash.output import OutputProcessor
+from kocor.tools.toolsets.bash.process_registry import process_registry
 
 logger = logging.getLogger(__name__)
 

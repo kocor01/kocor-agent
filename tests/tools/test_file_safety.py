@@ -5,7 +5,7 @@ import tempfile
 
 import pytest
 
-from kocor.tools.toolset.file_safety import (
+from kocor.tools.toolsets.file.file_safety import (
     _looks_like_read_file_line_numbered_content,
     check_sensitive_path,
     get_read_block_error,
@@ -133,7 +133,7 @@ class TestIsInternalFileToolContent:
 
     def test_short_text_with_status_message(self):
         """短文本包含状态消息被检测。"""
-        from kocor.tools.toolset.file_safety import _READ_DEDUP_STATUS_MESSAGE
+        from kocor.tools.toolsets.file.file_safety import _READ_DEDUP_STATUS_MESSAGE
         content = f"Note: {_READ_DEDUP_STATUS_MESSAGE}"
         assert is_internal_file_tool_content(content) is True
 

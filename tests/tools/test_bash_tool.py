@@ -4,9 +4,9 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from kocor.tools.toolset.bash_tool import BashTool, ProcessTool
-from kocor.tools.toolset.bash.environment import LocalEnvironment
-from kocor.tools.toolset.bash.process_registry import ProcessRegistry
+from kocor.tools.toolsets.bash_tool import BashTool, ProcessTool
+from kocor.tools.toolsets.bash.environment import LocalEnvironment
+from kocor.tools.toolsets.bash.process_registry import ProcessRegistry
 from kocor.tools.permission import PermissionManager
 
 

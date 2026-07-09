@@ -8,7 +8,7 @@ import pytest
 
 from kocor.memory.store import MemoryStore
 from kocor.memory.types import MemoryTarget
-from kocor.tools.toolset.memory_tool import MemoryTool
+from kocor.tools.toolsets.memory_tool import MemoryTool
 
 
 @pytest.fixture

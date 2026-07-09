@@ -11,12 +11,12 @@ import tempfile
 from pathlib import Path
 
 from kocor.tools.permission import PermissionManager
-from kocor.tools.toolset.file_safety import (
+from kocor.tools.toolsets.file.file_safety import (
     check_sensitive_path,
     is_internal_file_tool_content,
     is_write_denied,
 )
-from kocor.tools.toolset.file_state import FileStateTracker
+from kocor.tools.toolsets.file.file_state import FileStateTracker
 from kocor.tools.tool_utils import resolve_safe_path
 
 # ── 行尾/BOM 检测 ────────────────────────────────────────────────
@@ -200,7 +200,7 @@ class WriteFile:
             "dirs_created": dirs_created,
         }
         try:
-            from kocor.tools.toolset.inline_lint import check_lint_delta
+            from kocor.tools.toolsets.file.inline_lint import check_lint_delta
             lint_err = check_lint_delta(safe_path, content_before, write_content)
             if lint_err:
                 result_dict["lint"] = lint_err

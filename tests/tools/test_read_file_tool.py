@@ -4,8 +4,8 @@ import json
 import os
 import tempfile
 
-from kocor.tools.toolset.read_file_tool import ReadFile
-from kocor.tools.toolset.file_state import FileStateTracker
+from kocor.tools.toolsets.read_file_tool import ReadFile
+from kocor.tools.toolsets.file.file_state import FileStateTracker
 
 
 class TestReadFile:

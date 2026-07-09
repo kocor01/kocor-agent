@@ -4,8 +4,8 @@ import json
 import os
 import tempfile
 
-from kocor.tools.toolset.write_file_tool import WriteFile
-from kocor.tools.toolset.file_state import FileStateTracker
+from kocor.tools.toolsets.write_file_tool import WriteFile
+from kocor.tools.toolsets.file.file_state import FileStateTracker
 
 
 class TestWriteFile:

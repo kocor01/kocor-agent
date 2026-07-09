@@ -12,7 +12,7 @@ import json
 import logging
 from typing import Any, Optional
 
-from kocor.tools.toolset.cron.jobs import (
+from kocor.tools.toolsets.cron.jobs import (
     AmbiguousJobReference,
     claim_job_for_fire,
     create_job,
@@ -25,7 +25,7 @@ from kocor.tools.toolset.cron.jobs import (
     resume_job,
     update_job,
 )
-from kocor.tools.toolset.cron.scanner import scan_cron_prompt
+from kocor.tools.toolsets.cron.scanner import scan_cron_prompt
 
 logger = logging.getLogger(__name__)
 

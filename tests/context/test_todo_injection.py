@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 from kocor.config import Config
 from kocor.context.context_manager import ContextManager
 from kocor.llm_provider.message import Message
-from kocor.tools.toolset.todo_tool import TodoStore
+from kocor.tools.toolsets.todo_tool import TodoStore
 
 
 class FakeToolRegistry:

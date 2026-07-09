@@ -11,13 +11,13 @@ import logging
 import os
 
 from kocor.tools.permission import PermissionManager
-from kocor.tools.toolset.file_safety import (
+from kocor.tools.toolsets.file.file_safety import (
     check_sensitive_path,
     is_internal_file_tool_content,
     is_write_denied,
 )
-from kocor.tools.toolset.file_state import FileStateTracker
-from kocor.tools.toolset.fuzzy_match import fuzzy_find_and_replace
+from kocor.tools.toolsets.file.file_state import FileStateTracker
+from kocor.tools.toolsets.file.fuzzy_match import fuzzy_find_and_replace
 from kocor.tools.tool_utils import resolve_safe_path
 
 logger = logging.getLogger(__name__)
@@ -190,7 +190,7 @@ class PatchFile:
             # ── Lint delta 检查（仅报告新增错误） ──────────────
             lint_result = None
             try:
-                from kocor.tools.toolset.inline_lint import check_lint_delta
+                from kocor.tools.toolsets.file.inline_lint import check_lint_delta
                 lint_result = check_lint_delta(safe_path, content, new_content)
             except Exception:
                 pass

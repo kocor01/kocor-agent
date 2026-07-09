@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 import pytest
 
-from kocor.tools.toolset.bash.constants import (
+from kocor.tools.toolsets.bash.constants import (
     IS_WINDOWS,
     _find_bash,
     _make_run_env,
@@ -25,34 +25,34 @@ class TestIsWindows:
 class TestFindBash:
     """跨平台 bash 查找测试。"""
 
-    @patch("kocor.tools.toolset.bash.constants.shutil.which")
-    @patch("kocor.tools.toolset.bash.constants.IS_WINDOWS", False)
+    @patch("kocor.tools.toolsets.bash.constants.shutil.which")
+    @patch("kocor.tools.toolsets.bash.constants.IS_WINDOWS", False)
     def test_posix_uses_shutil(self, mock_which):
         mock_which.return_value = "/usr/bin/bash"
         assert _find_bash() == "/usr/bin/bash"
         mock_which.assert_called_once_with("bash")
 
-    @patch("kocor.tools.toolset.bash.constants.shutil.which")
-    @patch("kocor.tools.toolset.bash.constants.IS_WINDOWS", False)
+    @patch("kocor.tools.toolsets.bash.constants.shutil.which")
+    @patch("kocor.tools.toolsets.bash.constants.IS_WINDOWS", False)
     def test_posix_fallback_to_bin_bash(self, mock_which):
         mock_which.return_value = None
         result = _find_bash()
         assert result == "/bin/bash"
 
-    @patch("kocor.tools.toolset.bash.constants.IS_WINDOWS", True)
+    @patch("kocor.tools.toolsets.bash.constants.IS_WINDOWS", True)
     def test_windows_uses_env_var(self):
         with patch.dict(os.environ, {"KOCOR_GIT_BASH_PATH": "C:\\tools\\bash.exe"}, clear=True):
             with patch("os.path.isfile", return_value=True):
                 assert _find_bash() == "C:\\tools\\bash.exe"
 
-    @patch("kocor.tools.toolset.bash.constants.IS_WINDOWS", True)
+    @patch("kocor.tools.toolsets.bash.constants.IS_WINDOWS", True)
     def test_windows_uses_programfiles(self):
         with patch.dict(os.environ, {"ProgramFiles": "C:\\Program Files"}, clear=True):
             with patch("os.path.isfile", side_effect=[False, True, False]):
                 result = _find_bash()
                 assert "Git\\bin\\bash.exe" in result
 
-    @patch("kocor.tools.toolset.bash.constants.IS_WINDOWS", True)
+    @patch("kocor.tools.toolsets.bash.constants.IS_WINDOWS", True)
     def test_windows_raises_when_not_found(self):
         with patch.dict(os.environ, {}, clear=True):
             with patch("os.path.isfile", return_value=False):

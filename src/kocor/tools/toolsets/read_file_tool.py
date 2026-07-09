@@ -11,10 +11,10 @@ import os
 from pathlib import Path
 
 from kocor.tools.permission import PermissionManager
-from kocor.tools.toolset.binary_extensions import has_binary_extension
-from kocor.tools.toolset.read_extract import is_extractable_document
-from kocor.tools.toolset.file_safety import get_read_block_error
-from kocor.tools.toolset.file_state import FileStateTracker
+from kocor.tools.toolsets.file.binary_extensions import has_binary_extension
+from kocor.tools.toolsets.file.read_extract import is_extractable_document
+from kocor.tools.toolsets.file.file_safety import get_read_block_error
+from kocor.tools.toolsets.file.file_state import FileStateTracker
 from kocor.config import Config
 from kocor.tools.tool_utils import resolve_safe_path
 

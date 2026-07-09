@@ -10,8 +10,8 @@ from typing import Callable
 from kocor.config import Config
 from kocor.tools.definitions import ToolDefinition
 from kocor.tools.truncate import ToolOutputTruncator
-from kocor.tools.toolset.file_state import FileStateTracker
-from kocor.tools.toolset.bash.environment import LocalEnvironment
+from kocor.tools.toolsets.file.file_state import FileStateTracker
+from kocor.tools.toolsets.bash.environment import LocalEnvironment
 from kocor.llm_provider.message import ToolCall, ToolResult
 from kocor.tools.permission import PermissionManager
 
@@ -45,12 +45,12 @@ class ToolManager:
 
     def register_builtin_tools(self) -> None:
         """向当前 ToolManager 注册内置工具（文件操作、沙盒执行、bash、cron）。"""
-        from kocor.tools.toolset.read_file_tool import ReadFile
-        from kocor.tools.toolset.write_file_tool import WriteFile
-        from kocor.tools.toolset.patch_file_tool import PatchFile
-        from kocor.tools.toolset.search_file_tool import SearchFiles
-        from kocor.tools.toolset.bash_tool import BashTool, ProcessTool
-        from kocor.tools.toolset.cron_tool import CronTool
+        from kocor.tools.toolsets.read_file_tool import ReadFile
+        from kocor.tools.toolsets.write_file_tool import WriteFile
+        from kocor.tools.toolsets.patch_file_tool import PatchFile
+        from kocor.tools.toolsets.search_file_tool import SearchFiles
+        from kocor.tools.toolsets.bash_tool import BashTool, ProcessTool
+        from kocor.tools.toolsets.cron_tool import CronTool
 
         self.memory_store = None
         self.todo_store = None
@@ -86,7 +86,7 @@ class ToolManager:
         )
 
         # memory 工具依赖 self.memory_store，handler 在调用时读取
-        from kocor.tools.toolset.memory_tool import MemoryTool
+        from kocor.tools.toolsets.memory_tool import MemoryTool
         self.register(
             MemoryTool.NAME, MemoryTool.DESCRIPTION, MemoryTool.PARAMETERS,
             lambda **kw: MemoryTool.handler(store=self.memory_store, **kw),
@@ -94,7 +94,7 @@ class ToolManager:
         )
 
         # todo 工具依赖 self.todo_store，handler 在调用时读取
-        from kocor.tools.toolset.todo_tool import TodoTool
+        from kocor.tools.toolsets.todo_tool import TodoTool
         self.register(
             TodoTool.NAME, TodoTool.DESCRIPTION, TodoTool.PARAMETERS,
             lambda **kw: TodoTool.handler(store=self.todo_store, **kw),
@@ -102,7 +102,7 @@ class ToolManager:
         )
 
         # cron 工具
-        from kocor.tools.toolset.cron.scheduler import CronScheduler
+        from kocor.tools.toolsets.cron.scheduler import CronScheduler
         if self._cron_scheduler is None:
             self._cron_scheduler = CronScheduler()
         self.register(

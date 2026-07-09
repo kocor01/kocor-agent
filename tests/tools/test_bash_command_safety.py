@@ -2,7 +2,7 @@
 
 import pytest
 
-from kocor.tools.toolset.bash.command_safety import (
+from kocor.tools.toolsets.bash.command_safety import (
     detect_dangerous_command,
     validate_workdir,
 )

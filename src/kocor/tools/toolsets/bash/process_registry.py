@@ -17,7 +17,7 @@ import uuid
 from dataclasses import dataclass, field
 from typing import Any, Optional
 
-from kocor.tools.toolset.bash.constants import IS_WINDOWS, _find_bash
+from kocor.tools.toolsets.bash.constants import IS_WINDOWS, _find_bash
 
 logger = logging.getLogger(__name__)
 

@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from kocor.tools.toolset.bash.process_registry import (
+from kocor.tools.toolsets.bash.process_registry import (
     ProcessRegistry,
     ProcessSession,
     MAX_OUTPUT_CHARS,
@@ -65,7 +65,7 @@ class TestProcessRegistry:
         mock_stdout.buffer.read1.return_value = b""
         mock_stdout.read.return_value = ""
         mock_proc.stdout = mock_stdout
-        with patch("kocor.tools.toolset.bash.process_registry.subprocess.Popen",
+        with patch("kocor.tools.toolsets.bash.process_registry.subprocess.Popen",
                    return_value=mock_proc) as mock_popen:
             session = self.registry.spawn_local("echo hello")
             assert session.id.startswith("proc_")

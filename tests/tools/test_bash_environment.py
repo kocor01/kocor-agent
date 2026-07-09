@@ -6,7 +6,7 @@ from unittest.mock import patch, MagicMock, PropertyMock
 
 import pytest
 
-from kocor.tools.toolset.bash.environment import BaseEnvironment, LocalEnvironment
+from kocor.tools.toolsets.bash.environment import BaseEnvironment, LocalEnvironment
 
 
 # =============================================================================

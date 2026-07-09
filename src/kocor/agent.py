@@ -83,7 +83,7 @@ class Agent:
                 self._background_reviewer = BackgroundReviewer(llm=self.llm, store=self._memory)
 
         # 任务规划（todo）：零依赖、零风险，始终启用
-        from kocor.tools.toolset.todo_tool import TodoStore
+        from kocor.tools.toolsets.todo_tool import TodoStore
         self._todo_store = TodoStore()
         self.tool_manager.todo_store = self._todo_store
 

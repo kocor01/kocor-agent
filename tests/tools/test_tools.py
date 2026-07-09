@@ -132,7 +132,7 @@ class TestResolveSafePath:
 class TestCreateDefaultTools:
     """测试内置工具创建"""
 
-    @patch("kocor.tools.toolset.read_file_tool.Path.exists", return_value=False)
+    @patch("kocor.tools.toolsets.read_file_tool.Path.exists", return_value=False)
     def test_read_file_not_found(self, mock_exists):
         """测试读取不存在的文件"""
         registry = ToolManager()
@@ -146,8 +146,8 @@ class TestCreateDefaultTools:
         result = tools.execute(tool_call)
         assert "not found" in result.content.lower() or "未找到" in result.content
 
-    @patch("kocor.tools.toolset.read_file_tool.os.path.exists", return_value=True)
-    @patch("kocor.tools.toolset.read_file_tool.open", new_callable=mock_open, read_data="hello world")
+    @patch("kocor.tools.toolsets.read_file_tool.os.path.exists", return_value=True)
+    @patch("kocor.tools.toolsets.read_file_tool.open", new_callable=mock_open, read_data="hello world")
     def test_read_file_success(self, mock_file, mock_exists):
         """测试读取文件成功"""
         registry = ToolManager()
@@ -161,7 +161,7 @@ class TestCreateDefaultTools:
         result = tools.execute(tool_call)
         assert "hello world" in result.content
 
-    @patch("kocor.tools.toolset.write_file_tool.os.makedirs")
+    @patch("kocor.tools.toolsets.write_file_tool.os.makedirs")
     def test_write_file(self, mock_makedirs):
         """测试写入文件"""
         registry = ToolManager()
@@ -187,7 +187,7 @@ class TestCreateDefaultTools:
     def test_read_file_path_traversal_rejected(self):
         """读取文件路径遍历被拒绝"""
         with tempfile.TemporaryDirectory() as tmpdir:
-            with patch("kocor.tools.toolset.read_file_tool.os.getcwd", return_value=tmpdir):
+            with patch("kocor.tools.toolsets.read_file_tool.os.getcwd", return_value=tmpdir):
                 registry = ToolManager()
                 registry.register_builtin_tools()
                 tools = registry
@@ -205,7 +205,7 @@ class TestCreateDefaultTools:
     def test_write_file_path_traversal_rejected(self):
         """写入文件路径遍历被拒绝"""
         with tempfile.TemporaryDirectory() as tmpdir:
-            with patch("kocor.tools.toolset.write_file_tool.os.getcwd", return_value=tmpdir):
+            with patch("kocor.tools.toolsets.write_file_tool.os.getcwd", return_value=tmpdir):
                 registry = ToolManager()
                 registry.register_builtin_tools()
                 tools = registry

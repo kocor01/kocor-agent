@@ -22,7 +22,7 @@ import uuid
 from abc import ABC, abstractmethod
 from typing import Callable, IO
 
-from kocor.tools.toolset.bash.constants import (
+from kocor.tools.toolsets.bash.constants import (
     IS_WINDOWS,
     _find_bash,
     _make_run_env,

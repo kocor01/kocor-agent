@@ -27,7 +27,7 @@ class TestToolManagerTodoRegistration:
     def test_todo_handler_uses_injected_store(self):
         """注册后 handler 闭包应使用注入的 todo_store。"""
         from kocor.tools.tool_manager import ToolManager
-        from kocor.tools.toolset.todo_tool import TodoStore
+        from kocor.tools.toolsets.todo_tool import TodoStore
         tm = ToolManager()
         tm.register_builtin_tools()
         tm.todo_store = TodoStore()

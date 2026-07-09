@@ -8,7 +8,7 @@ import pytest
 
 from kocor.llm_provider.message import FunctionCall, Message, ToolCall
 from kocor.tools.permission import PermissionManager
-from kocor.tools.toolset.todo_tool import (
+from kocor.tools.toolsets.todo_tool import (
     MAX_TODO_CONTENT_CHARS,
     MAX_TODO_ITEMS,
     TodoStore,

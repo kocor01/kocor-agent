@@ -2,7 +2,7 @@
 
 import pytest
 
-from kocor.tools.toolset.bash.output import (
+from kocor.tools.toolsets.bash.output import (
     strip_ansi,
     truncate_output,
     redact_sensitive,
