@@ -149,9 +149,6 @@ src/kocor/
 │
 ├── harness/                 # 运行时系统
 │   ├── budget.py            # IterationBudget — ReAct 循环迭代预算
-│   ├── config.py            # HarnessConfig 数据类
-│   ├── error_handler.py     # ErrorHandler — 指数退避重试
-│   ├── file_guard.py        # FileAccessGuard — 文件 I/O 沙盒
 │   ├── sandbox.py           # Sandbox — 子进程代码执行
 │   ├── logger.py            # Logger — 按日轮转文件日志
 │   └── event/               # 事件系统

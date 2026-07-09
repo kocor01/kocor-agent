@@ -105,6 +105,16 @@ def _search_with_grep(
         return {"error": "Search timed out", "timed_out": True}
     if result.returncode == 2 and not result.stdout:
         return {"error": result.stderr.strip() or "grep error"}
+    if output_mode == "count":
+        counts = {}
+        for line in result.stdout.splitlines():
+            if ":" in line:
+                p, c = line.rsplit(":", 1)
+                try:
+                    counts[p] = int(c)
+                except ValueError:
+                    pass
+        return {"counts": counts, "total_count": sum(counts.values())}
     return _parse_content_matches(result.stdout, limit, offset)
 
 
@@ -146,9 +156,6 @@ def _search_with_python(
                                 "line": i,
                                 "content": line.rstrip(),
                             })
-                            if output_mode == "count":
-                                # count mode: just count, don't accumulate content
-                                pass
             except (OSError, UnicodeDecodeError):
                 continue
 
@@ -214,7 +221,10 @@ def _search_files_with_find(pattern: str, path: str, limit: int, offset: int) ->
     files = [f for f in result.stdout.splitlines() if f.strip()]
     rel = []
     for fname in files:
-        rel.append(os.path.relpath(fname, path) if fname.startswith(path) else fname)
+        try:
+            rel.append(os.path.relpath(fname, path))
+        except ValueError:
+            rel.append(fname)
     return {"files": rel[offset:offset + limit], "total_count": len(rel)}
 
 
