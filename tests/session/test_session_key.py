@@ -25,7 +25,7 @@ class TestSessionKey:
 
     def test_config_session_name(self):
         """profile 为 None 时应从 Config.session_name 读取。"""
-        Config.set("session_name", "env-test")
+        Config.load().session_name = "env-test"
         try:
             sm = SessionManager(store=SessionStore())
             assert sm.session_key == "kocor:env-test:cli"
@@ -34,7 +34,7 @@ class TestSessionKey:
 
     def test_explicit_profile_overrides_config(self):
         """显式传入 profile 应优先于 Config.session_name。"""
-        Config.set("session_name", "from-config")
+        Config.load().session_name = "from-config"
         try:
             sm = SessionManager(store=SessionStore(), profile="explicit")
             assert sm.session_key == "kocor:explicit:cli"

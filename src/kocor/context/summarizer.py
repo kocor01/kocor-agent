@@ -74,7 +74,7 @@ class HistorySummarizer:
         history_text = self._messages_to_text(messages)
 
         # 用 TokenCounter 估算 token 数，超限时按比例截断
-        max_tokens = Config.get("context_max_tokens")
+        max_tokens = Config.load().context_max_tokens
         estimated_tokens = self._token_counter.count(history_text)
         if estimated_tokens > max_tokens:
             ratio = max_tokens / estimated_tokens

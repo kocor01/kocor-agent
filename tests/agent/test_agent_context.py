@@ -60,12 +60,12 @@ class TestContextManagerIntegration:
         Path(mem_dir, "USER.md").write_text("用户: 张三", encoding="utf-8")
 
         llm = FakeLLMClient()
-        Config.set("memory_dir", mem_dir)
+        Config.load().memory_dir = mem_dir
         try:
             agent = Agent(llm=llm)
             agent.run("你好")
         finally:
-            Config.set("memory_dir", None)
+            Config.load().memory_dir = None
         system_msg = llm.last_messages[0]
         assert "记忆指引" in system_msg.content
         assert "用户: 张三" in system_msg.content

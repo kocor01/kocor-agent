@@ -29,13 +29,13 @@ logger = logging.getLogger(__name__)
 # ── 常量配置（通过 Config 读取） ────────────────────────────────
 def _get_read_chars():
     try:
-        return Config.get("file_read_max_chars")
+        return Config.load().file_read_max_chars
     except Exception:
         return 100_000
 
 def _get_read_lines():
     try:
-        return Config.get("file_read_max_lines")
+        return Config.load().file_read_max_lines
     except Exception:
         return 500
 _LARGE_FILE_HINT_BYTES = 512_000  # 512 KB - 大文件提示阈值

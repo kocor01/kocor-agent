@@ -21,10 +21,10 @@ class TokenBudget:
         threshold_truncate: 触发截断的阈值比例（0.0 ~ 1.0）
     """
 
-    limit: int = Config.get("context_max_tokens")
+    limit: int = Config.load().context_max_tokens
     used_prompt: int = 0
-    threshold_summary: float = Config.get("context_summary_threshold")
-    threshold_truncate: float = Config.get("context_truncate_threshold")
+    threshold_summary: float = Config.load().context_summary_threshold
+    threshold_truncate: float = Config.load().context_truncate_threshold
 
     @property
     def remaining(self) -> int:

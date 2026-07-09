@@ -60,7 +60,7 @@ class SystemPromptBuilder:
     """
 
     def __init__(self, memory: Any = None):
-        self.identity_prompt = Config.get("default_system_prompt")
+        self.identity_prompt = Config.load().default_system_prompt
         self.memory = memory
 
     def build(self) -> str:

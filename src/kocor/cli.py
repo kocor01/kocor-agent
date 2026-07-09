@@ -396,31 +396,31 @@ def main() -> None:
 
     # Apply CLI args to Config（CLI 优先级最高，覆盖环境变量）
     if args.strict:
-        Config.set("permission_policy", PermissionManager.POLICY_STRICT)
+        Config.load().permission_policy = PermissionManager.POLICY_STRICT
     elif args.permissive:
-        Config.set("permission_policy", PermissionManager.POLICY_PERMISSIVE)
+        Config.load().permission_policy = PermissionManager.POLICY_PERMISSIVE
     if args.debug:
-        Config.set("log_level", "DEBUG")
+        Config.load().log_level = "DEBUG"
 
     # 检测 REPL 模式：无参数且 stdin 是终端时默认进入
     is_repl = not user_args and sys.stdin.isatty()
 
     # 一次性模式默认关闭会话持久化
     if not is_repl:
-        Config.set("session_enabled", False)
+        Config.load().session_enabled = False
 
-    setup_logger(Config.get("log_level"), log_dir=Config.get("log_dir"))
+    setup_logger(Config.load().log_level, log_dir=Config.load().log_dir)
 
     toolManager = ToolManager()
     toolManager.register_all()
 
     permission_mgr = PermissionManager(
-        policy=Config.get("permission_policy"),
+        policy=Config.load().permission_policy,
         tool_manager=toolManager,
     )
 
     # Build Harness components
-    max_iterations = Config.get("max_iterations")
+    max_iterations = Config.load().max_iterations
 
     hook_manager = HookManager()
     hook_manager.register_all()
@@ -433,9 +433,9 @@ def main() -> None:
 
     # 可选地构建会话管理器
     session_manager = None
-    if Config.get("session_enabled"):
-        db_path = Config.get("session_db_path")
-        session_name = Config.get("session_name") or None
+    if Config.load().session_enabled:
+        db_path = Config.load().session_db_path
+        session_name = Config.load().session_name or None
         store = SessionStore(db_path=db_path)
         policy = SessionResetPolicy(mode="none")  # 默认不自动重置，后续可配置
         session_manager = SessionManager(

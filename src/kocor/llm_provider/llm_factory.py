@@ -43,7 +43,7 @@ class LlmFactory:
         if not cls._providers:
             cls._register_builtins()
 
-        provider = Config.get("provider")
+        provider = Config.load().provider
         client_class = cls._providers.get(provider)
         if client_class is None:
             raise ValueError(

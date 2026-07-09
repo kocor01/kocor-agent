@@ -177,9 +177,9 @@ class TestPermissionPolicyConfig:
             assert "不支持的 permission_policy" in str(e)
 
     def test_cli_applies_to_config(self):
-        """模拟 CLI 参数通过 Config.set() 修改配置"""
-        Config.set("permission_policy", "strict")
-        assert Config.get("permission_policy") == "strict"
+        """模拟 CLI 参数通过 Config.load() 修改配置"""
+        Config.load().permission_policy = "strict"
+        assert Config.load().permission_policy == "strict"
 
 
 class TestMaxTokensConfig:

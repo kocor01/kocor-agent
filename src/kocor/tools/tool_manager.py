@@ -98,12 +98,12 @@ class ToolManager:
         self.register_builtin_tools()
 
         from kocor.mcp import McpManager
-        self.mcp_manager = McpManager(self, Config.get("mcp_config"))
+        self.mcp_manager = McpManager(self, Config.load().mcp_config)
         self.mcp_manager.register_all()
 
         from kocor.skill import SkillManager
         self.skill_manager = SkillManager(self)
-        self.skill_manager.register_all(Config.get("skills_config"), Config.get("skills_dir"))
+        self.skill_manager.register_all(Config.load().skills_config, Config.load().skills_dir)
 
     def register(
         self,
@@ -160,7 +160,7 @@ class ToolManager:
 
         try:
             with ThreadPoolExecutor(max_workers=1) as pool:
-                timeout = Config.get("tool_timeout")
+                timeout = Config.load().tool_timeout
                 future = pool.submit(self._handlers[name], **args)
                 result = future.result(timeout=timeout)
             truncated = ToolOutputTruncator().truncate(str(result))

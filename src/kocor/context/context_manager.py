@@ -45,7 +45,7 @@ class ContextManager:
         self._token_counter = TokenCounter()
         self._prompt_builder = SystemPromptBuilder(memory)
 
-        resolved = Config.get("context_strategy")
+        resolved = Config.load().context_strategy
         mapping = {
             "default": ContextStrategy.DEFAULT,
             "sliding": ContextStrategy.SLIDING_WINDOW,
@@ -78,9 +78,9 @@ class ContextManager:
             + tool_tokens
         )
         self.token_budget = TokenBudget(
-            limit=Config.get("context_max_tokens"),
-            threshold_summary=Config.get("context_summary_threshold"),
-            threshold_truncate=Config.get("context_truncate_threshold"),
+            limit=Config.load().context_max_tokens,
+            threshold_summary=Config.load().context_summary_threshold,
+            threshold_truncate=Config.load().context_truncate_threshold,
         )
         self.token_budget.used_prompt = estimated_total
 

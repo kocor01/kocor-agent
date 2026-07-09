@@ -43,7 +43,7 @@ class SessionManager:
     @property
     def session_key(self) -> str:
         """当前会话键，格式: ``kocor:{namespace}:cli``。"""
-        profile = self.profile or Config.get("session_name")
+        profile = self.profile or Config.load().session_name
         return f"kocor:{profile}:cli"
 
     # -- 公开 API --

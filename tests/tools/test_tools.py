@@ -225,14 +225,14 @@ class TestToolTimeout:
     """测试工具执行超时"""
 
     def setup_method(self):
-        self._saved_timeout = Config.get("tool_timeout")
+        self._saved_timeout = Config.load().tool_timeout
 
     def teardown_method(self):
-        Config.set("tool_timeout", self._saved_timeout)
+        Config.load().tool_timeout = self._saved_timeout
 
     def test_tool_timeout(self):
         """工具执行超时返回超时错误"""
-        Config.set("tool_timeout", 1)
+        Config.load().tool_timeout = 1
         registry = ToolManager()
 
         def slow_handler(**kwargs):

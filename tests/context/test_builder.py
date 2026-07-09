@@ -29,7 +29,7 @@ class TestContextManagerBuilder:
 
     def test_build_system_prompt_contains_identity(self):
         """system prompt 应包含身份提示。"""
-        Config.set("default_system_prompt", "你是 Kocor 助手")
+        Config.load().default_system_prompt = "你是 Kocor 助手"
         try:
             ctx = ContextManager(
                 tools=ToolRegistryStub(),
@@ -37,7 +37,7 @@ class TestContextManagerBuilder:
             prompt = ctx._prompt_builder.build()
             assert "你是 Kocor 助手" in prompt
         finally:
-            Config.set("default_system_prompt", Config.default_system_prompt)
+            Config.load().default_system_prompt = Config.default_system_prompt
 
     def test_build_system_prompt_includes_env_info(self):
         """system prompt 应包含环境信息。"""
@@ -49,7 +49,7 @@ class TestContextManagerBuilder:
 
     def test_build_system_prompt_with_custom_instructions(self):
         """项目指令文件不存在时不报错，只跳过 L2 层。"""
-        Config.set("default_system_prompt", "你是 Kocor")
+        Config.load().default_system_prompt = "你是 Kocor"
         try:
             ctx = ContextManager(
                 tools=ToolRegistryStub(),
@@ -57,7 +57,7 @@ class TestContextManagerBuilder:
             prompt = ctx._prompt_builder.build()
             assert "你是 Kocor" in prompt
         finally:
-            Config.set("default_system_prompt", Config.default_system_prompt)
+            Config.load().default_system_prompt = Config.default_system_prompt
 
     def test_build_initial_context_sets_messages(self):
         """build_initial_context 应设置消息列表。"""

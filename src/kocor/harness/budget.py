@@ -10,7 +10,7 @@ class IterationBudget:
     """追踪 Agent ReAct 循环的迭代次数。"""
 
     used_iterations: int = 0
-    max_iterations: int = Config.get("max_iterations")
+    max_iterations: int = Config.load().max_iterations
 
     @property
     def exhausted(self) -> bool:

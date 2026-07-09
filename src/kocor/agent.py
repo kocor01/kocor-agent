@@ -48,8 +48,8 @@ class Agent:
     ):
         self.llm = llm
         self.tool_manager = tool_manager or ToolManager()
-        self.system_prompt = Config.get("default_system_prompt")
-        self.max_iterations = Config.get("max_iterations")
+        self.system_prompt = Config.load().default_system_prompt
+        self.max_iterations = Config.load().max_iterations
 
         # Harness 组件
         self.permission_mgr = permission_mgr or PermissionManager(policy=PermissionManager.POLICY_PERMISSIVE)
@@ -68,14 +68,14 @@ class Agent:
         self._memory: MemoryStore | None = None
         self._background_reviewer = None
         self._turns_since_memory = 0
-        if Config.get("memory_enabled"):
-            memory_dir = Config.get("memory_dir") or None
+        if Config.load().memory_enabled:
+            memory_dir = Config.load().memory_dir or None
             if memory_dir:
                 self._memory = MemoryStore(
                     memory_dir=memory_dir,
-                    memory_limit=Config.get("memory_char_limit"),
-                    user_limit=Config.get("user_char_limit"),
-                    user_enabled=Config.get("user_profile_enabled"),
+                    memory_limit=Config.load().memory_char_limit,
+                    user_limit=Config.load().user_char_limit,
+                    user_enabled=Config.load().user_profile_enabled,
                 )
                 self._memory.load_from_disk()
                 self.tool_manager.memory_store = self._memory
@@ -378,7 +378,7 @@ class Agent:
         if not self._background_reviewer:
             return
         self._turns_since_memory += 1
-        nudge_interval = Config.get("nudge_interval")
+        nudge_interval = Config.load().nudge_interval
         if self._turns_since_memory >= nudge_interval:
             self._background_reviewer.review(self.ctx.session_history)
             self._turns_since_memory = 0

@@ -115,7 +115,7 @@ class TestBackgroundReviewer:
         store.load_from_disk()
 
         llm = FakeLLMClient()
-        Config.set("memory_dir", str(tmp_path))
+        Config.load().memory_dir = str(tmp_path)
         try:
             agent = Agent(llm=llm)
             # 注入 counter 为 nudge_interval - 1
@@ -123,4 +123,4 @@ class TestBackgroundReviewer:
             agent.run("你好")
             # nudge_interval=10 时不应触发
         finally:
-            Config.set("memory_dir", None)
+            Config.load().memory_dir = None

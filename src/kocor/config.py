@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
-from typing import Any, ClassVar, Optional
+from typing import ClassVar, Optional
 
 from dotenv import load_dotenv
 
@@ -119,35 +119,16 @@ class Config:
         return cls._instance
 
     @classmethod
+    def load_fresh(cls) -> Config:
+        """强制重新加载配置（测试用）。"""
+        cls._instance = cls._load()
+        return cls._instance
+
+    @classmethod
     def reset(cls) -> None:
         """清除全局实例（用于测试）。"""
         cls._instance = None
         cls._dotenv_loaded = False
-
-    @classmethod
-    def get(cls, key: str) -> Any:
-        """获取配置项的值。
-
-        Args:
-            key: 配置项名称（如 "provider", "max_iterations"）
-
-        Returns:
-            配置项的值
-
-        Raises:
-            AttributeError: 配置项不存在
-        """
-        return getattr(cls.load(), key)
-
-    @classmethod
-    def set(cls, key: str, value: Any) -> None:
-        """设置配置项的值（运行时覆盖，不持久化）。
-
-        Args:
-            key: 配置项名称
-            value: 配置项的值
-        """
-        setattr(cls.load(), key, value)
 
     @classmethod
     def _load(cls) -> Config:

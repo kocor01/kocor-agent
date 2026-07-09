@@ -9,6 +9,24 @@ from kocor.context.context_manager import ContextManager
 from kocor.context.strategies import ContextStrategyApplier
 from kocor.context.types import ContextStrategy
 from kocor.llm_provider.message import Message
+from kocor.config import Config
+
+
+def _override_config(values: dict) -> dict:
+    """覆盖 Config 值，返回原值字典用于恢复。"""
+    cfg = Config.load()
+    orig = {}
+    for key, val in values.items():
+        orig[key] = getattr(cfg, key)
+        setattr(cfg, key, val)
+    return orig
+
+
+def _restore_config(orig: dict) -> None:
+    """恢复 Config 原始值。"""
+    cfg = Config.load()
+    for key, val in orig.items():
+        setattr(cfg, key, val)
 
 
 class FakeToolRegistry:
@@ -119,17 +137,16 @@ class TestContextManagerCompression:
 
     def test_compress_if_needed_within_budget(self):
         """预算未超时不压缩。"""
-        with patch("kocor.context.context_manager.Config") as mock_config:
-            mock_config.get.side_effect = lambda key, **kw: {
-                "context_strategy": "sliding",
-                "preserve_last_rounds": 2,
-                "preserve_first_rounds": 1,
-                "context_max_tokens": 100_000,
-                "context_summary_threshold": 0.5,
-                "context_truncate_threshold": 0.9,
-                "default_system_prompt": "你是一个助手",
-            }.get(key, kw.get("default"))
-            ctx = ContextManager()
+        _orig = _override_config({
+            "context_strategy": "sliding",
+            "preserve_last_rounds": 2,
+            "preserve_first_rounds": 1,
+            "context_max_tokens": 100_000,
+            "context_summary_threshold": 0.5,
+            "context_truncate_threshold": 0.9,
+            "default_system_prompt": "你是一个助手",
+        })
+        ctx = ContextManager()
 
         ctx.messages = [
             Message(role="user", content="hi"),
@@ -138,27 +155,36 @@ class TestContextManagerCompression:
         original_len = len(ctx.messages)
         ctx.compress_if_needed()
         assert len(ctx.messages) == original_len
+        _restore_config(_orig)
 
     def test_compress_if_needed_over_threshold(self):
         """超阈值时压缩应减少消息数量。"""
         with _patch_llm():
-            with patch("kocor.context.context_manager.Config") as mock_config:
-                mock_config.get.return_value = "sliding"
-                ctx = ContextManager()
+            _orig = _override_config({
+                "context_strategy": "sliding",
+                "preserve_last_rounds": 2,
+                "preserve_first_rounds": 1,
+                "context_max_tokens": 100_000,
+                "context_summary_threshold": 0.5,
+                "context_truncate_threshold": 0.9,
+                "default_system_prompt": "你是一个助手",
+            })
+            ctx = ContextManager()
 
-                # mock token 计数，让 compress_if_needed 认为超阈值
-                ctx.count_message_tokens = MagicMock(return_value=95_000)
-                ctx.count_tool_tokens = MagicMock(return_value=50_000)
+            # mock token 计数，让 compress_if_needed 认为超阈值
+            ctx.count_message_tokens = MagicMock(return_value=95_000)
+            ctx.count_tool_tokens = MagicMock(return_value=50_000)
 
-                messages = [Message(role="system", content="sys")]
-                for i in range(10):
-                    messages.append(Message(role="user", content=f"q{i}"))
-                    messages.append(Message(role="assistant", content=f"a{i}"))
-                ctx.messages = messages
+            messages = [Message(role="system", content="sys")]
+            for i in range(10):
+                messages.append(Message(role="user", content=f"q{i}"))
+                messages.append(Message(role="assistant", content=f"a{i}"))
+            ctx.messages = messages
 
-                ctx.compress_if_needed()
+            ctx.compress_if_needed()
 
-                assert len(ctx.messages) < len(messages)
+            assert len(ctx.messages) < len(messages)
+            _restore_config(_orig)
 
 
 class TestSessionHistoryCompression:
@@ -175,17 +201,16 @@ class TestSessionHistoryCompression:
     def test_session_history_grows_normally(self):
         """extract_session_history 不压缩，只过滤非 system 消息。"""
         with _patch_llm():
-            with patch("kocor.context.context_manager.Config") as mock_config:
-                mock_config.get.side_effect = lambda key, **kw: {
-                    "context_strategy": "sliding",
-                    "preserve_last_rounds": 2,
-                    "preserve_first_rounds": 1,
-                    "context_max_tokens": 100_000,
-                    "context_summary_threshold": 0.5,
-                    "context_truncate_threshold": 0.9,
-                    "default_system_prompt": "你是一个助手",
-                }.get(key, kw.get("default"))
-                ctx = ContextManager(tools=FakeToolRegistry())
+            _orig = _override_config({
+                "context_strategy": "sliding",
+                "preserve_last_rounds": 2,
+                "preserve_first_rounds": 1,
+                "context_max_tokens": 100_000,
+                "context_summary_threshold": 0.5,
+                "context_truncate_threshold": 0.9,
+                "default_system_prompt": "你是一个助手",
+            })
+            ctx = ContextManager(tools=FakeToolRegistry())
 
             # 模拟多轮对话
             for i in range(5):
@@ -195,21 +220,21 @@ class TestSessionHistoryCompression:
 
             # extract 不压缩，只过滤
             assert all(m.role != "system" for m in ctx.session_history)
+            _restore_config(_orig)
 
     def test_summary_persists_through_extract(self):
         """通过 build_initial_context(压缩) → extract 后，摘要以 assistant role 存在于 session_history。"""
         with _patch_llm():
-            with patch("kocor.context.context_manager.Config") as mock_config:
-                mock_config.get.side_effect = lambda key, **kw: {
-                    "context_strategy": "sliding",
-                    "preserve_last_rounds": 2,
-                    "preserve_first_rounds": 1,
-                    "context_max_tokens": 100_000,
-                    "context_summary_threshold": 0.5,
-                    "context_truncate_threshold": 0.9,
-                    "default_system_prompt": "你是一个助手",
-                }.get(key, kw.get("default"))
-                ctx = ContextManager(tools=FakeToolRegistry())
+            _orig = _override_config({
+                "context_strategy": "sliding",
+                "preserve_last_rounds": 2,
+                "preserve_first_rounds": 1,
+                "context_max_tokens": 100_000,
+                "context_summary_threshold": 0.5,
+                "context_truncate_threshold": 0.9,
+                "default_system_prompt": "你是一个助手",
+            })
+            ctx = ContextManager(tools=FakeToolRegistry())
 
             # 预置多轮会话历史，确保触发压缩
             ctx.session_history = self._make_long_history(8)
@@ -225,21 +250,21 @@ class TestSessionHistoryCompression:
             ]
             assert len(summary_msgs) == 1
             assert summary_msgs[0].role == "assistant"
+            _restore_config(_orig)
 
     def test_compress_if_needed_uses_assistant_role(self):
         """compress_if_needed 压缩后，摘要以 assistant role 存在。"""
         with _patch_llm():
-            with patch("kocor.context.context_manager.Config") as mock_config:
-                mock_config.get.side_effect = lambda key, **kw: {
-                    "context_strategy": "sliding",
-                    "preserve_last_rounds": 2,
-                    "preserve_first_rounds": 1,
-                    "context_max_tokens": 100_000,
-                    "context_summary_threshold": 0.5,
-                    "context_truncate_threshold": 0.9,
-                    "default_system_prompt": "你是一个助手",
-                }.get(key, kw.get("default"))
-                ctx = ContextManager(tools=FakeToolRegistry())
+            _orig = _override_config({
+                "context_strategy": "sliding",
+                "preserve_last_rounds": 2,
+                "preserve_first_rounds": 1,
+                "context_max_tokens": 100_000,
+                "context_summary_threshold": 0.5,
+                "context_truncate_threshold": 0.9,
+                "default_system_prompt": "你是一个助手",
+            })
+            ctx = ContextManager(tools=FakeToolRegistry())
 
             messages = [Message(role="system", content="sys")]
             messages.extend(self._make_long_history(10))
@@ -252,21 +277,21 @@ class TestSessionHistoryCompression:
 
             # 压缩后 messages[0] 应为 system
             assert ctx.messages[0].role == "system"
+            _restore_config(_orig)
 
     def test_compress_if_needed_over_threshold_with_sliding(self):
         """sliding 策略下超阈值压缩应减少消息。"""
         with _patch_llm():
-            with patch("kocor.context.context_manager.Config") as mock_config:
-                mock_config.get.side_effect = lambda key, **kw: {
-                    "context_strategy": "sliding",
-                    "preserve_last_rounds": 2,
-                    "preserve_first_rounds": 1,
-                    "context_max_tokens": 100_000,
-                    "context_summary_threshold": 0.5,
-                    "context_truncate_threshold": 0.9,
-                    "default_system_prompt": "你是一个助手",
-                }.get(key, kw.get("default"))
-                ctx = ContextManager(tools=FakeToolRegistry())
+            _orig = _override_config({
+                "context_strategy": "sliding",
+                "preserve_last_rounds": 2,
+                "preserve_first_rounds": 1,
+                "context_max_tokens": 100_000,
+                "context_summary_threshold": 0.5,
+                "context_truncate_threshold": 0.9,
+                "default_system_prompt": "你是一个助手",
+            })
+            ctx = ContextManager(tools=FakeToolRegistry())
 
             messages = [Message(role="system", content="sys")]
             messages.extend(self._make_long_history(10))
@@ -278,3 +303,4 @@ class TestSessionHistoryCompression:
             ctx.compress_if_needed()
 
             assert len(ctx.messages) < len(messages)
+            _restore_config(_orig)

@@ -64,7 +64,7 @@ except ImportError:
 # 根据 data_dir 或默认值确定 cron 存储根目录
 def _resolve_cron_root() -> Path:
     """解析 cron 存储根目录。"""
-    data_dir = Config.get("memory_dir")  # 复用 memory_dir 的基目录逻辑
+    data_dir = Config.load().memory_dir  # 复用 memory_dir 的基目录逻辑
     base = Path(data_dir).parent if data_dir else Path.home() / ".kocor"
     return base.resolve() / CRON_DIR_NAME
 
