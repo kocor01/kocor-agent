@@ -325,3 +325,23 @@ class TestTableRendering:
         assert "北京" in output
         assert "25°C" in output
         assert "以上就是天气数据" in output
+
+
+class TestConsoleCaching:
+    """_console 不应在类级别缓存 Console 实例。"""
+
+    def test_console_not_cached_at_class_level(self):
+        """类级别缓存可能导致状态泄漏，每次调用应返回新实例。"""
+        c1 = _StreamFormatter._console()
+        c2 = _StreamFormatter._console()
+        assert c1 is not c2, "_console() 不应返回同一个缓存的 Console 实例"
+
+    def test_separator_uses_current_stdout(self):
+        """分隔线应写入当前 sys.stdout。"""
+        f = _StreamFormatter(width=80)
+        buf = io.StringIO()
+        with patch("sys.stdout", buf):
+            f.handle_chunk(StreamChunk(reasoning="testing reasoning"))
+        output = buf.getvalue()
+        assert "─" in output, "分隔线应被捕获在当前 patch 的 stdout 中"
+        assert "testing reasoning" in output

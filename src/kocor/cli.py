@@ -79,10 +79,8 @@ class _StreamFormatter:
 
     @staticmethod
     def _console() -> Console:
-        """缓存一个共享 Console 实例，避免反复构造。"""
-        if not hasattr(_StreamFormatter, "_console_inst"):
-            _StreamFormatter._console_inst = Console()
-        return _StreamFormatter._console_inst
+        """创建 Console 实例。不缓存——避免类级别状态泄漏。"""
+        return Console()
 
     def _sep(self, style: str = "dim") -> None:
         """打印一条自适应宽度的彩色分隔线。"""
@@ -211,8 +209,11 @@ class _StreamFormatter:
         if self.tool_result_idx < len(self.tool_calls):
             tc = self.tool_calls[self.tool_result_idx]
             content = chunk.tool_result.content
+            # 智能截断：保留首尾，确保关键信息（尤其是错误消息）不丢失
             if len(content) > 1000:
-                content = content[:1000] + "..."
+                head = content[:500]
+                tail = content[-400:]
+                content = f"{head}\n...\n{tail}"
             if self.tool_result_idx > 0:
                 print()
             print(f"{self.tool_result_idx + 1:2}. {tc.function.name}({tc.function.arguments})")
