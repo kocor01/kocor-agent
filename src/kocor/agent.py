@@ -167,20 +167,21 @@ class Agent:
 
         entry = self.session_manager.get_or_create_session()
 
-        # 自动重置时注入通知
+        # 自动重置时注入通知，重置已持久化消息索引
         if entry.was_auto_reset:
             reason = entry.auto_reset_reason or "unknown"
             self.ctx.append(Message(
                 role="user",
                 content=f"[会话因 {reason} 已自动重置，开始新对话]",
             ))
+            self._persisted_msg_idx = 0
 
         # 恢复历史消息（跨进程重启时 session_history 为空）
         if not self.ctx.session_history and self.session_manager.store.db:
             history = self.session_manager.load_messages(entry.session_id)
             if history:
                 self.ctx.session_history = history
-                self._persisted_msg_idx = len(self.ctx.messages) + len(history)
+                self._persisted_msg_idx = len(history)
                 self._hydrate_todo_store(history)
 
     def _session_after_run(self) -> None:
@@ -197,8 +198,12 @@ class Agent:
         if entry is None:
             return
 
-        # 计算本轮新增消息数（session_history 包含跨轮历史）
-        prev_count = entry.message_count
+        # 使用 _persisted_msg_idx 作为已持久化消息的基准，
+        # 而非 entry.message_count，因为会话可能在 ReAct 循环
+        # 中被重置（如 /reset 或自动重置），此时 entry 指向
+        # 新会话且 message_count 为 0，但 session_history 中
+        # 可能已有本轮新增消息
+        prev_count = self._persisted_msg_idx
         current_total = len(self.ctx.session_history)
         msg_delta = max(0, current_total - prev_count)
 

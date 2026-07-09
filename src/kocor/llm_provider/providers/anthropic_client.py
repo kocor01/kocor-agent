@@ -47,7 +47,7 @@ class AnthropicClient(LLMClient):
         actual_max_tokens = max_tokens if max_tokens is not None else self.config.max_tokens
         client = Anthropic(
             api_key=self.config.anthropic_api_key,
-            auth_token=self.config.anthropic_api_key,
+            auth_token=self.config.anthropic_api_key, # anthropic 兼容不同厂商模型
             base_url=self.config.anthropic_base_url or None,
         )
 
@@ -99,7 +99,7 @@ class AnthropicClient(LLMClient):
         actual_max_tokens = max_tokens if max_tokens is not None else self.config.max_tokens
         client = Anthropic(
             api_key=self.config.anthropic_api_key,
-            auth_token=self.config.anthropic_api_key,
+            auth_token=self.config.anthropic_api_key, # anthropic 兼容不同厂商模型
             base_url=self.config.anthropic_base_url or None,
         )
 

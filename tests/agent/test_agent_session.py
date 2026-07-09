@@ -208,3 +208,127 @@ class TestAgentSessionIntegration:
         info = sm.get_session_info(sm.session_key)
         assert info.was_auto_reset is True
         assert info.auto_reset_reason == "idle"
+
+    # ── 修复 3.2: _session_after_run 使用 _persisted_msg_idx ──
+
+    def test_agent_messages_persisted_after_reset(self, session_manager):
+        """reset_conversation() 后，后续消息应持久化到新会话。
+
+        复现场景：_session_after_run 使用 entry.message_count 作为 prev_count，
+        但会话已被重置，entry 指向新会话（message_count=0）。
+        修复后使用 _persisted_msg_idx 作为基准，确保消息被正确持久化。
+        """
+        llm = FakeLLMClient([
+            Message(role="assistant", content="回复 1"),
+            Message(role="assistant", content="回复 2"),
+        ])
+        agent = Agent(llm=llm, session_manager=session_manager)
+
+        # 第一次运行：建立会话，消息被持久化
+        agent.run("第一条消息")
+        info1 = session_manager.get_session_info(session_manager.session_key)
+        assert info1 is not None
+        sid1 = info1.session_id
+        msgs1 = session_manager.load_messages(sid1)
+        assert len(msgs1) >= 1
+
+        # 重置会话（模拟 ReAct 循环中的重置）
+        agent.reset_conversation()
+
+        # 第二次运行：消息应持久化到新会话
+        agent.run("第二条消息")
+        info2 = session_manager.get_session_info(session_manager.session_key)
+        assert info2 is not None
+        assert info2.session_id != sid1  # 新会话
+
+        msgs2 = session_manager.load_messages(info2.session_id)
+        assert len(msgs2) >= 1
+        assert msgs2[0].content == "第二条消息"
+
+    def test_agent_auto_reset_persists_new_messages(self, db_path):
+        """自动重置后，新运行的消息应正确持久化到新会话。
+
+        复现场景：_session_before_run 中自动重置时 _persisted_msg_idx 未被重置，
+        仍持有上次运行后的值，导致 _session_after_run 计算 msg_delta=0。
+        修复后自动重置时重置 _persisted_msg_idx=0，确保后续消息被持久化。
+        """
+        from datetime import timedelta
+
+        store = SessionStore(db_path=db_path)
+        policy = SessionResetPolicy(mode="idle", idle_minutes=60)
+        sm = SessionManager(store=store, policy=policy, profile="test-auto-reset-persist")
+
+        llm = FakeLLMClient([
+            Message(role="assistant", content="回复 1"),
+            Message(role="assistant", content="回复 2"),
+        ])
+        agent = Agent(llm=llm, session_manager=sm)
+
+        # 第一次运行：建立会话，消息被持久化
+        agent.run("第一条消息")
+        entry = sm.store.get_entry(sm.session_key)
+        assert entry is not None
+        sid_before = entry.session_id
+        msgs_before = sm.load_messages(sid_before)
+        assert len(msgs_before) >= 1
+
+        # 模拟超时触发自动重置
+        entry.updated_at = datetime.now() - timedelta(minutes=120)
+        sm.store.set_entry(entry)
+
+        # 第二次运行：应触发自动重置，新消息应持久化到新会话
+        agent.run("第二条消息")
+
+        info_after = sm.get_session_info(sm.session_key)
+        assert info_after is not None
+        assert info_after.was_auto_reset is True
+        assert info_after.session_id != sid_before  # 新会话
+
+        # 验证新会话的消息被正确持久化
+        msgs_after = sm.load_messages(info_after.session_id)
+        assert len(msgs_after) >= 1
+        # 至少包含 "第二条消息" 用户消息
+        user_msgs = [m for m in msgs_after if m.role == "user" and "第二条消息" in str(m.content)]
+        assert len(user_msgs) >= 1
+
+    def test_agent_multiple_runs_with_reset_between(self, session_manager):
+        """多次运行 + 中间重置，每次运行的消息都应正确持久化。
+
+        确保 _session_after_run 在会话重置后仍能正确计算消息增量。
+        """
+        llm = FakeLLMClient([
+            Message(role="assistant", content="回复 A"),
+            Message(role="assistant", content="回复 B"),
+            Message(role="assistant", content="回复 C"),
+        ])
+        agent = Agent(llm=llm, session_manager=session_manager)
+
+        # 第一次运行
+        agent.run("消息 A")
+        info = session_manager.get_session_info(session_manager.session_key)
+        sid_a = info.session_id
+        assert len(session_manager.load_messages(sid_a)) >= 1
+
+        # 重置
+        agent.reset_conversation()
+
+        # 第二次运行
+        agent.run("消息 B")
+        info = session_manager.get_session_info(session_manager.session_key)
+        sid_b = info.session_id
+        assert sid_b != sid_a
+        msgs_b = session_manager.load_messages(sid_b)
+        assert len(msgs_b) >= 1
+        assert msgs_b[0].content == "消息 B"
+
+        # 再重置一次
+        agent.reset_conversation()
+
+        # 第三次运行
+        agent.run("消息 C")
+        info = session_manager.get_session_info(session_manager.session_key)
+        sid_c = info.session_id
+        assert sid_c != sid_b
+        msgs_c = session_manager.load_messages(sid_c)
+        assert len(msgs_c) >= 1
+        assert msgs_c[0].content == "消息 C"
