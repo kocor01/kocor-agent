@@ -111,7 +111,7 @@ class TestLocalEnvironmentInit:
 
     def test_init_without_cwd_uses_current_dir(self):
         env = LocalEnvironment(timeout=30)
-        assert env.cwd == os.getcwd()
+        assert os.path.normcase(env.cwd) == os.path.normcase(os.getcwd())
 
     def test_init_results_in_session_id(self):
         env = LocalEnvironment(timeout=30)

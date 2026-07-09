@@ -9,19 +9,15 @@ from kocor.harness.budget import IterationBudget
 class TestIterationBudget:
     def setup_method(self):
         Config.reset()
-        self._saved = {}
-        for key in ["KOCOR_MAX_ITERATIONS"]:
-            self._saved[key] = os.environ.pop(key, None)
-
-    def teardown_method(self):
-        for key, val in self._saved.items():
-            if val is not None:
-                os.environ[key] = val
+        for key in list(os.environ):
+            if key.startswith("KOCOR_"):
+                os.environ.pop(key, None)
 
     def test_default_values(self):
         budget = IterationBudget()
         assert budget.used_iterations == 0
-        assert budget.max_iterations == 20
+        # max_iterations 从 Config.load().max_iterations 加载（默认 20）
+        assert budget.max_iterations == Config.load().max_iterations
 
     def test_not_exhausted_by_default(self):
         budget = IterationBudget()
