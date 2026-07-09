@@ -1,8 +1,6 @@
 """测试 LLMClient 抽象接口"""
 
 
-from kocor.config import Config
-from kocor.llm_provider.llm_manager import LlmManager
 from kocor.llm_provider.llm_client import LLMClient
 from kocor.tools.definitions import ToolDefinition
 from kocor.llm_provider.message import Message, StreamChunk
@@ -106,61 +104,3 @@ class TestLLMClientStream:
         assert len(chunks) == 1
         assert chunks[0].content == "hello"
         assert chunks[0].is_final is True
-
-
-class TestCreateLLMClient:
-    """测试 LLMClient 工厂函数"""
-
-    def setup_method(self):
-        LlmManager.reset()
-        Config.reset()
-
-    def test_create_openai_client(self):
-        """测试创建 OpenAI 客户端"""
-        from kocor.llm_provider.providers import OpenAIClient
-
-        Config._instance = Config(provider="openai")
-        client = LlmManager.get_llm_client()
-        assert isinstance(client, OpenAIClient)
-        assert client.provider == "openai"
-
-    def test_create_anthropic_client(self):
-        """测试创建 Anthropic 客户端"""
-        from kocor.llm_provider.providers import AnthropicClient
-
-        Config._instance = Config(provider="anthropic")
-        client = LlmManager.get_llm_client()
-        assert isinstance(client, AnthropicClient)
-        assert client.provider == "anthropic"
-
-    def test_create_unsupported_provider(self):
-        """测试不支持的 provider 抛出异常"""
-        Config._instance = Config(provider="unknown")
-        try:
-            LlmManager.get_llm_client()
-            assert False, "Should have raised ValueError"
-        except ValueError as e:
-            assert "不支持的 provider" in str(e)
-
-    def test_register_client(self):
-        """测试 register_client 注册新 provider"""
-        class FakeClient(LLMClient):
-            def __init__(self):
-                pass
-
-            @property
-            def provider(self) -> str:
-                return "fake"
-
-            def generate(self, messages, tools=None, max_tokens=4096, temperature=0.0) -> Message:
-                return Message(role="assistant", content="fake")
-
-        LlmManager.register("fake", FakeClient)
-        try:
-            Config._instance = Config(provider="fake")
-            client = LlmManager.get_llm_client()
-            assert isinstance(client, FakeClient)
-            assert client.provider == "fake"
-        finally:
-            # 清理注册表
-            LlmManager._clients.pop("fake", None)

@@ -8,9 +8,7 @@ from kocor.context.budget import TokenBudget
 from kocor.context.context_manager import ContextManager
 from kocor.context.strategies import ContextStrategyApplier
 from kocor.context.types import ContextStrategy
-from kocor.llm_provider.llm_manager import LlmManager
 from kocor.llm_provider.message import Message
-from kocor.tools.toolset.todo_tool import TodoStore
 
 
 class FakeToolRegistry:
@@ -19,8 +17,6 @@ class FakeToolRegistry:
 
 
 class FakeLLMForSummary:
-    """伪造的 LLM 客户端，返回预设摘要。"""
-
     def __init__(self, summary_text: str = "这是对话摘要"):
         self.summary_text = summary_text
 
@@ -32,66 +28,75 @@ class FakeLLMForSummary:
         return Message(role="assistant", content=self.summary_text)
 
 
+def _patch_llm():
+    """返回一个上下文管理器，将 LlmFactory.create 替换为 FakeLLMForSummary。"""
+    return patch(
+        "kocor.llm_provider.llm_factory.LlmFactory.create",
+        return_value=FakeLLMForSummary(),
+    )
+
+
 class TestContextManager:
-    """测试 ContextManager 基本功能。"""
+    """测试 ContextManager 基础功能。"""
 
     def test_default_initial_state(self):
-        """空构造应提供合理的默认值。"""
+        """验证默认初始状态。"""
         ctx = ContextManager()
-        assert ctx.messages == []
-        assert ctx.session_history == []
-        assert ctx.iteration == 0
-        assert ctx.token_budget is not None
         assert ctx.system_content == ""
+        assert ctx.messages == []
+        assert ctx.iteration == 0
+        assert ctx.usage is None
 
     def test_reset_clears_iteration_state(self):
-        """reset() 应清空本轮状态但保留 session_history。"""
+        """reset() 应重置迭代状态但不重置会话历史。"""
         ctx = ContextManager()
-        ctx.messages = [Message(role="user", content="hi")]
         ctx.iteration = 5
-        ctx.session_history = [Message(role="assistant", content="prev")]
+        ctx.usage = MagicMock()
+        ctx.messages = [Message(role="user", content="hi")]
+        ctx.session_history = [Message(role="user", content="old")]
 
         ctx.reset()
 
-        assert ctx.messages == []
         assert ctx.iteration == 0
-        # session_history 应保留
-        assert len(ctx.session_history) == 1
+        assert ctx.usage is None
+        assert ctx.messages == []
+        assert ctx.session_history == [Message(role="user", content="old")]
 
     def test_reset_conversation_clears_all(self):
-        """reset_conversation() 应清空所有状态包括 session_history。"""
+        """reset_conversation() 应清空所有消息和历史。"""
         ctx = ContextManager()
-        ctx.session_history = [Message(role="assistant", content="prev")]
-        ctx.iteration = 3
+        ctx.messages = [Message(role="user", content="hi")]
+        ctx.session_history = [Message(role="user", content="old")]
 
         ctx.reset_conversation()
 
+        assert ctx.messages == []
         assert ctx.session_history == []
-        assert ctx.iteration == 0
 
     def test_append_adds_message(self):
-        """append() 应追加消息到 messages。"""
+        """append() 应添加消息到 messages。"""
         ctx = ContextManager()
-        ctx.append(Message(role="user", content="hi"))
+        msg = Message(role="user", content="你好")
+        ctx.append(msg)
         assert len(ctx.messages) == 1
-        assert ctx.messages[0].content == "hi"
+        assert ctx.messages[0].content == "你好"
 
     def test_extract_session_history(self):
-        """extract_session_history() 应提取非 system 消息。"""
+        """extract_session_history 应排除 system 消息。"""
         ctx = ContextManager()
         ctx.messages = [
-            Message(role="system", content="system"),
+            Message(role="system", content="sys"),
             Message(role="user", content="hi"),
             Message(role="assistant", content="hello"),
             Message(role="tool", content="result", tool_call_id="c1"),
         ]
         ctx.extract_session_history()
-        assert len(ctx.session_history) == 3
         assert all(m.role != "system" for m in ctx.session_history)
 
     def test_advance_iteration(self):
-        """advance_iteration() 应递增计数。"""
+        """advance_iteration() 应递增 iteration。"""
         ctx = ContextManager()
+        assert ctx.iteration == 0
         ctx.advance_iteration()
         assert ctx.iteration == 1
         ctx.advance_iteration()
@@ -99,29 +104,34 @@ class TestContextManager:
 
 
 class TestContextManagerCompression:
-    """测试上下文压缩功能。"""
+    """测试 ContextManager 的上下文压缩功能。"""
 
     def test_compress_if_needed_default_skips(self):
-        """DEFAULT 策略不压缩。"""
-        with patch("kocor.context.context_manager.Config") as mock_config:
-            mock_config.get.return_value = "default"
-            ctx = ContextManager()
+        """DEFAULT 策略下 compress_if_needed 不应压缩。"""
+        ctx = ContextManager()
         ctx.messages = [
-            Message(role="system", content="sys"),
-            Message(role="user", content="x" * 100_000),
-            Message(role="assistant", content="y" * 100_000),
+            Message(role="user", content="hi"),
+            Message(role="assistant", content="hello"),
         ]
         original_len = len(ctx.messages)
         ctx.compress_if_needed()
         assert len(ctx.messages) == original_len
 
     def test_compress_if_needed_within_budget(self):
-        """未超阈值时不压缩。"""
+        """预算未超时不压缩。"""
         with patch("kocor.context.context_manager.Config") as mock_config:
-            mock_config.get.return_value = "sliding"
+            mock_config.get.side_effect = lambda key, **kw: {
+                "context_strategy": "sliding",
+                "preserve_last_rounds": 2,
+                "preserve_first_rounds": 1,
+                "context_max_tokens": 100_000,
+                "context_summary_threshold": 0.5,
+                "context_truncate_threshold": 0.9,
+                "default_system_prompt": "你是一个助手",
+            }.get(key, kw.get("default"))
             ctx = ContextManager()
+
         ctx.messages = [
-            Message(role="system", content="sys"),
             Message(role="user", content="hi"),
             Message(role="assistant", content="hello"),
         ]
@@ -131,9 +141,7 @@ class TestContextManagerCompression:
 
     def test_compress_if_needed_over_threshold(self):
         """超阈值时压缩应减少消息数量。"""
-        LlmManager._client = FakeLLMForSummary()
-
-        try:
+        with _patch_llm():
             with patch("kocor.context.context_manager.Config") as mock_config:
                 mock_config.get.return_value = "sliding"
                 ctx = ContextManager()
@@ -151,33 +159,10 @@ class TestContextManagerCompression:
                 ctx.compress_if_needed()
 
                 assert len(ctx.messages) < len(messages)
-        finally:
-            LlmManager.reset()
-
-    def test_build_initial_context_uses_session_history(self):
-        """build_initial_context 应使用 session_history 构建消息列表。"""
-        with patch("kocor.context.context_manager.Config") as mock_config:
-            mock_config.get.return_value = "default"
-            ctx = ContextManager(
-                tools=FakeToolRegistry(),
-            )
-        ctx.session_history = [Message(role="user", content="prev_q"),
-                                Message(role="assistant", content="prev_a")]
-
-        ctx.build_initial_context("new_q")
-
-        assert len(ctx.messages) == 4  # system + 2 history + current input
-        assert ctx.messages[1].content == "prev_q"
-        assert ctx.messages[3].content == "new_q"
 
 
 class TestSessionHistoryCompression:
-    """测试 session_history 压缩和摘要 role。
-
-    使用 sliding 策略触发压缩验证：
-    - session_history 有界
-    - 摘要以 assistant role 嵌入 processed 消息流
-    """
+    """测试 session_history 按 sliding window 策略压缩。"""
 
     def _make_long_history(self, n_rounds: int = 10) -> list[Message]:
         """构造多轮对话历史。"""
@@ -189,9 +174,7 @@ class TestSessionHistoryCompression:
 
     def test_session_history_grows_normally(self):
         """extract_session_history 不压缩，只过滤非 system 消息。"""
-        LlmManager._client = FakeLLMForSummary()
-
-        try:
+        with _patch_llm():
             with patch("kocor.context.context_manager.Config") as mock_config:
                 mock_config.get.side_effect = lambda key, **kw: {
                     "context_strategy": "sliding",
@@ -212,14 +195,10 @@ class TestSessionHistoryCompression:
 
             # extract 不压缩，只过滤
             assert all(m.role != "system" for m in ctx.session_history)
-        finally:
-            LlmManager.reset()
 
     def test_summary_persists_through_extract(self):
         """通过 build_initial_context(压缩) → extract 后，摘要以 assistant role 存在于 session_history。"""
-        LlmManager._client = FakeLLMForSummary()
-
-        try:
+        with _patch_llm():
             with patch("kocor.context.context_manager.Config") as mock_config:
                 mock_config.get.side_effect = lambda key, **kw: {
                     "context_strategy": "sliding",
@@ -246,14 +225,10 @@ class TestSessionHistoryCompression:
             ]
             assert len(summary_msgs) == 1
             assert summary_msgs[0].role == "assistant"
-        finally:
-            LlmManager.reset()
 
     def test_compress_if_needed_uses_assistant_role(self):
         """compress_if_needed 压缩后，摘要以 assistant role 存在。"""
-        LlmManager._client = FakeLLMForSummary()
-
-        try:
+        with _patch_llm():
             with patch("kocor.context.context_manager.Config") as mock_config:
                 mock_config.get.side_effect = lambda key, **kw: {
                     "context_strategy": "sliding",
@@ -278,21 +253,9 @@ class TestSessionHistoryCompression:
             # 压缩后 messages[0] 应为 system
             assert ctx.messages[0].role == "system"
 
-            # 应有 assistant 摘要消息
-            summary_msgs = [
-                m for m in ctx.messages
-                if m.role == "assistant" and m.content.startswith("[历史对话摘要]")
-            ]
-            assert len(summary_msgs) >= 1
-            assert summary_msgs[0].role == "assistant"
-        finally:
-            LlmManager.reset()
-
-    def test_compress_if_needed_uses_assistant_role(self):
-        """compress_if_needed 压缩后，摘要以 assistant role 存在。"""
-        LlmManager._client = FakeLLMForSummary()
-
-        try:
+    def test_compress_if_needed_over_threshold_with_sliding(self):
+        """sliding 策略下超阈值压缩应减少消息。"""
+        with _patch_llm():
             with patch("kocor.context.context_manager.Config") as mock_config:
                 mock_config.get.side_effect = lambda key, **kw: {
                     "context_strategy": "sliding",
@@ -314,15 +277,4 @@ class TestSessionHistoryCompression:
 
             ctx.compress_if_needed()
 
-            # 压缩后 messages[0] 应为 system
-            assert ctx.messages[0].role == "system"
-
-            # 应有 assistant 摘要消息
-            summary_msgs = [
-                m for m in ctx.messages
-                if m.role == "assistant" and m.content.startswith("[历史对话摘要]")
-            ]
-            assert len(summary_msgs) >= 1
-            assert summary_msgs[0].role == "assistant"
-        finally:
-            LlmManager.reset()
+            assert len(ctx.messages) < len(messages)

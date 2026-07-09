@@ -14,8 +14,8 @@ from kocor.harness.event.event_manager import EventType, HarnessEvent, EventEmit
 from kocor.harness.logger import get_logger
 from kocor.hook.base import HookPoint, HookContext
 from kocor.hook.hook_manager import HookManager
-from kocor.llm_provider.llm_manager import LlmManager
 from kocor.llm_provider.message import Message
+
 
 class HistorySummarizer:
     """会话历史摘要器。
@@ -38,7 +38,8 @@ class HistorySummarizer:
         event_emitter: EventEmitter | None = None,
         hook_manager: HookManager | None = None,
     ):
-        self.llm = LlmManager.get_llm_client()
+        from kocor.llm_provider.llm_factory import LlmFactory
+        self.llm = LlmFactory.create()
         self.summarization_prompt = self.DEFAULT_PROMPT
         self._token_counter = TokenCounter()
         self._event_emitter = event_emitter

@@ -27,7 +27,7 @@ from kocor import __version__
 
 from kocor.agent import Agent
 from kocor.config import Config
-from kocor.llm_provider.llm_manager import LlmManager
+from kocor.llm_provider.llm_factory import LlmFactory
 from kocor.llm_provider.message import StreamChunk
 from kocor.skill.types import InvokeStrategy
 from kocor.tools.tool_manager import ToolManager
@@ -445,7 +445,7 @@ def main() -> None:
         )
 
     agent = Agent(
-        llm=LlmManager.get_llm_client(),
+        llm=LlmFactory.create(),
         tool_manager=toolManager,
         permission_mgr=permission_mgr,
         hook_manager=hook_manager,

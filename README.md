@@ -87,7 +87,7 @@ python -m kocor --strict "读取配置文件"
 ```python
 from kocor.agent import Agent
 from kocor.config import Config
-from kocor.llm_provider.llm_manager import LlmManager
+from kocor.llm_provider.llm_factory import LlmFactory
 from kocor.tools.tool_manager import ToolManager
 from kocor.tools.permission import PermissionManager
 from kocor.harness import IterationBudget
@@ -98,7 +98,7 @@ tool_manager = ToolManager()
 tool_manager.register_all()
 
 agent = Agent(
-    llm=LlmManager.get_llm_client(),
+    llm=LlmFactory.create(),
     tool_manager=tool_manager,
     permission_mgr=PermissionManager(policy="permissive", tool_manager=tool_manager),
     budget=IterationBudget(max_iterations=20),
@@ -120,7 +120,7 @@ src/kocor/
 │
 ├── llm_provider/            # LLM 抽象层
 │   ├── llm_client.py        # LLMClient Protocol（generate / stream）
-│   ├── llm_manager.py       # LlmManager — 工厂 + 客户端单例
+│   ├── llm_factory.py       # LlmFactory — 纯工厂，每次 create() 返回新实例
 │   ├── message.py           # 统一数据模型：Message, ToolCall, StreamChunk
 │   └── providers/
 │       ├── openai_client.py     # OpenAI SDK 集成

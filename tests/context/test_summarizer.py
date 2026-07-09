@@ -1,12 +1,12 @@
 """测试 HistorySummarizer。"""
 
 from __future__ import annotations
+
 from unittest.mock import patch
 
 from kocor.context.types import SummaryNode
 from kocor.context.summarizer import HistorySummarizer
 from kocor.llm_provider.message import FunctionCall, Message, ToolCall
-from kocor.tools.definitions import ToolDefinition
 
 
 class FakeLLMForSummary:
@@ -30,14 +30,20 @@ class FakeLLMForSummary:
         raise NotImplementedError
 
 
+def _patch_llm(summary_text: str = "这是对话摘要"):
+    """返回一个上下文管理器，将 LlmFactory.create 替换为 FakeLLMForSummary。"""
+    return patch(
+        "kocor.llm_provider.llm_factory.LlmFactory.create",
+        return_value=FakeLLMForSummary(summary_text=summary_text),
+    )
+
+
 class TestHistorySummarizer:
     """测试 HistorySummarizer。"""
 
     def test_summarize_returns_summary_node(self):
         """summarize() 应返回 SummaryNode。"""
-        with patch("kocor.context.summarizer.LlmManager.get_llm_client") as mock:
-            llm = FakeLLMForSummary()
-            mock.return_value = llm
+        with _patch_llm():
             summarizer = HistorySummarizer()
             msgs = [
                 Message(role="user", content="你好"),
@@ -50,21 +56,18 @@ class TestHistorySummarizer:
 
     def test_summarize_calls_llm(self):
         """summarize() 应调用 LLM。"""
-        with patch("kocor.context.summarizer.LlmManager.get_llm_client") as mock:
-            llm = FakeLLMForSummary()
-            mock.return_value = llm
+        fake = FakeLLMForSummary()
+        with patch("kocor.llm_provider.llm_factory.LlmFactory.create", return_value=fake):
             summarizer = HistorySummarizer()
             summarizer.summarize([
                 Message(role="user", content="问题1"),
                 Message(role="assistant", content="回答1"),
             ])
-            assert llm.call_count == 1
+        assert fake.call_count == 1
 
     def test_summarize_token_count_estimated(self):
         """摘要的 token_count 应被估算。"""
-        with patch("kocor.context.summarizer.LlmManager.get_llm_client") as mock:
-            llm = FakeLLMForSummary(summary_text="短摘要")
-            mock.return_value = llm
+        with _patch_llm(summary_text="短摘要"):
             summarizer = HistorySummarizer()
             node = summarizer.summarize([
                 Message(role="user", content="hi"),
@@ -74,9 +77,7 @@ class TestHistorySummarizer:
 
     def test_summarize_empty_list(self):
         """空消息列表应返回空摘要。"""
-        with patch("kocor.context.summarizer.LlmManager.get_llm_client") as mock:
-            llm = FakeLLMForSummary()
-            mock.return_value = llm
+        with _patch_llm():
             summarizer = HistorySummarizer()
             node = summarizer.summarize([])
         assert node.summary == ""
@@ -85,9 +86,7 @@ class TestHistorySummarizer:
 
     def test_summarize_captures_indexes(self):
         """摘要应记录原始消息索引。"""
-        with patch("kocor.context.summarizer.LlmManager.get_llm_client") as mock:
-            llm = FakeLLMForSummary()
-            mock.return_value = llm
+        with _patch_llm():
             summarizer = HistorySummarizer()
             msgs = [Message(role="user", content=str(i)) for i in range(5)]
             node = summarizer.summarize(msgs, start_index=2, end_index=7)
@@ -96,9 +95,7 @@ class TestHistorySummarizer:
 
     def test_summarize_formats_messages_with_tool_calls(self):
         """消息包含工具调用时应被正确格式化。"""
-        with patch("kocor.context.summarizer.LlmManager.get_llm_client") as mock:
-            llm = FakeLLMForSummary()
-            mock.return_value = llm
+        with _patch_llm():
             summarizer = HistorySummarizer()
             msgs = [
                 Message(role="assistant", content="", tool_calls=[
@@ -112,9 +109,8 @@ class TestHistorySummarizer:
 
     def test_custom_summarization_prompt(self):
         """自定义摘要 prompt。"""
-        with patch("kocor.context.summarizer.LlmManager.get_llm_client") as mock:
-            llm = FakeLLMForSummary()
-            mock.return_value = llm
+        fake = FakeLLMForSummary()
+        with patch("kocor.llm_provider.llm_factory.LlmFactory.create", return_value=fake):
             summarizer = HistorySummarizer()
             custom_prompt = "请用中文总结：{history_text}"
             summarizer.summarization_prompt = custom_prompt
@@ -123,6 +119,13 @@ class TestHistorySummarizer:
                 Message(role="assistant", content="hello"),
             ])
         # 验证自定义 prompt 被使用
-        assert llm.last_messages is not None
-        last_msg = llm.last_messages[0]
+        assert fake.last_messages is not None
+        last_msg = fake.last_messages[0]
         assert "请用中文总结" in last_msg.content
+
+    def test_summarizer_creates_llm_via_factory(self):
+        """HistorySummarizer 内部通过 LlmFactory 创建 LLM 客户端。"""
+        with _patch_llm():
+            summarizer = HistorySummarizer()
+        assert summarizer.llm is not None
+        assert summarizer.llm.provider == "fake"

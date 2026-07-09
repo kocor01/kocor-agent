@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 import os
+from unittest.mock import patch
 
 from kocor.config import Config
 from kocor.context.budget import TokenBudget
 from kocor.context.strategies import ContextStrategyApplier
 from kocor.context.types import ContextStrategy
-from kocor.llm_provider.llm_manager import LlmManager
 from kocor.llm_provider.message import Message
 
 
@@ -26,38 +26,39 @@ class FakeLLM:
 class TestContextStrategyApplier:
     """测试 ContextStrategyApplier。"""
 
-    def setup_method(self):
-        LlmManager._client = FakeLLM()
-        self.applier = ContextStrategyApplier()
-
-    def teardown_method(self):
-        LlmManager.reset()
-
-    def test_default_no_history(self):
+    @patch("kocor.llm_provider.llm_factory.LlmFactory.create")
+    def test_default_no_history(self, mock_create):
         """DEFAULT 策略下空历史应原样返回。"""
+        mock_create.return_value = FakeLLM()
+        applier = ContextStrategyApplier()
         msgs = [
             Message(role="user", content="你好"),
             Message(role="assistant", content="你好！"),
         ]
-        result, summary = self.applier.apply(
+        result, summary = applier.apply(
             messages=msgs,
             strategy=ContextStrategy.DEFAULT,
         )
         assert summary is None
         assert result == msgs
 
-    def test_default_with_long_history(self):
+    @patch("kocor.llm_provider.llm_factory.LlmFactory.create")
+    def test_default_with_long_history(self, mock_create):
         """DEFAULT 策略下长历史也不截断。"""
+        mock_create.return_value = FakeLLM()
+        applier = ContextStrategyApplier()
         msgs = [Message(role="user", content=f"msg{i}") for i in range(100)]
-        result, summary = self.applier.apply(
+        result, summary = applier.apply(
             messages=msgs,
             strategy=ContextStrategy.DEFAULT,
         )
         assert summary is None
         assert len(result) == 100
 
-    def test_sliding_window_truncates(self):
+    @patch("kocor.llm_provider.llm_factory.LlmFactory.create")
+    def test_sliding_window_truncates(self, mock_create):
         """SLIDING_WINDOW 策略应截断超出轮次的消息。"""
+        mock_create.return_value = FakeLLM()
         applier = ContextStrategyApplier()
         msgs = []
         for i in range(10):
@@ -72,15 +73,18 @@ class TestContextStrategyApplier:
         assert summary is not None
         assert len(result) < len(msgs)
 
-    def test_aggressive_preserves_one_round(self):
+    @patch("kocor.llm_provider.llm_factory.LlmFactory.create")
+    def test_aggressive_preserves_one_round(self, mock_create):
         """AGGRESSIVE 策略应仅保留最后一轮。"""
+        mock_create.return_value = FakeLLM()
+        applier = ContextStrategyApplier()
         msgs = []
         for i in range(5):
             msgs.extend([
                 Message(role="user", content=f"问题{i}"),
                 Message(role="assistant", content=f"回答{i}"),
             ])
-        result, summary = self.applier.apply(
+        result, summary = applier.apply(
             messages=msgs,
             strategy=ContextStrategy.AGGRESSIVE,
         )
@@ -89,15 +93,18 @@ class TestContextStrategyApplier:
 
     def test_empty_messages(self):
         """空消息列表应返回空。"""
-        result, summary = self.applier.apply(
+        applier = ContextStrategyApplier()
+        result, summary = applier.apply(
             messages=[],
             strategy=ContextStrategy.SLIDING_WINDOW,
         )
         assert result == []
         assert summary is None
 
-    def test_tight_budget_triggers_truncation(self):
+    @patch("kocor.llm_provider.llm_factory.LlmFactory.create")
+    def test_tight_budget_triggers_truncation(self, mock_create):
         """token 预算紧张时 SLIDING_WINDOW 应触发截断。"""
+        mock_create.return_value = FakeLLM()
         old = os.environ.get("KOCOR_CONTEXT_MAX_TOKENS")
         os.environ["KOCOR_CONTEXT_MAX_TOKENS"] = "500"
         Config.reset()
@@ -119,8 +126,10 @@ class TestContextStrategyApplier:
 
     # ── TokenBudget 驱动的策略升级 ──────────────────────
 
-    def test_budget_summarize_upgrades_default(self):
+    @patch("kocor.llm_provider.llm_factory.LlmFactory.create")
+    def test_budget_summarize_upgrades_default(self, mock_create):
         """should_summarize=True 时 DEFAULT 策略应升级为 SLIDING_WINDOW。"""
+        mock_create.return_value = FakeLLM()
         budget = TokenBudget(limit=1000, used_prompt=750)  # ratio=0.75
         msgs = []
         for i in range(10):
@@ -129,7 +138,8 @@ class TestContextStrategyApplier:
                 Message(role="assistant", content=f"回答{i}"),
             ])
 
-        result, summary = self.applier.apply(
+        applier = ContextStrategyApplier()
+        result, summary = applier.apply(
             messages=msgs,
             strategy=ContextStrategy.DEFAULT,
             token_budget=budget,
@@ -145,7 +155,8 @@ class TestContextStrategyApplier:
             Message(role="assistant", content="你好！"),
         ]
 
-        result, summary = self.applier.apply(
+        applier = ContextStrategyApplier()
+        result, summary = applier.apply(
             messages=msgs,
             strategy=ContextStrategy.DEFAULT,
             token_budget=budget,
@@ -153,8 +164,10 @@ class TestContextStrategyApplier:
         assert summary is None
         assert len(result) == 2
 
-    def test_budget_truncate_overrides_sliding(self):
+    @patch("kocor.llm_provider.llm_factory.LlmFactory.create")
+    def test_budget_truncate_overrides_sliding(self, mock_create):
         """should_truncate=True 时 SLIDING_WINDOW 应降级为 AGGRESSIVE。"""
+        mock_create.return_value = FakeLLM()
         budget = TokenBudget(limit=1000, used_prompt=950)  # ratio=0.95
         applier = ContextStrategyApplier()
         msgs = []
@@ -173,9 +186,12 @@ class TestContextStrategyApplier:
         # AGGRESSIVE 只保留最后一轮 → 最多 3 条消息（user + assistant + 摘要）
         assert len(result) <= 3
 
-    def test_budget_truncate_overrides_default(self):
+    @patch("kocor.llm_provider.llm_factory.LlmFactory.create")
+    def test_budget_truncate_overrides_default(self, mock_create):
         """should_truncate=True 时 DEFAULT 应直接升级为 AGGRESSIVE。"""
+        mock_create.return_value = FakeLLM()
         budget = TokenBudget(limit=1000, used_prompt=950)  # ratio=0.95
+        applier = ContextStrategyApplier()
         msgs = []
         for i in range(8):
             msgs.extend([
@@ -183,7 +199,7 @@ class TestContextStrategyApplier:
                 Message(role="assistant", content=f"回答{i}"),
             ])
 
-        result, summary = self.applier.apply(
+        result, summary = applier.apply(
             messages=msgs,
             strategy=ContextStrategy.DEFAULT,
             token_budget=budget,
@@ -193,8 +209,9 @@ class TestContextStrategyApplier:
 
     def test_budget_none_preserves_existing_behavior(self):
         """token_budget=None 时行为不变。"""
+        applier = ContextStrategyApplier()
         msgs = [Message(role="user", content=f"msg{i}") for i in range(100)]
-        result, summary = self.applier.apply(
+        result, summary = applier.apply(
             messages=msgs,
             strategy=ContextStrategy.DEFAULT,
             token_budget=None,

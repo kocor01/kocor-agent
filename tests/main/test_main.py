@@ -13,7 +13,7 @@ def _mock_cli_main_stack(argv: list[str]) -> ExitStack:
                           memory_dir="", context_strategy="default",
                           log_level="INFO", log_dir="./log")
     stack.enter_context(patch("kocor.config.Config.load", return_value=mock_cfg))
-    stack.enter_context(patch("kocor.cli.LlmManager"))
+    stack.enter_context(patch("kocor.cli.LlmFactory"))
     stack.enter_context(patch("kocor.cli.ToolManager"))
     stack.enter_context(patch("sys.argv", argv))
     return stack
@@ -58,7 +58,7 @@ class TestCLIMain:
     """测试 CLI main 函数"""
 
     @patch("kocor.config.Config.load")
-    @patch("kocor.cli.LlmManager")
+    @patch("kocor.cli.LlmFactory")
     @patch("kocor.cli.ToolManager")
     @patch("kocor.cli.Agent")
     @patch("sys.argv", ["kocor", "你好"])
@@ -83,7 +83,7 @@ class TestCLIMain:
         mock_agent.run.assert_not_called()
 
     @patch("kocor.config.Config.load")
-    @patch("kocor.cli.LlmManager")
+    @patch("kocor.cli.LlmFactory")
     @patch("kocor.cli.ToolManager")
     @patch("kocor.cli.Agent")
     @patch("sys.argv", ["kocor", "--no-stream", "你好"])
@@ -104,7 +104,7 @@ class TestCLIMain:
         mock_agent.stream.assert_not_called()
 
     @patch("kocor.config.Config.load")
-    @patch("kocor.cli.LlmManager")
+    @patch("kocor.cli.LlmFactory")
     @patch("kocor.cli.ToolManager")
     @patch("kocor.cli.Agent")
     @patch("sys.argv", ["kocor"])
@@ -129,7 +129,7 @@ class TestCLIMain:
         mock_exit.assert_called_with(1)
 
     @patch("kocor.config.Config.load")
-    @patch("kocor.cli.LlmManager")
+    @patch("kocor.cli.LlmFactory")
     @patch("kocor.cli.ToolManager")
     @patch("kocor.cli.Agent")
     @patch("sys.argv", ["kocor", "你好"])
@@ -204,7 +204,7 @@ class TestCLIReasoning:
     """测试 CLI 流式模式下 reasoning 输出"""
 
     @patch("kocor.config.Config.load")
-    @patch("kocor.cli.LlmManager")
+    @patch("kocor.cli.LlmFactory")
     @patch("kocor.cli.ToolManager")
     @patch("kocor.cli.Agent")
     @patch("sys.argv", ["kocor", "你好"])
@@ -245,7 +245,7 @@ class TestCLIReasoning:
 
 _CLI_MAIN_MOCKS = [
     patch("kocor.config.Config.load"),
-    patch("kocor.cli.LlmManager"),
+    patch("kocor.cli.LlmFactory"),
     patch("kocor.cli.ToolManager"),
     patch("kocor.cli.Agent"),
 ]

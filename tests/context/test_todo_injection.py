@@ -5,7 +5,6 @@ from __future__ import annotations
 from unittest.mock import MagicMock, patch
 
 from kocor.context.context_manager import ContextManager
-from kocor.llm_provider.llm_manager import LlmManager
 from kocor.llm_provider.message import Message
 from kocor.tools.toolset.todo_tool import TodoStore
 
@@ -46,13 +45,20 @@ def _make_long_history(n_rounds: int = 8) -> list[Message]:
     return msgs
 
 
+def _patch_llm():
+    """返回一个上下文管理器，将 LlmFactory.create 替换为 FakeLLMForSummary。"""
+    return patch(
+        "kocor.llm_provider.llm_factory.LlmFactory.create",
+        return_value=FakeLLMForSummary(),
+    )
+
+
 class TestTodoSnapshotInjection:
     """测试上下文压缩时注入 active todos 快照。"""
 
     def test_build_initial_context_injects_on_compression(self):
         """压缩发生（summary_node 非空）时，应在 user_input 前注入 active todos。"""
-        LlmManager._client = FakeLLMForSummary()
-        try:
+        with _patch_llm():
             with patch("kocor.context.context_manager.Config") as mock_config:
                 mock_config.get.side_effect = lambda key, **kw: _CONFIG.get(key, kw.get("default"))
                 store = TodoStore()
@@ -66,8 +72,6 @@ class TestTodoSnapshotInjection:
             assert len(injected) == 1
             # 注入在最后一条 user_input 之前
             assert ctx.messages[-1].content == "最新问题"
-        finally:
-            LlmManager.reset()
 
     def test_build_initial_context_no_injection_without_compression(self):
         """未压缩（summary_node 为 None）时不注入。"""
@@ -87,8 +91,7 @@ class TestTodoSnapshotInjection:
 
     def test_build_initial_context_no_injection_when_no_active(self):
         """无 active 项时不注入（即使压缩发生）。"""
-        LlmManager._client = FakeLLMForSummary()
-        try:
+        with _patch_llm():
             with patch("kocor.context.context_manager.Config") as mock_config:
                 mock_config.get.side_effect = lambda key, **kw: _CONFIG.get(key, kw.get("default"))
                 store = TodoStore()
@@ -99,13 +102,10 @@ class TestTodoSnapshotInjection:
             ctx.build_initial_context("最新问题")
             injected = [m for m in ctx.messages if "preserved across context compression" in m.content]
             assert injected == []
-        finally:
-            LlmManager.reset()
 
     def test_no_todo_store_never_injects(self):
         """未提供 todo_store 时即使压缩也不注入。"""
-        LlmManager._client = FakeLLMForSummary()
-        try:
+        with _patch_llm():
             with patch("kocor.context.context_manager.Config") as mock_config:
                 mock_config.get.side_effect = lambda key, **kw: _CONFIG.get(key, kw.get("default"))
                 ctx = ContextManager(tools=FakeToolRegistry())  # 无 todo_store
@@ -114,13 +114,10 @@ class TestTodoSnapshotInjection:
             ctx.build_initial_context("最新问题")
             injected = [m for m in ctx.messages if "preserved across context compression" in m.content]
             assert injected == []
-        finally:
-            LlmManager.reset()
 
     def test_compress_if_needed_injects_snapshot(self):
         """compress_if_needed 压缩后应在末尾追加快照。"""
-        LlmManager._client = FakeLLMForSummary()
-        try:
+        with _patch_llm():
             with patch("kocor.context.context_manager.Config") as mock_config:
                 mock_config.get.side_effect = lambda key, **kw: _CONFIG.get(key, kw.get("default"))
                 store = TodoStore()
@@ -138,5 +135,3 @@ class TestTodoSnapshotInjection:
             injected = [m for m in ctx.messages if "preserved across context compression" in m.content]
             assert len(injected) == 1
             assert "active task" in injected[0].content
-        finally:
-            LlmManager.reset()
