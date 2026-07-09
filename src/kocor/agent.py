@@ -94,7 +94,8 @@ class Agent:
             todo_store=self._todo_store,
         )
 
-        # ReAct 循环引擎
+        # ReAct 循环引擎：Agent 负责组装并拥有 harness 组件，Loop 仅持有引用、
+        # 专注迭代机制。调用方通过 Loop 公共入口驱动循环，不访问其私有成员。
         self.loop = Loop(
             llm=self.llm,
             ctx=self.ctx,
@@ -364,11 +365,9 @@ class Agent:
                 messages.append(Message(role="user", content=result.content))
             self.ctx.reset()
             self.ctx.messages = messages
-            result = self.loop._run_messages()
-            # 与 loop.run() 保持一致：将本轮 messages 提取为 session_history，
-            # 否则 _session_after_run 拿不到新增消息，PROMPT 技能的 LLM 回复不会被持久化
-            self.ctx.extract_session_history()
-            return result
+            # 走 Loop 公共入口：循环结束后由 Loop 统一提取 session_history，
+            # 随后 _session_after_run 据此持久化 PROMPT 技能触发的 LLM 回复
+            return self.loop.run_messages()
         else:
             return result.content
 

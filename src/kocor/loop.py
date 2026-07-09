@@ -1,7 +1,11 @@
 """ReAct 循环引擎。
 
 管理 LLM 生成 → 工具执行 → 循环 的完整流程。
-不依赖 Agent 类，可作为独立编排引擎被任意 Agent 复用。
+
+职责边界：Loop 是 Agent 的内部编排引擎，所需 harness 组件（权限、钩子、
+事件、预算、工具）由 Agent 注入并持有。Loop 非独立可复用——它假定这些
+组件已由 Agent 装配完成。调用方仅通过 run/stream（含上下文构建）或
+run_messages/stream_messages（在已预设消息上直接运行循环）驱动循环。
 """
 
 from __future__ import annotations
@@ -22,11 +26,12 @@ from kocor.tools.tool_manager import ToolManager
 
 
 class Loop:
-    """ReAct 循环编排引擎。
+    """ReAct 循环编排引擎（Agent 的内部组件）。
 
     职责：
     - 管理 ReAct 循环（LLM 生成 → 工具执行 → 循环）
     - 权限检查、钩子调用、预算追踪、事件分发
+    - 循环结束后提取 session_history（状态归属在本引擎内收敛）
     """
 
     def __init__(
@@ -60,16 +65,13 @@ class Loop:
         """执行一次完整的 ReAct 循环。"""
         self._reset_state()
         self.ctx.build_initial_context(user_input)
-        result = self._run_messages()
-        self.ctx.extract_session_history()
-        return result
+        return self.run_messages()
 
     def stream(self, user_input: str) -> Iterator[StreamChunk]:
         """流式执行 ReAct 循环。"""
         self._reset_state()
         self.ctx.build_initial_context(user_input)
-        yield from self._stream_messages()
-        self.ctx.extract_session_history()
+        yield from self.stream_messages()
 
     # ── 核心循环 ──
 
@@ -84,9 +86,12 @@ class Loop:
         self._last_tool_call_signature = None
         self._stop_requested = False
 
-    def _run_messages(self) -> str:
-        """运行 ReAct 循环（消息已由 build_initial_context 设置）。"""
+    def run_messages(self) -> str:
+        """运行 ReAct 循环（消息已由 build_initial_context 或调用方预设）。
 
+        循环结束后由本方法负责将本轮 messages 提取为 session_history，
+        调用方无需手工调用 extract_session_history。
+        """
         try:
             while not self.budget.exhausted:
                 if self._stop_requested:
@@ -125,17 +130,23 @@ class Loop:
                 # 工具结果已追加，压缩上下文供下一轮迭代使用
                 self.ctx.usage = response.usage
                 self.ctx.compress_if_needed()
+
+            self._emit(EventType.ON_BUDGET_EXHAUSTED, iteration=self.ctx.iteration,
+                       max_iterations=self.budget.max_iterations)
+            self._run_hooks(HookPoint.ON_BUDGET_EXHAUSTED)
+            return self._budget_exhausted_message()
         except KeyboardInterrupt:
             return self._stopped_message()
+        finally:
+            # 状态归属收敛：循环结束后统一提取 session_history，
+            # 避免调用方（Agent）手工补位导致遗漏或不一致
+            self.ctx.extract_session_history()
 
-        self._emit(EventType.ON_BUDGET_EXHAUSTED, iteration=self.ctx.iteration,
-                       max_iterations=self.budget.max_iterations)
-        self._run_hooks(HookPoint.ON_BUDGET_EXHAUSTED)
-        return self._budget_exhausted_message()
+    def stream_messages(self) -> Iterator[StreamChunk]:
+        """以流模式运行 ReAct 循环（消息已由 build_initial_context 或调用方预设）。
 
-    def _stream_messages(self) -> Iterator[StreamChunk]:
-        """以流模式运行 ReAct 循环（消息已由 build_initial_context 设置）。"""
-
+        生成器结束（耗尽或被关闭）时由本方法负责提取 session_history。
+        """
         try:
             while not self.budget.exhausted:
                 if self._stop_requested:
@@ -209,15 +220,18 @@ class Loop:
                 # 工具结果已追加，压缩上下文供下一轮迭代使用
                 self.ctx.usage = streaming_usage
                 self.ctx.compress_if_needed()
+
+            self._emit(EventType.ON_BUDGET_EXHAUSTED, iteration=self.ctx.iteration,
+                       max_iterations=self.budget.max_iterations)
+            self._run_hooks(HookPoint.ON_BUDGET_EXHAUSTED)
+            yield StreamChunk(content=self._budget_exhausted_message(), is_final=True)
         except KeyboardInterrupt:
             msg = self._stopped_message()
             yield StreamChunk(content="\n⏹️ " + msg, is_final=True)
             return
-
-        self._emit(EventType.ON_BUDGET_EXHAUSTED, iteration=self.ctx.iteration,
-                       max_iterations=self.budget.max_iterations)
-        self._run_hooks(HookPoint.ON_BUDGET_EXHAUSTED)
-        yield StreamChunk(content=self._budget_exhausted_message(), is_final=True)
+        finally:
+            # 状态归属收敛：生成器结束时统一提取 session_history
+            self.ctx.extract_session_history()
 
     # ── 工具执行 ──
 

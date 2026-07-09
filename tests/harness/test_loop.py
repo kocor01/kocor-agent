@@ -351,6 +351,67 @@ class TestAgentLoop:
         assert result is not None
 
 
+# ── Loop 公共循环入口（问题 4.1：职责边界） ──
+
+
+class TestLoopPublicEntry:
+    """Loop 对外仅暴露公共循环入口，Agent 不得访问其私有成员。
+
+    循环结束后 Loop 自身负责将本轮 messages 提取为 session_history
+    （状态归属收敛），Agent 不再手工调用 extract_session_history。
+    """
+
+    def test_run_messages_is_public(self):
+        """run_messages 为公共方法，可对预置的 ctx.messages 运行循环。"""
+        llm = MockLLM(responses=[Message(role="assistant", content="公共入口回复")])
+        agent = Agent(
+            llm=llm,
+            tool_manager=MockToolRegistry(),
+            permission_mgr=PermissionManager(policy=PermissionManager.POLICY_PERMISSIVE),
+        )
+        # 模拟 PROMPT 技能路径：调用方已构造好 messages，直接进入循环
+        agent.ctx.messages = [
+            Message(role="system", content="system"),
+            Message(role="user", content="hello"),
+        ]
+        result = agent.loop.run_messages()
+        assert result == "公共入口回复"
+
+    def test_run_messages_auto_extracts_session_history(self):
+        """循环结束后 session_history 自动填充，无需外部调用 extract。"""
+        llm = MockLLM(responses=[Message(role="assistant", content="回复X")])
+        agent = Agent(
+            llm=llm,
+            tool_manager=MockToolRegistry(),
+            permission_mgr=PermissionManager(policy=PermissionManager.POLICY_PERMISSIVE),
+        )
+        agent.ctx.messages = [
+            Message(role="system", content="system"),
+            Message(role="user", content="hello"),
+        ]
+        agent.loop.run_messages()
+        roles = [m.role for m in agent.ctx.session_history]
+        assert "user" in roles
+        assert "assistant" in roles
+
+    def test_stream_messages_is_public_and_auto_extracts(self):
+        """stream_messages 为公共方法，消费完毕后 session_history 自动填充。"""
+        llm = MockLLM(responses=[Message(role="assistant", content="流式回复")])
+        agent = Agent(
+            llm=llm,
+            tool_manager=MockToolRegistry(),
+            permission_mgr=PermissionManager(policy=PermissionManager.POLICY_PERMISSIVE),
+        )
+        agent.ctx.messages = [
+            Message(role="system", content="system"),
+            Message(role="user", content="hello"),
+        ]
+        chunks = list(agent.loop.stream_messages())
+        assert len(chunks) > 0
+        roles = [m.role for m in agent.ctx.session_history]
+        assert "assistant" in roles
+
+
 # ── 重复工具调用检测 ──
 
 
