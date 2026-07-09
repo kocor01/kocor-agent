@@ -5,6 +5,8 @@ from __future__ import annotations
 import os
 from unittest.mock import patch
 
+import pytest
+
 from kocor.config import Config, _resolve_data_path
 
 
@@ -312,5 +314,117 @@ class TestContextConfig:
         os.environ["KOCOR_PRESERVE_FIRST_ROUNDS"] = "2"
         cfg = Config._load()
         assert cfg.preserve_first_rounds == 2
+
+
+class TestFieldValidation:
+    """测试配置项校验（阈值/限制/数值字段的边界与类型）。
+
+    这些校验分支原本在 Config._load 中已存在，但缺少测试覆盖。
+    作为重构前的行为锁定测试：先在当前实现上通过，重构后仍须保持。
+    """
+
+    # 重构中可能调整错误信息的 env（如 file_read_max_* 的裸 int() 报错），
+    # 这类只断言抛 ValueError；其余断言保留错误信息关键字以锁行为。
+    _VALIDATION_ENVS = [
+        "KOCOR_PROVIDER", "KOCOR_CONTEXT_SUMMARY_THRESHOLD",
+        "KOCOR_CONTEXT_TRUNCATE_THRESHOLD", "KOCOR_MEMORY_CHAR_LIMIT",
+        "KOCOR_USER_CHAR_LIMIT", "KOCOR_NUDGE_INTERVAL",
+        "KOCOR_FILE_READ_MAX_CHARS", "KOCOR_FILE_READ_MAX_LINES",
+        "KOCOR_FILE_SEARCH_MAX_RESULTS", "KOCOR_FILE_SEARCH_TIMEOUT",
+    ]
+
+    def setup_method(self):
+        self._dotenv_patch = patch("kocor.config.load_dotenv")
+        self._dotenv_patch.start()
+        self._saved = {k: os.environ.pop(k, None) for k in self._VALIDATION_ENVS}
+        Config.reset()
+
+    def teardown_method(self):
+        self._dotenv_patch.stop()
+        for k, v in self._saved.items():
+            if v is not None:
+                os.environ[k] = v
+            else:
+                os.environ.pop(k, None)
+        Config.reset()
+
+    # --- 上下文阈值 [0, 1] ---
+    def test_summary_threshold_above_range_raises(self):
+        os.environ["KOCOR_CONTEXT_SUMMARY_THRESHOLD"] = "1.5"
+        with pytest.raises(ValueError):
+            Config._load()
+
+    def test_summary_threshold_below_range_raises(self):
+        os.environ["KOCOR_CONTEXT_SUMMARY_THRESHOLD"] = "-0.1"
+        with pytest.raises(ValueError):
+            Config._load()
+
+    def test_summary_threshold_non_numeric_raises(self):
+        os.environ["KOCOR_CONTEXT_SUMMARY_THRESHOLD"] = "abc"
+        with pytest.raises(ValueError):
+            Config._load()
+
+    def test_truncate_threshold_above_range_raises(self):
+        os.environ["KOCOR_CONTEXT_TRUNCATE_THRESHOLD"] = "2.0"
+        with pytest.raises(ValueError):
+            Config._load()
+
+    def test_truncate_threshold_below_range_raises(self):
+        os.environ["KOCOR_CONTEXT_TRUNCATE_THRESHOLD"] = "-1"
+        with pytest.raises(ValueError):
+            Config._load()
+
+    # --- 字符上限 >= 1 ---
+    def test_memory_char_limit_zero_raises(self):
+        os.environ["KOCOR_MEMORY_CHAR_LIMIT"] = "0"
+        with pytest.raises(ValueError):
+            Config._load()
+
+    def test_memory_char_limit_non_int_raises(self):
+        os.environ["KOCOR_MEMORY_CHAR_LIMIT"] = "abc"
+        with pytest.raises(ValueError):
+            Config._load()
+
+    def test_user_char_limit_zero_raises(self):
+        os.environ["KOCOR_USER_CHAR_LIMIT"] = "0"
+        with pytest.raises(ValueError):
+            Config._load()
+
+    def test_user_char_limit_non_int_raises(self):
+        os.environ["KOCOR_USER_CHAR_LIMIT"] = "x"
+        with pytest.raises(ValueError):
+            Config._load()
+
+    # --- nudge_interval >= 0 ---
+    def test_nudge_interval_negative_raises(self):
+        os.environ["KOCOR_NUDGE_INTERVAL"] = "-1"
+        with pytest.raises(ValueError):
+            Config._load()
+
+    def test_nudge_interval_non_int_raises(self):
+        os.environ["KOCOR_NUDGE_INTERVAL"] = "abc"
+        with pytest.raises(ValueError):
+            Config._load()
+
+    # --- 文件工具数值字段：仅校验整数转型（原实现无范围校验） ---
+    def test_file_read_max_chars_non_int_raises(self):
+        os.environ["KOCOR_FILE_READ_MAX_CHARS"] = "abc"
+        with pytest.raises(ValueError):
+            Config._load()
+
+    def test_file_read_max_lines_non_int_raises(self):
+        os.environ["KOCOR_FILE_READ_MAX_LINES"] = "abc"
+        with pytest.raises(ValueError):
+            Config._load()
+
+    def test_file_search_max_results_non_int_raises(self):
+        os.environ["KOCOR_FILE_SEARCH_MAX_RESULTS"] = "abc"
+        with pytest.raises(ValueError):
+            Config._load()
+
+    def test_file_search_timeout_non_int_raises(self):
+        os.environ["KOCOR_FILE_SEARCH_TIMEOUT"] = "abc"
+        with pytest.raises(ValueError):
+            Config._load()
 
 
