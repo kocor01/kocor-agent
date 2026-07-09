@@ -111,6 +111,7 @@ class Agent:
     def stop(self) -> None:
         """请求在当前迭代边界停止 ReAct 循环。"""
         self.tool_manager.stop_cron_scheduler()
+        self._cron_started = False
         self.loop.stop()
 
     def run(self, user_input: str) -> str:

@@ -304,3 +304,30 @@ class ToolRegistryMock:
     def stop_cron_scheduler(self):
         """cron 调度器，测试中为空操作。"""
         pass
+
+
+class TestAgentCronRestart:
+    """测试 cron 调度器在 stop() 后能重启"""
+
+    def test_cron_restarts_after_stop(self):
+        """stop() 后再次 run() 应重新启动 cron 调度器"""
+        call_count = 0
+
+        class TrackingToolRegistryMock(ToolRegistryMock):
+            def start_cron_scheduler(self):
+                nonlocal call_count
+                call_count += 1
+
+        llm = FakeLLMClient([Message(role="assistant", content="hello")])
+        agent = Agent(llm=llm, tool_manager=TrackingToolRegistryMock())
+
+        # 第一次 run → cron 启动（1 次）
+        agent.run("hi")
+        assert call_count == 1, f"首次 run 应启动 cron，实际: {call_count}"
+
+        # stop → cron 停止
+        agent.stop()
+
+        # 再次 run → cron 应重新启动（2 次）
+        agent.run("hello again")
+        assert call_count == 2, f"stop 后再次 run 应重新启动 cron，实际: {call_count}"
