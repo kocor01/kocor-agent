@@ -14,7 +14,10 @@ from kocor.config import Config
 from kocor.llm_provider.llm_client import LLMClient
 from kocor.llm_provider.message import Message, ToolResult
 from kocor.session import SessionManager, SessionResetPolicy, SessionStore
+from kocor.skill.skill_manager import SkillManager
+from kocor.skill.types import InvokeStrategy, SkillDefinition, SkillType
 from kocor.tools.definitions import ToolDefinition
+from kocor.tools.tool_manager import ToolManager
 from tests.agent.test_agent import FakeLLMClient
 
 
@@ -332,3 +335,70 @@ class TestAgentSessionIntegration:
         msgs_c = session_manager.load_messages(sid_c)
         assert len(msgs_c) >= 1
         assert msgs_c[0].content == "消息 C"
+
+    # ── 修复 3.3:  slash 命令不经过 session_before_run/after_run ──
+
+    def test_slash_prompt_skill_updates_session(self, session_manager):
+        """PROMPT 类型 slash 命令执行后应更新会话元数据并持久化消息。
+
+        修复 3.3：_handle_slash_command 中 loop._run_messages() 不经过
+        _session_after_run，导致 PROMPT 型技能触发的 LLM 会话消息未被持久化。
+        """
+        llm = FakeLLMClient([Message(role="assistant", content="slash 技能回复")])
+
+        skill_mgr = SkillManager()
+        skill_mgr.register(SkillDefinition(
+            name="test",
+            description="测试 slash 技能",
+            skill_type=SkillType.PROMPT,
+            invoke_strategy=InvokeStrategy.SLASH,
+            prompt_template="你是测试助手，请回复：{user_input}",
+            prompt_role="user",
+        ))
+
+        tool_mgr = ToolManager()
+        tool_mgr.skill_manager = skill_mgr
+
+        agent = Agent(llm=llm, tool_manager=tool_mgr, session_manager=session_manager)
+        result = agent.run("/test 你好")
+
+        assert result == "slash 技能回复"
+
+        # 会话元数据应已更新
+        info = session_manager.get_session_info(session_manager.session_key)
+        assert info is not None
+        assert info.message_count > 0
+
+        # 消息应已持久化到 SQLite
+        messages = session_manager.load_messages(info.session_id)
+        assert len(messages) >= 1
+
+    def test_slash_code_skill_updates_session(self, session_manager):
+        """CODE 类型 slash 命令执行后也应更新会话元数据。
+
+        修复 3.3：_handle_slash_command 直接返回 CODE 技能结果，不经过
+        _session_after_run，导致会话元数据未更新。
+        """
+        llm = FakeLLMClient([Message(role="assistant", content="ignored")])
+
+        skill_mgr = SkillManager()
+        skill_mgr.register(SkillDefinition(
+            name="hello",
+            description="测试 CODE slash 技能",
+            skill_type=SkillType.CODE,
+            invoke_strategy=InvokeStrategy.SLASH,
+            handler=lambda user_input="": f"你好，{user_input}!",
+        ))
+
+        tool_mgr = ToolManager()
+        tool_mgr.skill_manager = skill_mgr
+
+        agent = Agent(llm=llm, tool_manager=tool_mgr, session_manager=session_manager)
+        result = agent.run("/hello world")
+
+        assert result == "你好，world!"
+
+        # 会话元数据应已更新
+        info = session_manager.get_session_info(session_manager.session_key)
+        assert info is not None
+        assert info.message_count >= 0  # CODE 技能不产生 LLM 消息，但会话记录应存在

@@ -124,7 +124,10 @@ class Agent:
                 return cmd_result
         self._session_before_run()
         if self.tool_manager.skill_manager and user_input.startswith("/"):
-            return self._handle_slash_command(user_input)
+            result = self._handle_slash_command(user_input)
+            self._session_after_run()
+            self._check_nudge()
+            return result
         result = self.loop.run(user_input)
         self._session_after_run()
         self._check_nudge()
@@ -140,6 +143,8 @@ class Agent:
         self._session_before_run()
         if self.tool_manager.skill_manager and user_input.startswith("/"):
             result = self._handle_slash_command(user_input)
+            self._session_after_run()
+            self._check_nudge()
             yield StreamChunk(content=result, is_final=True)
             return
         yield from self.loop.stream(user_input)
