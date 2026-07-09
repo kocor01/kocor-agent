@@ -66,6 +66,7 @@ class TestPermissionManager:
         assert pm.check(_tc("write_file")) is False
 
     def test_always_ask_allows_with_mocked_stdin(self, monkeypatch):
+        monkeypatch.setattr("sys.stdin.isatty", lambda: True)
         monkeypatch.setattr("builtins.input", lambda prompt="": "y")
         pm = PermissionManager(always_ask={"write_file"}, cache_enabled=True)
         assert pm.check(_tc("write_file")) is True
@@ -128,12 +129,14 @@ class TestPermissionManager:
             assert f"t{i}" not in pm._cache
 
     def test_ask_user_always_option(self, monkeypatch):
+        monkeypatch.setattr("sys.stdin.isatty", lambda: True)
         monkeypatch.setattr("builtins.input", lambda prompt="": "a")
         pm = PermissionManager(always_ask={"read_file"})
         assert pm.check(_tc("read_file")) is True
         assert "read_file" in pm._cache
 
     def test_ask_user_no_option(self, monkeypatch):
+        monkeypatch.setattr("sys.stdin.isatty", lambda: True)
         monkeypatch.setattr("builtins.input", lambda prompt="": "n")
         pm = PermissionManager(always_ask={"read_file"})
         assert pm.check(_tc("read_file")) is False
@@ -142,3 +145,10 @@ class TestPermissionManager:
     def test_ask_user_eof_returns_false(self):
         pm = PermissionManager(always_ask={"read_file"})
         assert pm.check(_tc("read_file")) is False
+
+    def test_ask_user_non_tty_returns_false(self):
+        """非 TTY 模式（如管道输入）下应直接拒绝，不调用 input()。"""
+        pm = PermissionManager(always_ask={"read_file"})
+        assert pm.check(_tc("read_file")) is False
+        # 即使有 IO 错误也不应抛出异常
+        assert pm.check(_tc("write_file")) is False

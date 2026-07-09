@@ -5,6 +5,7 @@
 """
 
 import json
+import sys
 from collections import OrderedDict
 
 
@@ -96,6 +97,10 @@ class PermissionManager:
         返回 True 表示已批准（包括"始终允许此会话"）。
         如果 stdin 不可用（非交互模式），返回 False。
         """
+        # 非 TTY 模式（管道输入、测试环境）下直接拒绝，不调用 input()
+        if not sys.stdin.isatty():
+            return False
+
         try:
             print(f"⚠️  工具调用需要确认: ")
             print(f"   名称: {tool_name}")
