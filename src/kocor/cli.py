@@ -43,22 +43,21 @@ from kocor.harness.logger import Logger
 # 可选的会话管理
 from kocor.session import SessionManager, SessionResetPolicy, SessionStore
 
-def _detect_width() -> int:
-    """检测终端宽度，设置合理的下限和上限。"""
-    try:
-        cols = shutil.get_terminal_size().columns
-        return max(58, min(cols, 150))
-    except Exception:
-        return 58
-
-
-W = _detect_width()
-
-
 class _StreamFormatter:
     """管理流式输出的格式状态。"""
 
-    def __init__(self, width: int = W):
+    @staticmethod
+    def _detect_width() -> int:
+        """检测终端宽度，设置合理的下限和上限。"""
+        try:
+            cols = shutil.get_terminal_size().columns
+            return max(58, min(cols, 150))
+        except Exception:
+            return 58
+
+    def __init__(self, width: int | None = None):
+        if width is None:
+            width = self._detect_width()
         self.width = width
         self.round_num = 0
         self.pending_round = False
@@ -309,7 +308,7 @@ def _print_welcome(
             console.print(cmd)
 
     # ── 底部提示 ──
-    console.print(Text("─" * max(4, W - 2), style="dim"))
+    console.print(Text("─" * max(4, _StreamFormatter._detect_width() - 2), style="dim"))
     print(" 输入 exit 或 Ctrl+C 退出")
     print()
 
