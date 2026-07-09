@@ -14,13 +14,7 @@ from kocor.tools.permission import PermissionManager
 from kocor.tools.toolset.binary_extensions import has_binary_extension
 from kocor.tools.toolset.read_extract import is_extractable_document
 from kocor.tools.toolset.file_safety import get_read_block_error
-from kocor.tools.toolset.file_state import (
-    check_dedup,
-    get_consecutive_count,
-    get_dedup_hits,
-    notify_other_tool_call,
-    record_read,
-)
+from kocor.tools.toolset.file_state import FileStateTracker
 from kocor.config import Config
 from kocor.tools.tool_utils import resolve_safe_path
 
@@ -136,17 +130,26 @@ class ReadFile:
     }
 
     @staticmethod
-    def handler(path: str, offset: int | None = None, limit: int | None = None) -> str:
+    def handler(
+        path: str,
+        offset: int | None = None,
+        limit: int | None = None,
+        file_state: FileStateTracker | None = None,
+    ) -> str:
         """读取文件内容。
 
         Args:
             path: 文件路径
             offset: 起始行号（从 1 开始）
             limit: 最大行数
+            file_state: FileStateTracker 实例（由 ToolManager 注入）
 
         Returns:
             JSON 字符串
         """
+        if file_state is None:
+            return json.dumps({"error": "Internal error: file_state is required"}, ensure_ascii=False)
+
         try:
             offset, limit = _normalize_pagination(offset, limit)
 
@@ -188,18 +191,18 @@ class ReadFile:
                 return json.dumps({"error": block_error}, ensure_ascii=False)
 
             # ── 去重检查 ──────────────────────────────────────
-            if check_dedup("default", safe_path, offset, limit):
-                hits = get_dedup_hits("default", safe_path, offset, limit)
-                if hits >= 2:
+            if file_state.check_dedup(safe_path, offset, limit):
+                dedup_hits = file_state.get_dedup_hits(safe_path, offset, limit)
+                if dedup_hits >= 2:
                     return json.dumps({
                         "error": (
                             f"BLOCKED: You have called read_file on this "
-                            f"exact region {hits + 1} times and the file has "
+                            f"exact region {dedup_hits + 1} times and the file has "
                             "NOT changed. STOP calling read_file for this path "
                             "— the content from your earlier result is still current."
                         ),
                         "path": path,
-                        "already_read": hits + 1,
+                        "already_read": dedup_hits + 1,
                     }, ensure_ascii=False)
                 return json.dumps({
                     "status": "unchanged",
@@ -287,10 +290,10 @@ class ReadFile:
                 )
 
             # ── 记录读取状态 ──────────────────────────────────
-            record_read("default", safe_path, offset, limit)
+            file_state.record_read(safe_path, offset, limit)
 
             # ── 连续循环检测 ──────────────────────────────────
-            consecutive = get_consecutive_count("default")
+            consecutive = file_state.get_consecutive_count()
             if consecutive >= 4:
                 return json.dumps({
                     "error": (

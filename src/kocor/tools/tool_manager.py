@@ -9,6 +9,7 @@ from typing import Callable
 from kocor.config import Config
 from kocor.tools.definitions import ToolDefinition
 from kocor.tools.truncate import ToolOutputTruncator
+from kocor.tools.toolset.file_state import FileStateTracker
 from kocor.llm_provider.message import ToolCall, ToolResult
 from kocor.tools.permission import PermissionManager
 
@@ -19,6 +20,7 @@ class ToolManager:
     def __init__(self):
         self._tools: dict[str, ToolDefinition] = {}
         self._handlers: dict[str, Callable] = {}
+        self.file_state = FileStateTracker()
         self.mcp_manager = None
         self.skill_manager = None
         self._cron_scheduler = None
@@ -34,8 +36,26 @@ class ToolManager:
 
         self.memory_store = None
         self.todo_store = None
-        builtin_tools = [ReadFile, WriteFile, PatchFile, SearchFiles, BashTool, ProcessTool]
-        for tools in builtin_tools:
+
+        # 文件工具：通过闭包注入 file_state
+        self.register(
+            ReadFile.NAME, ReadFile.DESCRIPTION, ReadFile.PARAMETERS,
+            lambda **kw: ReadFile.handler(file_state=self.file_state, **kw),
+            ReadFile.SAFETY_LEVEL,
+        )
+        self.register(
+            WriteFile.NAME, WriteFile.DESCRIPTION, WriteFile.PARAMETERS,
+            lambda **kw: WriteFile.handler(file_state=self.file_state, **kw),
+            WriteFile.SAFETY_LEVEL,
+        )
+        self.register(
+            PatchFile.NAME, PatchFile.DESCRIPTION, PatchFile.PARAMETERS,
+            lambda **kw: PatchFile.handler(file_state=self.file_state, **kw),
+            PatchFile.SAFETY_LEVEL,
+        )
+
+        # 其余内置工具直接注册
+        for tools in [SearchFiles, BashTool, ProcessTool]:
             self.register(tools.NAME, tools.DESCRIPTION, tools.PARAMETERS, tools.handler, tools.SAFETY_LEVEL)
 
         # memory 工具需要 MemoryStore，handler 延迟读取 self.memory_store

@@ -16,11 +16,7 @@ from kocor.tools.toolset.file_safety import (
     is_internal_file_tool_content,
     is_write_denied,
 )
-from kocor.tools.toolset.file_state import (
-    invalidate_dedup,
-    record_patch_failure,
-    reset_patch_failures,
-)
+from kocor.tools.toolset.file_state import FileStateTracker
 from kocor.tools.toolset.fuzzy_match import fuzzy_find_and_replace
 from kocor.tools.tool_utils import resolve_safe_path
 
@@ -80,6 +76,7 @@ class PatchFile:
         old_string: str,
         new_string: str,
         replace_all: bool = False,
+        file_state: FileStateTracker | None = None,
     ) -> str:
         """执行模糊匹配替换。
 
@@ -88,10 +85,14 @@ class PatchFile:
             old_string: 要替换的旧文本
             new_string: 替换后的新文本
             replace_all: 是否替换所有匹配
+            file_state: FileStateTracker 实例（由 ToolManager 注入）
 
         Returns:
             JSON 字符串
         """
+        if file_state is None:
+            return json.dumps({"error": "Internal error: file_state is required", "success": False}, ensure_ascii=False)
+
         try:
             # ── 安全守卫 ──────────────────────────────────────
             err = _check_patch_safety(path, old_string, new_string)
@@ -136,7 +137,7 @@ class PatchFile:
             if match_err or count == 0:
                 err_msg = match_err or "No match found"
                 # 记录补丁失败（用于升级提示）
-                failures = record_patch_failure("default", safe_path)
+                failures = file_state.record_patch_failure(safe_path)
                 if failures >= 3:
                     err_msg += (
                         ". This patch has failed 3+ times consecutively. "
@@ -183,8 +184,8 @@ class PatchFile:
                 }, ensure_ascii=False)
 
             # ── 刷新状态 ──────────────────────────────────────
-            invalidate_dedup("default", safe_path)
-            reset_patch_failures("default", [safe_path])
+            file_state.invalidate_dedup(safe_path)
+            file_state.reset_patch_failures([safe_path])
 
             # ── Lint delta 检查（仅报告新增错误） ──────────────
             lint_result = None

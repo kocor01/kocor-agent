@@ -16,7 +16,7 @@ from kocor.tools.toolset.file_safety import (
     is_internal_file_tool_content,
     is_write_denied,
 )
-from kocor.tools.toolset.file_state import invalidate_dedup
+from kocor.tools.toolset.file_state import FileStateTracker
 from kocor.tools.tool_utils import resolve_safe_path
 
 # ── 行尾/BOM 检测 ────────────────────────────────────────────────
@@ -98,16 +98,24 @@ class WriteFile:
     }
 
     @staticmethod
-    def handler(path: str, content: str) -> str:
+    def handler(
+        path: str,
+        content: str,
+        file_state: FileStateTracker | None = None,
+    ) -> str:
         """写入文件。
 
         Args:
             path: 文件路径
             content: 文件内容
+            file_state: FileStateTracker 实例（由 ToolManager 注入）
 
         Returns:
             JSON 字符串，包含 bytes_written, dirs_created 或 error
         """
+        if file_state is None:
+            return json.dumps({"error": "Internal error: file_state is required"}, ensure_ascii=False)
+
         # ── 安全守卫 ────────────────────────────────────────────
         err = _check_write_safety(path, content)
         if err:
@@ -184,7 +192,7 @@ class WriteFile:
             }, ensure_ascii=False)
 
         # ── 刷新读去重缓存 ──────────────────────────────────────
-        invalidate_dedup("default", safe_path)
+        file_state.invalidate_dedup(safe_path)
 
         # ── Lint delta 检查（仅报告新增错误） ────────────────────
         result_dict: dict = {

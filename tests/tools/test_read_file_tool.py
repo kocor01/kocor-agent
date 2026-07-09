@@ -5,10 +5,14 @@ import os
 import tempfile
 
 from kocor.tools.toolset.read_file_tool import ReadFile
+from kocor.tools.toolset.file_state import FileStateTracker
 
 
 class TestReadFile:
     """测试 ReadFile 工具。"""
+
+    def setup_method(self):
+        self.tracker = FileStateTracker()
 
     def _make_file(self, content: str, suffix: str = ".py") -> str:
         """创建临时文件并返回路径。"""
@@ -22,7 +26,7 @@ class TestReadFile:
         content = "line1\nline2\nline3\n"
         path = self._make_file(content)
         try:
-            result = ReadFile.handler(path=path)
+            result = ReadFile.handler(file_state=self.tracker, path=path)
             data = json.loads(result)
             assert "line1" in data["content"]
             assert "line2" in data["content"]
@@ -35,7 +39,7 @@ class TestReadFile:
         content = "hello\nworld\nfoo\n"
         path = self._make_file(content)
         try:
-            result = ReadFile.handler(path=path, offset=1, limit=10)
+            result = ReadFile.handler(file_state=self.tracker, path=path, offset=1, limit=10)
             data = json.loads(result)
             assert "1|hello" in data["content"]
             assert "2|world" in data["content"]
@@ -48,7 +52,7 @@ class TestReadFile:
         content = "a\nb\nc\nd\ne\n"
         path = self._make_file(content)
         try:
-            result = ReadFile.handler(path=path, offset=3, limit=2)
+            result = ReadFile.handler(file_state=self.tracker, path=path, offset=3, limit=2)
             data = json.loads(result)
             assert "3|c" in data["content"]
             assert "4|d" in data["content"]
@@ -58,7 +62,7 @@ class TestReadFile:
 
     def test_file_not_found(self):
         """文件不存在返回错误。"""
-        result = ReadFile.handler(path="/tmp/nonexistent_file_xyz.py")
+        result = ReadFile.handler(file_state=self.tracker, path="/tmp/nonexistent_file_xyz.py")
         data = json.loads(result)
         assert "error" in data
 
@@ -66,7 +70,7 @@ class TestReadFile:
         """空文件返回空内容。"""
         path = self._make_file("")
         try:
-            result = ReadFile.handler(path=path)
+            result = ReadFile.handler(file_state=self.tracker, path=path)
             data = json.loads(result)
             assert data["content"] == ""
             assert data["total_lines"] == 0
@@ -77,7 +81,7 @@ class TestReadFile:
         """二进制扩展名文件被阻断。"""
         path = self._make_file("not really png", suffix=".png")
         try:
-            result = ReadFile.handler(path=path)
+            result = ReadFile.handler(file_state=self.tracker, path=path)
             data = json.loads(result)
             assert "error" in data
             assert "binary" in data["error"].lower() or "Cannot" in data["error"]
@@ -90,7 +94,7 @@ class TestReadFile:
             old_cwd = os.getcwd()
             os.chdir(tmpdir)
             try:
-                result = ReadFile.handler(path="../etc/passwd")
+                result = ReadFile.handler(file_state=self.tracker, path="../etc/passwd")
                 assert "denied" in result.lower() or "Error" in result
             finally:
                 os.chdir(old_cwd)
@@ -102,7 +106,7 @@ class TestReadFile:
         content = "\n".join(lines) + "\n"
         path = self._make_file(content)
         try:
-            result = ReadFile.handler(path=path, offset=1, limit=2000)
+            result = ReadFile.handler(file_state=self.tracker, path=path, offset=1, limit=2000)
             data = json.loads(result)
             assert data["truncated"] is True
             assert "truncated_by" in data
@@ -115,9 +119,9 @@ class TestReadFile:
         path = self._make_file(content)
         try:
             # 首次读取
-            ReadFile.handler(path=path)
+            ReadFile.handler(file_state=self.tracker, path=path)
             # 再次读取
-            result = ReadFile.handler(path=path)
+            result = ReadFile.handler(file_state=self.tracker, path=path)
             data = json.loads(result)
             if "status" in data:
                 assert data["status"] == "unchanged"
