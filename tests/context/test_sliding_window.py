@@ -129,6 +129,48 @@ class TestSlidingWindowStrategy:
         last_tool_rounds = [m for m in result if m.role == "assistant" and m.tool_calls]
         assert len(last_tool_rounds) <= 2
 
+    def test_split_rounds_normal_alternation(self, mock_create):
+        """正常 user/assistant 交替时，每条消息自成一轮（assistant 为单元的设计）。"""
+        msgs = [
+            Message(role="user", content="u1"),
+            Message(role="assistant", content="a1"),
+            Message(role="user", content="u2"),
+            Message(role="assistant", content="a2"),
+        ]
+        rounds = self.strategy._split_into_rounds(msgs)
+        assert [[m.content for m in r] for r in rounds] == [
+            ["u1"], ["a1"], ["u2"], ["a2"],
+        ]
+
+    def test_split_rounds_merges_consecutive_users(self, mock_create):
+        """连续 user 消息（中间无 assistant 回复）应合并到同一轮，而非各自成轮。
+
+        回归 BUG 3.5：连续 user 时第二条 user 触发新轮次切分，
+        使第一条 user 被孤立成单独一轮。
+        """
+        msgs = [
+            Message(role="user", content="u1"),
+            Message(role="user", content="u2"),
+            Message(role="assistant", content="a1"),
+        ]
+        rounds = self.strategy._split_into_rounds(msgs)
+        # 连续的两条 user 合并；assistant 仍按设计自成一轮
+        assert [[m.content for m in r] for r in rounds] == [
+            ["u1", "u2"], ["a1"],
+        ]
+
+    def test_split_rounds_user_after_assistant_starts_new_turn(self, mock_create):
+        """user 跟在 assistant 之后时应开启新轮次（新对话回合）。"""
+        msgs = [
+            Message(role="user", content="u1"),
+            Message(role="assistant", content="a1"),
+            Message(role="user", content="u2"),
+        ]
+        rounds = self.strategy._split_into_rounds(msgs)
+        assert [[m.content for m in r] for r in rounds] == [
+            ["u1"], ["a1"], ["u2"],
+        ]
+
     # ── 三段落策略（preserve_first_rounds） ──────────────────────
 
     def test_preserve_first_rounds_keeps_initial_rounds(self, mock_create):

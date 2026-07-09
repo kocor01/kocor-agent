@@ -105,9 +105,11 @@ class SlidingWindowStrategy:
     def _split_into_rounds(self, messages: list[Message]) -> list[list[Message]]:
         """将消息列表分割为语义轮次。
 
-        一轮在 user 或 assistant 消息边界处切分（首次 assistant 不切）。
-        每次 LLM 调用产生一条 assistant 消息，以此为单位做滑动窗口。
-        也支持多轮对话（多 user 消息）场景。
+        每次 LLM 调用产生一条 assistant 消息，以此为单位做滑动窗口；
+        assistant 边界处切分（首次 assistant 不切）。
+        连续 user 消息（中间无 assistant 回复，如 REPL 快速连续输入）
+        视为同一回合的多条输入，合并到同一轮而不各自成轮，
+        避免第一条 user 被孤立成单独一轮（BUG 3.5）。
 
         Args:
             messages: 消息列表
@@ -119,7 +121,12 @@ class SlidingWindowStrategy:
         current_round: list[Message] = []
 
         for msg in messages:
-            if msg.role in ("user", "assistant") and current_round:
+            # assistant 消息始终开启新轮次；user 消息仅在跟随非 user
+            # （即真正的对话回合切换）时才切分，连续 user 合并。
+            if current_round and (
+                msg.role == "assistant"
+                or (msg.role == "user" and current_round[-1].role != "user")
+            ):
                 rounds.append(current_round)
                 current_round = []
 
