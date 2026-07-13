@@ -16,7 +16,7 @@ from typing import Iterator
 
 from kocor.context.context_manager import ContextManager
 from kocor.event.event_manager import HarnessEvent, EventEmitter, EventType
-from kocor.hook.base import HookPoint, HookContext, HookResult, HookAction
+from kocor.hook.base import HookPoint, HookContext, HookAction
 from kocor.hook.hook_manager import HookManager
 from kocor.llm_provider.llm_client import LLMClient
 from kocor.llm_provider.message import Message, StreamChunk
@@ -99,7 +99,9 @@ class Loop:
 
                 self._emit(EventType.PRE_GENERATE, iteration=self.ctx.iteration, messages=self.ctx.messages,
                            tools=self.tool_manager.get_definitions())
-                self._run_hooks(HookPoint.PRE_GENERATE)
+                msg = self._run_hooks(HookPoint.PRE_GENERATE)
+                if msg is not None:
+                    return msg
 
                 response = self.llm.generate(
                     self.ctx.messages,
@@ -108,7 +110,9 @@ class Loop:
                 self.ctx.append(response)
 
                 self._emit(EventType.POST_GENERATE, iteration=self.ctx.iteration, response=response)
-                self._run_hooks(HookPoint.POST_GENERATE, response=response)
+                msg = self._run_hooks(HookPoint.POST_GENERATE, response=response)
+                if msg is not None:
+                    return msg or response.content or ""
 
                 if not response.tool_calls:
                     return response.content or ""
@@ -152,7 +156,10 @@ class Loop:
 
                 self._emit(EventType.PRE_GENERATE, iteration=self.ctx.iteration, messages=self.ctx.messages,
                            tools=self.tool_manager.get_definitions())
-                self._run_hooks(HookPoint.PRE_GENERATE)
+                msg = self._run_hooks(HookPoint.PRE_GENERATE)
+                if msg is not None:
+                    yield StreamChunk(content=msg, is_final=True)
+                    return
 
                 accumulated_tool_calls = []
                 final_content = ""
@@ -195,7 +202,10 @@ class Loop:
 
                 self._emit(EventType.POST_GENERATE, iteration=self.ctx.iteration,
                            response=response)
-                self._run_hooks(HookPoint.POST_GENERATE, response=response)
+                msg = self._run_hooks(HookPoint.POST_GENERATE, response=response)
+                if msg is not None:
+                    yield StreamChunk(content=msg or response.content or "", is_final=True)
+                    return
 
                 self.ctx.append(response)
 
@@ -251,15 +261,11 @@ class Loop:
                 tool_call_id=tool_call.id,
             )
 
-        hook_results = self._run_hooks(HookPoint.PRE_TOOL, tool_call=tool_call)
-        if any(r.action == HookAction.SKIP_TOOL for r in hook_results):
+        msg = self._run_hooks(HookPoint.PRE_TOOL, tool_call=tool_call)
+        if msg is not None:
             self._emit(EventType.POST_TOOL, iteration=self.ctx.iteration,
                        tool_name=tool_name, success=False, skipped_by_hook=True)
-            return Message(
-                role="tool",
-                content="[Tool Skipped by Hook]",
-                tool_call_id=tool_call.id,
-            )
+            return Message(role="tool", content=msg or "[Tool Skipped by Hook]", tool_call_id=tool_call.id)
 
         duration = 0
         start = time.monotonic()
@@ -270,7 +276,8 @@ class Loop:
 
             self._emit(EventType.POST_TOOL, iteration=self.ctx.iteration,
                        tool_name=tool_name, duration=duration, success=True, result=result)
-            self._run_hooks(HookPoint.POST_TOOL, tool_call=tool_call, tool_result=result)
+            if self._run_hooks(HookPoint.POST_TOOL, tool_call=tool_call, tool_result=result) is not None:
+                self._stop_requested = True
 
             return Message(
                 role="tool",
@@ -283,7 +290,8 @@ class Loop:
                        tool_name=tool_name, duration=duration, success=False, error=str(e))
             self._emit(EventType.ON_ERROR, iteration=self.ctx.iteration,
                        component="tool", error=str(e))
-            self._run_hooks(HookPoint.ON_ERROR, error=e)
+            if self._run_hooks(HookPoint.ON_ERROR, error=e) is not None:
+                self._stop_requested = True
 
             return Message(
                 role="tool",
@@ -352,13 +360,20 @@ class Loop:
         self._stop_requested = False
         return f"Agent 在第 {self.ctx.iteration} 次迭代被终止。"
 
-    def _run_hooks(self, point: HookPoint, **extra) -> list[HookResult]:
+    def _run_hooks(self, point: HookPoint, **extra) -> str | None:
+        """执行指定生命周期点的钩子。
+
+        返回 abort 消息（钩子终止循环）或 None（继续执行）。
+        """
         ctx = HookContext(
             iteration=self.ctx.iteration,
             messages=self.ctx.messages,
             **extra,
         )
-        return self.hook_manager.run(point, ctx)
+        for r in self.hook_manager.run(point, ctx):
+            if r.action == HookAction.ABORT:
+                return r.message
+        return None
 
     def _emit(self, event_type: str, **data) -> None:
         self.event_emitter.fire(HarnessEvent(

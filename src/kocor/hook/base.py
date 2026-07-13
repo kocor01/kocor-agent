@@ -9,7 +9,6 @@ class HookAction(str, Enum):
     """钩子执行结果动作常量。"""
 
     CONTINUE = "continue"          # 继续执行
-    SKIP_TOOL = "skip_tool"        # 跳过当前工具调用
     ABORT = "abort"                # 终止当前阶段
 
 

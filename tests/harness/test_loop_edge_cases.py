@@ -392,14 +392,14 @@ class TestExecuteOneToolEdgeCases:
         assert "Permission Denied" in result.content
 
     def test_skip_by_hook_returns_skip_message(self):
-        """钩子返回 SKIP_TOOL 时跳过工具执行。"""
+        """钩子返回 ABORT 时跳过工具执行。"""
         loop = _make_loop()
         hook_manager = loop.hook_manager
 
         class SkipHook:
             hook_point = HookPoint.PRE_TOOL
             def run(self, ctx):
-                return HookResult(action=HookAction.SKIP_TOOL, message="skip this tool")
+                return HookResult(action=HookAction.ABORT, message="skip this tool")
 
         hook_manager.register(SkipHook())
 
@@ -408,7 +408,7 @@ class TestExecuteOneToolEdgeCases:
 
         assert result is not None
         assert result.role == "tool"
-        assert "Tool Skipped by Hook" in result.content
+        assert "skip this tool" in result.content
 
     def test_tool_execution_error_returns_error_message(self):
         """工具执行异常时返回错误消息给 LLM。"""

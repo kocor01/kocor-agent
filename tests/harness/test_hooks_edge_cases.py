@@ -168,7 +168,7 @@ class TestHookManagerMultiregister:
         class SkipHook:
             hook_point = HookPoint.PRE_TOOL
             def run(self, ctx):
-                return HookResult(action=HookAction.SKIP_TOOL, message="skip")
+                return HookResult(action=HookAction.ABORT, message="skip")
 
         class AbortHook:
             hook_point = HookPoint.PRE_TOOL
@@ -257,5 +257,4 @@ class TestHookActionEnum:
 
     def test_action_values(self):
         assert HookAction.CONTINUE == "continue"
-        assert HookAction.SKIP_TOOL == "skip_tool"
         assert HookAction.ABORT == "abort"

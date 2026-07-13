@@ -129,11 +129,11 @@ class TestHookManager:
         class Skipper:
             hook_point = HookPoint.PRE_TOOL
             def run(self, ctx):
-                return HookResult(action=HookAction.SKIP_TOOL, message="skip it")
+                return HookResult(action=HookAction.ABORT, message="skip it")
 
         runner.register(Skipper())
         results = runner.run(HookPoint.PRE_TOOL, HookContext(iteration=1, messages=[]))
-        assert results[0].action == HookAction.SKIP_TOOL
+        assert results[0].action == HookAction.ABORT
         assert results[0].message == "skip it"
 
     def test_clear_all_hooks(self):

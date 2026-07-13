@@ -698,3 +698,240 @@ class TestAgentStop:
         final_chunks = [c for c in chunks if c.is_final]
         assert final_chunks
         assert "终止" in final_chunks[0].content or "中断" in final_chunks[0].content
+
+
+# ── Hook 动作处理测试 ──
+
+
+class TestHookActions:
+    """验证 hook 返回的 ABORT 被 Loop 正确响应。"""
+
+    def test_post_generate_abort_terminates_run(self):
+        """POST_GENERATE 返回 ABORT 时终止循环。"""
+        llm = MockLLM(responses=[
+            Message(
+                role="assistant", content="I'll call a tool",
+                tool_calls=[ToolCall(id="c1", function=FunctionCall(name="read_file", arguments='{"path": "x.txt"}'))],
+            ),
+            Message(role="assistant", content="不应执行到这里"),
+        ])
+        hook_manager = HookManager()
+        class AbortHook:
+            hook_point = HookPoint.POST_GENERATE
+            def run(self, ctx):
+                return HookResult(action=HookAction.ABORT)
+        hook_manager.register(AbortHook())
+
+        agent = Agent(
+            llm=llm, tool_manager=MockToolRegistry(),
+            permission_mgr=PermissionManager(policy=PermissionManager.POLICY_PERMISSIVE),
+            hook_manager=hook_manager,
+        )
+        result = agent.run("test")
+        # 立即返回，不执行工具、不进入下一轮
+        assert result == "I'll call a tool"
+        assert agent.ctx.iteration == 1
+
+    def test_post_generate_abort_terminates_stream(self):
+        """流模式下 POST_GENERATE ABORT 终止循环。"""
+        llm = MockLLM(responses=[
+            Message(
+                role="assistant", content="I'll call a tool",
+                tool_calls=[ToolCall(id="c1", function=FunctionCall(name="read_file", arguments='{"path": "x.txt"}'))],
+            ),
+        ])
+        hook_manager = HookManager()
+        class AbortHook:
+            hook_point = HookPoint.POST_GENERATE
+            def run(self, ctx):
+                return HookResult(action=HookAction.ABORT)
+        hook_manager.register(AbortHook())
+
+        agent = Agent(
+            llm=llm, tool_manager=MockToolRegistry(),
+            permission_mgr=PermissionManager(policy=PermissionManager.POLICY_PERMISSIVE),
+            hook_manager=hook_manager,
+        )
+        chunks = list(agent.stream("test"))
+        final = [c for c in chunks if c.is_final]
+        # MockLLM.stream() 产出 final chunk + ABORT 也产出 final chunk
+        assert len(final) >= 1
+        assert any("I'll call a tool" in (c.content or "") for c in final)
+        # 工具不应被执行
+        assert agent.ctx.iteration == 1
+
+    def test_post_generate_abort_skips_execution(self):
+        """POST_GENERATE 返回 ABORT 时跳过工具执行。"""
+        tool_registry = MockToolRegistry()
+        llm = MockLLM(responses=[
+            Message(
+                role="assistant", content="I'll call a tool",
+                tool_calls=[ToolCall(id="c1", function=FunctionCall(name="read_file", arguments='{"path": "x.txt"}'))],
+            ),
+        ])
+        hook_manager = HookManager()
+        class AbortHook:
+            hook_point = HookPoint.POST_GENERATE
+            def run(self, ctx):
+                return HookResult(action=HookAction.ABORT)
+        hook_manager.register(AbortHook())
+
+        agent = Agent(
+            llm=llm, tool_manager=tool_registry,
+            permission_mgr=PermissionManager(policy=PermissionManager.POLICY_PERMISSIVE),
+            hook_manager=hook_manager,
+        )
+        result = agent.run("test")
+        # 返回 response 内容，工具不被执行
+        assert result == "I'll call a tool"
+        assert len(tool_registry.executed) == 0
+
+    def test_post_generate_abort_skips_execution_stream(self):
+        """流模式下 POST_GENERATE ABORT 跳过工具执行。"""
+        tool_registry = MockToolRegistry()
+        llm = MockLLM(responses=[
+            Message(
+                role="assistant", content="I'll call a tool",
+                tool_calls=[ToolCall(id="c1", function=FunctionCall(name="read_file", arguments='{"path": "x.txt"}'))],
+            ),
+        ])
+        hook_manager = HookManager()
+        class AbortHook:
+            hook_point = HookPoint.POST_GENERATE
+            def run(self, ctx):
+                return HookResult(action=HookAction.ABORT)
+        hook_manager.register(AbortHook())
+
+        agent = Agent(
+            llm=llm, tool_manager=tool_registry,
+            permission_mgr=PermissionManager(policy=PermissionManager.POLICY_PERMISSIVE),
+            hook_manager=hook_manager,
+        )
+        chunks = list(agent.stream("test"))
+        assert len(tool_registry.executed) == 0
+
+    def test_pre_generate_abort_terminates_run(self):
+        """PRE_GENERATE 返回 ABORT 时终止循环。"""
+        llm = MockLLM(responses=[Message(role="assistant", content="不应执行")])
+        hook_manager = HookManager()
+        class AbortHook:
+            hook_point = HookPoint.PRE_GENERATE
+            def run(self, ctx):
+                return HookResult(action=HookAction.ABORT)
+        hook_manager.register(AbortHook())
+
+        agent = Agent(
+            llm=llm, tool_manager=MockToolRegistry(),
+            permission_mgr=PermissionManager(policy=PermissionManager.POLICY_PERMISSIVE),
+            hook_manager=hook_manager,
+        )
+        result = agent.run("test")
+        assert result == ""  # ABORT 时返回空字符串
+        assert agent.ctx.iteration == 1  # 迭代计数已增加，但不执行 LLM 生成
+
+    def test_pre_generate_abort_terminates_stream(self):
+        """流模式下 PRE_GENERATE ABORT 终止循环。"""
+        llm = MockLLM(responses=[Message(role="assistant", content="不应执行")])
+        hook_manager = HookManager()
+        class AbortHook:
+            hook_point = HookPoint.PRE_GENERATE
+            def run(self, ctx):
+                return HookResult(action=HookAction.ABORT)
+        hook_manager.register(AbortHook())
+
+        agent = Agent(
+            llm=llm, tool_manager=MockToolRegistry(),
+            permission_mgr=PermissionManager(policy=PermissionManager.POLICY_PERMISSIVE),
+            hook_manager=hook_manager,
+        )
+        chunks = list(agent.stream("test"))
+        # 应有一个 final chunk
+        assert any(c.is_final for c in chunks)
+        assert agent.ctx.iteration == 1
+
+    def test_pre_tool_abort_skips_tool(self):
+        """PRE_TOOL 返回 ABORT 时跳过工具（同 SKIP_TOOL）。"""
+        tool_registry = MockToolRegistry()
+        llm = MockLLM(responses=[
+            Message(
+                role="assistant", content="calling...",
+                tool_calls=[ToolCall(id="c1", function=FunctionCall(name="read_file", arguments='{"path": "x.txt"}'))],
+            ),
+            Message(role="assistant", content="done"),
+        ])
+        hook_manager = HookManager()
+        class AbortHook:
+            hook_point = HookPoint.PRE_TOOL
+            def run(self, ctx):
+                return HookResult(action=HookAction.ABORT)
+        hook_manager.register(AbortHook())
+
+        agent = Agent(
+            llm=llm, tool_manager=tool_registry,
+            permission_mgr=PermissionManager(policy=PermissionManager.POLICY_PERMISSIVE),
+            hook_manager=hook_manager,
+        )
+        result = agent.run("test")
+        assert "done" in result
+        assert len(tool_registry.executed) == 0
+
+    def test_post_tool_abort_sets_stop_requested(self):
+        """POST_TOOL 返回 ABORT 时设置 _stop_requested 停止循环。"""
+        tool_registry = MockToolRegistry()
+        llm = MockLLM(responses=[
+            Message(
+                role="assistant", content="first call",
+                tool_calls=[ToolCall(id="c1", function=FunctionCall(name="read_file", arguments='{"path": "x.txt"}'))],
+            ),
+            Message(
+                role="assistant", content="second call",
+                tool_calls=[ToolCall(id="c2", function=FunctionCall(name="read_file", arguments='{"path": "y.txt"}'))],
+            ),
+        ])
+        hook_manager = HookManager()
+        class AbortAfterToolHook:
+            hook_point = HookPoint.POST_TOOL
+            def run(self, ctx):
+                return HookResult(action=HookAction.ABORT)
+        hook_manager.register(AbortAfterToolHook())
+
+        agent = Agent(
+            llm=llm, tool_manager=tool_registry,
+            permission_mgr=PermissionManager(policy=PermissionManager.POLICY_PERMISSIVE),
+            hook_manager=hook_manager,
+        )
+        result = agent.run("test")
+        # 工具被调用了一次，但 ABORT 阻止了下一轮循环
+        assert len(tool_registry.executed) == 1
+        assert "终止" in result or "停止" in result or result == ""
+
+    def test_on_error_abort_sets_stop_requested(self):
+        """ON_ERROR 返回 ABORT 时设置 _stop_requested。"""
+        class ErrorToolRegistry(MockToolRegistry):
+            def execute(self, tool_call):
+                raise RuntimeError("fatal error")
+
+        llm = MockLLM(responses=[
+            Message(
+                role="assistant", content="calling...",
+                tool_calls=[ToolCall(id="c1", function=FunctionCall(name="read_file", arguments='{"path": "x.txt"}'))],
+            ),
+            Message(role="assistant", content="should not reach"),
+        ])
+        hook_manager = HookManager()
+        class AbortOnErrorHook:
+            hook_point = HookPoint.ON_ERROR
+            def run(self, ctx):
+                return HookResult(action=HookAction.ABORT)
+        hook_manager.register(AbortOnErrorHook())
+
+        agent = Agent(
+            llm=llm, tool_manager=ErrorToolRegistry(),
+            permission_mgr=PermissionManager(policy=PermissionManager.POLICY_PERMISSIVE),
+            hook_manager=hook_manager,
+        )
+        result = agent.run("test")
+        # _stop_requested 会在 _stopped_message() 中被重置为 False，
+        # 所以检查实际行为：第二轮 LLM 调用不应发生，且返回终止消息
+        assert llm.call_count == 1
+        assert "终止" in result
