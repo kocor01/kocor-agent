@@ -810,6 +810,36 @@ class TestHookActions:
         chunks = list(agent.stream("test"))
         assert len(tool_registry.executed) == 0
 
+    def test_post_generate_abort_yields_single_final(self):
+        """POST_GENERATE abort 时 abort 消息是唯一的 final chunk。
+
+        回归：原先 LLM 结束标记被透传并提前关闭当前轮，abort 消息
+        随后到达被渲染成"第 2 次请求"。修复后 LLM 标记被吸收，
+        abort 消息并入当前轮，成为唯一 final。
+        """
+        llm = MockLLM(responses=[
+            Message(
+                role="assistant", content="I'll call a tool",
+                tool_calls=[ToolCall(id="c1", function=FunctionCall(name="read_file", arguments='{"path": "x.txt"}'))],
+            ),
+        ])
+        hook_manager = HookManager()
+        class AbortHook:
+            hook_point = HookPoint.POST_GENERATE
+            def run(self, ctx):
+                return HookResult(action=HookAction.ABORT, message="hook false")
+        hook_manager.register(AbortHook())
+
+        agent = Agent(
+            llm=llm, tool_manager=MockToolRegistry(),
+            permission_mgr=PermissionManager(policy=PermissionManager.POLICY_PERMISSIVE),
+            hook_manager=hook_manager,
+        )
+        chunks = list(agent.stream("test"))
+        finals = [c for c in chunks if c.is_final]
+        assert len(finals) == 1
+        assert finals[0].content == "hook false"
+
     def test_pre_generate_abort_terminates_run(self):
         """PRE_GENERATE 返回 ABORT 时终止循环。"""
         llm = MockLLM(responses=[Message(role="assistant", content="不应执行")])

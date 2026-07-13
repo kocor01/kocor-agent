@@ -194,7 +194,11 @@ class Loop:
                         final_reasoning += chunk.reasoning
                     if chunk.usage:
                         streaming_usage = chunk.usage
-                    if chunk.usage and not chunk.content and not chunk.reasoning and not chunk.tool_calls:
+                    # 吸收 LLM 流的纯结束标记（is_final 且无实质内容，可能携带 usage）：
+                    # 不透传给渲染层，由循环层在轮末统一发出 is_final 关闭轮次。
+                    # 否则该标记会在 POST_GENERATE 钩子前提前关闭当前轮，使随后的
+                    # abort/stop 消息被渲染层误判为新的一轮"第 N 次请求"。
+                    if chunk.is_final and not chunk.content and not chunk.reasoning and not chunk.tool_calls:
                         continue
                     yield chunk
 
@@ -216,6 +220,8 @@ class Loop:
                 self.ctx.append(response)
 
                 if not accumulated_tool_calls:
+                    # 纯文本回复：LLM 流的结束标记已被吸收，由循环层补发关闭当前轮
+                    yield StreamChunk(is_final=True)
                     return
 
                 if self._check_repetition(response):
@@ -235,6 +241,11 @@ class Loop:
                             tool_result=result_msg,
                             is_final=False,
                         )
+
+                # 本轮工具执行完毕：循环层主动发出结束标记关闭当前渲染轮，
+                # 使下一轮 LLM 生成开启新的"第 N 次请求"标题。
+                # LLM 流自带的结束标记已被上方吸收，轮次边界由此处统一管控。
+                yield StreamChunk(is_final=True)
 
                 # 工具结果已追加，压缩上下文供下一轮迭代使用
                 self.ctx.usage = streaming_usage
