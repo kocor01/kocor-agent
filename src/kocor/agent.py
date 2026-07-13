@@ -11,7 +11,6 @@ from typing import Iterator
 from kocor.config import Config
 from kocor.context.context_manager import ContextManager
 from kocor.memory.store import MemoryStore
-from kocor.harness.budget import IterationBudget
 from kocor.event.event_manager import EventEmitter
 from kocor.hook.hook_manager import HookManager
 from kocor.llm_provider.llm_client import LLMClient
@@ -45,20 +44,18 @@ class Agent:
         permission_mgr: PermissionManager | None = None,
         hook_manager: HookManager | None = None,
         event_emitter: EventEmitter | None = None,
-        budget: IterationBudget | None = None,
+        max_iterations: int | None = None,
         # 会话管理（可选）
         session_manager: _SessionManager | None = None,
     ):
         self.llm = llm
         self.tool_manager = tool_manager or ToolManager()
         self.system_prompt = Config.load().default_system_prompt
-        self.max_iterations = Config.load().max_iterations
-
         # Harness 组件
         self.permission_mgr = permission_mgr or PermissionManager(policy=PermissionManager.POLICY_PERMISSIVE)
         self.hook_manager = hook_manager or HookManager()
         self.event_emitter = event_emitter or EventEmitter()
-        self.budget = budget or IterationBudget(max_iterations=self.max_iterations)
+        self.max_iterations = max_iterations or Config.load().max_iterations
 
         # 会话管理
         self.session_manager = session_manager
@@ -106,7 +103,7 @@ class Agent:
             permission_mgr=self.permission_mgr,
             hook_manager=self.hook_manager,
             event_emitter=self.event_emitter,
-            budget=self.budget,
+            max_iterations=self.max_iterations,
         )
 
     # ── 公开方法 ──

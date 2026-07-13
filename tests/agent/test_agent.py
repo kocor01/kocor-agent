@@ -6,7 +6,6 @@ from kocor.config import Config
 from kocor.agent import Agent
 from kocor.llm_provider.llm_client import LLMClient
 from kocor.tools.definitions import ToolDefinition
-from kocor.harness.budget import IterationBudget
 from kocor.llm_provider.message import FunctionCall, Message, StreamChunk, ToolCall, ToolResult
 
 
@@ -146,7 +145,7 @@ class TestAgentTimeout:
             content="content",
         )
 
-        agent = Agent(llm=llm, tool_manager=mock_tools, budget=IterationBudget(max_iterations=3))
+        agent = Agent(llm=llm, tool_manager=mock_tools, max_iterations=3)
         result = agent.run("持续调用工具")
         assert "重复" in result
 
@@ -278,7 +277,7 @@ class TestAgentStream:
             content="content",
         )
 
-        agent = Agent(llm=llm, tool_manager=mock_tools, budget=IterationBudget(max_iterations=2))
+        agent = Agent(llm=llm, tool_manager=mock_tools, max_iterations=2)
         chunks = list(agent.stream("持续调用工具"))
 
         # 最后应该有超时信息

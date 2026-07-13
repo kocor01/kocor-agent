@@ -15,7 +15,6 @@ import time
 from typing import Iterator
 
 from kocor.context.context_manager import ContextManager
-from kocor.harness.budget import IterationBudget
 from kocor.event.event_manager import HarnessEvent, EventEmitter, EventType
 from kocor.hook.base import HookPoint, HookContext, HookResult, HookAction
 from kocor.hook.hook_manager import HookManager
@@ -42,7 +41,7 @@ class Loop:
         permission_mgr: PermissionManager,
         hook_manager: HookManager,
         event_emitter: EventEmitter,
-        budget: IterationBudget,
+        max_iterations: int,
     ):
         self.llm = llm
         self.ctx = ctx
@@ -50,7 +49,7 @@ class Loop:
         self.permission_mgr = permission_mgr
         self.hook_manager = hook_manager
         self.event_emitter = event_emitter
-        self.budget = budget
+        self.max_iterations = max_iterations
 
         # 重复工具调用检测
         self._consecutive_duplicate_count = 0
@@ -81,7 +80,6 @@ class Loop:
 
     def _reset_state(self) -> None:
         self.ctx.reset()
-        self.budget.reset()
         self._consecutive_duplicate_count = 0
         self._last_tool_call_signature = None
         self._stop_requested = False
@@ -93,12 +91,11 @@ class Loop:
         调用方无需手工调用 extract_session_history。
         """
         try:
-            while not self.budget.exhausted:
+            while not self.ctx.iteration >= self.max_iterations:
                 if self._stop_requested:
                     return self._stopped_message()
 
                 self.ctx.advance_iteration()
-                self.budget.used_iterations = self.ctx.iteration
 
                 self._emit(EventType.PRE_GENERATE, iteration=self.ctx.iteration, messages=self.ctx.messages,
                            tools=self.tool_manager.get_definitions())
@@ -129,7 +126,7 @@ class Loop:
                 self.ctx.compress_if_needed()
 
             self._emit(EventType.ON_BUDGET_EXHAUSTED, iteration=self.ctx.iteration,
-                       max_iterations=self.budget.max_iterations)
+                       max_iterations=self.max_iterations)
             self._run_hooks(HookPoint.ON_BUDGET_EXHAUSTED)
             return self._budget_exhausted_message()
         except KeyboardInterrupt:
@@ -145,14 +142,13 @@ class Loop:
         生成器结束（耗尽或被关闭）时由本方法负责提取 session_history。
         """
         try:
-            while not self.budget.exhausted:
+            while not self.ctx.iteration >= self.max_iterations:
                 if self._stop_requested:
                     msg = self._stopped_message()
                     yield StreamChunk(content="\n⏹️ " + msg, is_final=True)
                     return
 
                 self.ctx.advance_iteration()
-                self.budget.used_iterations = self.ctx.iteration
 
                 self._emit(EventType.PRE_GENERATE, iteration=self.ctx.iteration, messages=self.ctx.messages,
                            tools=self.tool_manager.get_definitions())
@@ -229,7 +225,7 @@ class Loop:
                 self.ctx.compress_if_needed()
 
             self._emit(EventType.ON_BUDGET_EXHAUSTED, iteration=self.ctx.iteration,
-                       max_iterations=self.budget.max_iterations)
+                       max_iterations=self.max_iterations)
             self._run_hooks(HookPoint.ON_BUDGET_EXHAUSTED)
             yield StreamChunk(content=self._budget_exhausted_message(), is_final=True)
         except KeyboardInterrupt:
@@ -338,7 +334,7 @@ class Loop:
 
         if self._consecutive_duplicate_count >= 3:
             self._emit(EventType.ON_BUDGET_EXHAUSTED, iteration=self.ctx.iteration,
-                       max_iterations=self.budget.max_iterations, reason="duplicate_tool_calls")
+                       max_iterations=self.max_iterations, reason="duplicate_tool_calls")
             self._run_hooks(HookPoint.ON_BUDGET_EXHAUSTED)
             return True
 

@@ -19,9 +19,6 @@ from kocor.skill.skill_manager import SkillManager
 from kocor.skill.types import InvokeStrategy, SkillDefinition, SkillType
 from kocor.tools.definitions import ToolDefinition
 from kocor.tools.tool_manager import ToolManager
-from kocor.harness.budget import IterationBudget
-
-
 # ── Fake LLM ──
 
 
@@ -524,7 +521,7 @@ class TestAgentLightweightInit:
         assert agent.permission_mgr is not None
         assert agent.hook_manager is not None
         assert agent.event_emitter is not None
-        assert agent.budget is not None
+        assert agent.max_iterations > 0
         assert agent.loop is not None
 
     def test_minimal_agent_runs(self):

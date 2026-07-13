@@ -6,7 +6,6 @@ from dataclasses import dataclass, field
 import pytest
 
 from kocor.agent import Agent
-from kocor.harness.budget import IterationBudget
 from kocor.event.event_manager import EventEmitter, EventType
 from kocor.tools.permission import PermissionManager
 from kocor.hook.base import HookPoint, HookContext, HookResult, HookAction
@@ -159,12 +158,11 @@ class TestAgentLoop:
             tool_calls=[ToolCall(id="call_1", function=FunctionCall(name="read_file", arguments='{"path": "x.txt"}'))],
         )
         llm = MockLLM(responses=[tool_response] * 10)
-        budget = IterationBudget(max_iterations=3)
         agent = Agent(
             llm=llm,
             tool_manager=MockToolRegistry(),
             permission_mgr=PermissionManager(policy=PermissionManager.POLICY_PERMISSIVE),
-            budget=budget,
+            max_iterations=3,
         )
         result = agent.run("do work")
         assert "迭代" in result or "限制" in result
@@ -284,7 +282,6 @@ class TestAgentLoop:
 
     def test_max_iterations_config(self):
         """Agent 遵循预算中的最大迭代次数。"""
-        budget = IterationBudget(max_iterations=1)
         tool_response = Message(
             role="assistant",
             content="working...",
@@ -295,7 +292,7 @@ class TestAgentLoop:
             llm=llm,
             tool_manager=MockToolRegistry(),
             permission_mgr=PermissionManager(policy=PermissionManager.POLICY_PERMISSIVE),
-            budget=budget,
+            max_iterations=1,
         )
         result = agent.run("do")
         assert agent.ctx.iteration == 1  # Should stop after 1 iteration
@@ -429,7 +426,7 @@ class TestDuplicateToolCallDetection:
             llm=llm,
             tool_manager=MockToolRegistry(),
             permission_mgr=PermissionManager(policy=PermissionManager.POLICY_PERMISSIVE),
-            budget=IterationBudget(max_iterations=10),
+            max_iterations=10,
         )
         result = agent.run("search")
         # 前两次相同调用正常执行，第3次触发检测
@@ -447,7 +444,7 @@ class TestDuplicateToolCallDetection:
             llm=llm,
             tool_manager=MockToolRegistry(),
             permission_mgr=PermissionManager(policy=PermissionManager.POLICY_PERMISSIVE),
-            budget=IterationBudget(max_iterations=10),
+            max_iterations=10,
         )
         result = agent.run("search")
         # 在第 3 次迭代时检测到重复，提前终止（而不是等 10 次预算用完）
@@ -487,7 +484,7 @@ class TestDuplicateToolCallDetection:
             llm=llm,
             tool_manager=MockToolRegistry(),
             permission_mgr=PermissionManager(policy=PermissionManager.POLICY_PERMISSIVE),
-            budget=IterationBudget(max_iterations=10),
+            max_iterations=10,
         )
         chunks = list(agent.stream("search"))
         stuck_chunks = [c for c in chunks if c.is_final and c.content]
@@ -528,7 +525,7 @@ class TestDuplicateToolCallDetection:
             llm=llm1,
             tool_manager=MockToolRegistry(),
             permission_mgr=PermissionManager(policy=PermissionManager.POLICY_PERMISSIVE),
-            budget=IterationBudget(max_iterations=10),
+            max_iterations=10,
         )
         result1 = agent.run("search")
         assert "重复" in result1
@@ -567,7 +564,7 @@ class TestDuplicateToolCallDetection:
             llm=llm,
             tool_manager=MockToolRegistry(),
             permission_mgr=PermissionManager(policy=PermissionManager.POLICY_PERMISSIVE),
-            budget=IterationBudget(max_iterations=10),
+            max_iterations=10,
         )
         result = agent.run("read both")
         assert "重复" in result
@@ -595,7 +592,7 @@ class TestAgentStop:
             tool_manager=MockToolRegistry(),
             permission_mgr=PermissionManager(policy=PermissionManager.POLICY_PERMISSIVE),
             hook_manager=hook_manager,
-            budget=IterationBudget(max_iterations=10),
+            max_iterations=10,
         )
 
         triggered = [False]
@@ -645,7 +642,7 @@ class TestAgentStop:
             tool_manager=MockToolRegistry(),
             permission_mgr=PermissionManager(policy=PermissionManager.POLICY_PERMISSIVE),
             hook_manager=hook_manager,
-            budget=IterationBudget(max_iterations=10),
+            max_iterations=10,
         )
 
         triggered = [False]

@@ -33,7 +33,6 @@ from kocor.skill.types import InvokeStrategy
 from kocor.tools.tool_manager import ToolManager
 
 # Harness imports
-from kocor.harness import IterationBudget
 from kocor.tools.permission import PermissionManager
 from kocor.hook.hook_manager import HookManager
 from kocor.event.event_manager import EventEmitter
@@ -443,8 +442,6 @@ def main() -> None:
 
     EventSubscribe(event_emitter).subscribe_all(logger=logger)
 
-    budget = IterationBudget(max_iterations=max_iterations)
-
     # 可选地构建会话管理器
     session_manager = None
     if Config.load().session_enabled:
@@ -464,7 +461,7 @@ def main() -> None:
         permission_mgr=permission_mgr,
         hook_manager=hook_manager,
         event_emitter=event_emitter,
-        budget=budget,
+        max_iterations=max_iterations,
         session_manager=session_manager,
     )
 

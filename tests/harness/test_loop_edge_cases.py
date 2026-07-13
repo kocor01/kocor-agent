@@ -11,7 +11,6 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from kocor.harness.budget import IterationBudget
 from kocor.event.event_manager import EventEmitter, EventType
 from kocor.hook.base import HookPoint, HookContext, HookResult, HookAction
 from kocor.hook.hook_manager import HookManager
@@ -115,8 +114,6 @@ def _make_loop(llm_responses=None, max_iterations=10):
     pm.check.return_value = True
     hm = HookManager()
     ee = EventEmitter()
-    budget = IterationBudget(max_iterations=max_iterations)
-
     return Loop(
         llm=llm,
         ctx=ctx,
@@ -124,7 +121,7 @@ def _make_loop(llm_responses=None, max_iterations=10):
         permission_mgr=pm,
         hook_manager=hm,
         event_emitter=ee,
-        budget=budget,
+        max_iterations=max_iterations,
     )
 
 
