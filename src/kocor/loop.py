@@ -108,7 +108,7 @@ class Loop:
                 self.ctx.append(response)
 
                 self._emit(EventType.POST_GENERATE, iteration=self.ctx.iteration, response=response)
-                self._run_hooks(HookPoint.POST_GENERATE)
+                self._run_hooks(HookPoint.POST_GENERATE, response=response)
 
                 if not response.tool_calls:
                     return response.content or ""
@@ -195,7 +195,7 @@ class Loop:
 
                 self._emit(EventType.POST_GENERATE, iteration=self.ctx.iteration,
                            response=response)
-                self._run_hooks(HookPoint.POST_GENERATE)
+                self._run_hooks(HookPoint.POST_GENERATE, response=response)
 
                 self.ctx.append(response)
 

@@ -34,6 +34,7 @@ class HookContext:
     messages: list
     tool_call: any = None
     tool_result: any = None
+    response: any = None
     error: Exception | None = None
     config: dict = field(default_factory=dict)
 

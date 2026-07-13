@@ -1,4 +1,4 @@
-"""内置钩子：工具调用审计日志。"""
+"""内置钩子：LLM 生成审计日志（token 消耗），写入独立 audit.log 文件。"""
 
 import json
 from datetime import datetime
@@ -8,12 +8,12 @@ from kocor.hook.base import HookPoint, HookContext, HookResult, HookAction
 
 
 class AuditLogHook:
-    """将所有工具调用记录到 Logger 审计日志。
+    """记录大模型每次生成的 token 消耗到 audit.log。
 
-    通过依赖注入接收 Logger 实例，不依赖全局单例。
+    通过主 Logger 的 ``audit()`` 方法写入，日志文件由 Logger 内部按类别分流。
     """
 
-    hook_point = HookPoint.POST_TOOL
+    hook_point = HookPoint.POST_GENERATE
 
     def __init__(self, logger: Logger):
         self._logger = logger
@@ -23,13 +23,19 @@ class AuditLogHook:
             "timestamp": datetime.now().isoformat(),
             "iteration": context.iteration,
         }
-        if context.tool_call:
-            entry["tool"] = context.tool_call.function.name
-            entry["arguments"] = context.tool_call.function.arguments
-            entry["tool_call_id"] = context.tool_call.id
-        if context.error:
-            entry["error"] = str(context.error)
 
-        self._logger.info(json.dumps(entry, ensure_ascii=False))
+        usage = None
+        if context.response:
+            usage = getattr(context.response, "usage", None)
+
+        if usage:
+            entry["prompt_tokens"] = usage.prompt_tokens
+            entry["completion_tokens"] = usage.completion_tokens
+            entry["total_tokens"] = usage.total_tokens
+            entry["cached_tokens"] = usage.cached_tokens
+        else:
+            entry["usage"] = "unavailable"
+
+        self._logger.audit(json.dumps(entry, ensure_ascii=False))
 
         return HookResult(action=HookAction.CONTINUE)

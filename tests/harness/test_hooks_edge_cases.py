@@ -14,7 +14,6 @@ from kocor.logger import Logger
 from kocor.hook.base import HookPoint, HookContext, HookResult, HookAction
 from kocor.hook.hook_manager import HookManager
 from kocor.hook.hooks.audit_log import AuditLogHook
-from kocor.llm_provider.message import FunctionCall, ToolCall
 
 
 # ═══════════════════════════════════════════════
@@ -31,8 +30,8 @@ class TestHookManagerRegisterAll:
         hm = HookManager()
         hm.register_all(logger)
 
-        # 验证 POST_TOOL 点有钩子
-        hooks = hm._hooks.get(HookPoint.POST_TOOL, [])
+        # 验证 POST_GENERATE 点有钩子
+        hooks = hm._hooks.get(HookPoint.POST_GENERATE, [])
         assert len(hooks) >= 1
         assert isinstance(hooks[0], AuditLogHook)
 
@@ -42,26 +41,31 @@ class TestHookManagerRegisterAll:
         hm = HookManager()
         hm.register_all(logger)
 
-        # 执行 POST_TOOL 钩子，不应报错
+        # 执行 POST_GENERATE 钩子，不应报错
+        from kocor.llm_provider.message import Message, Usage
         ctx = HookContext(
             iteration=1,
             messages=[],
-            tool_call=ToolCall(id="c1", function=FunctionCall(name="read_file", arguments='{"path":"a.txt"}')),
+            response=Message(
+                role="assistant",
+                content="Hello",
+                usage=Usage(prompt_tokens=10, completion_tokens=20, total_tokens=30),
+            ),
         )
-        results = hm.run(HookPoint.POST_TOOL, ctx)
+        results = hm.run(HookPoint.POST_GENERATE, ctx)
 
         assert len(results) == 1
         assert results[0].action == HookAction.CONTINUE
 
-    def test_register_all_only_affects_post_tool(self):
-        """register_all 只注册到 POST_TOOL 点。"""
+    def test_register_all_only_affects_post_generate(self):
+        """register_all 只注册到 POST_GENERATE 点。"""
         logger = Logger("INFO")
         hm = HookManager()
         hm.register_all(logger)
 
         # 其他点不应有钩子
         for point in HookPoint:
-            if point != HookPoint.POST_TOOL:
+            if point != HookPoint.POST_GENERATE:
                 assert len(hm._hooks.get(point, [])) == 0, f"{point} should have no hooks"
 
 
@@ -74,71 +78,58 @@ class TestAuditLogHookErrorPaths:
     """AuditLogHook 错误路径测试。"""
 
     def setup_method(self):
-        self.logger = Logger("INFO")
+        self._logger = Logger("INFO")
 
-    def test_run_with_error_context(self):
-        """包含 error 上下文的审计日志。"""
-        hook = AuditLogHook(logger=self.logger)
-        with patch.object(self.logger, 'info') as mock_info:
-            ctx = HookContext(
-                iteration=1,
-                messages=[],
-                tool_call=ToolCall(id="c1", function=FunctionCall(name="read_file", arguments='{"path":"a.txt"}')),
-                error=RuntimeError("file not found"),
-            )
-            hook.run(ctx)
-
-            # 验证日志内容包含错误信息
-            call_args = mock_info.call_args[0][0]
-            entry = json.loads(call_args)
-            assert entry["error"] == "file not found"
-            assert entry["tool"] == "read_file"
-
-    def test_run_without_tool_call(self):
-        """无 tool_call 时日志不包含工具信息。"""
-        hook = AuditLogHook(logger=self.logger)
-        with patch.object(self.logger, 'info') as mock_info:
+    def test_run_without_response(self):
+        """无 response 时日志标记 usage 为 unavailable。"""
+        hook = AuditLogHook(logger=self._logger)
+        with patch.object(hook._logger, 'audit') as mock_audit:
             ctx = HookContext(iteration=1, messages=[])
             hook.run(ctx)
 
-            call_args = mock_info.call_args[0][0]
+            call_args = mock_audit.call_args[0][0]
             entry = json.loads(call_args)
-            assert "tool" not in entry
-            assert "arguments" not in entry
-            assert "tool_call_id" not in entry
+            assert entry["usage"] == "unavailable"
             assert entry["iteration"] == 1
 
-    def test_run_without_error(self):
-        """无 error 时日志不包含 error 字段。"""
-        hook = AuditLogHook(logger=self.logger)
-        with patch.object(self.logger, 'info') as mock_info:
+    def test_run_without_usage(self):
+        """response 无 usage 时日志标记 usage 为 unavailable。"""
+        hook = AuditLogHook(logger=self._logger)
+        with patch.object(hook._logger, 'audit') as mock_audit:
+            from kocor.llm_provider.message import Message
             ctx = HookContext(
                 iteration=1,
                 messages=[],
-                tool_call=ToolCall(id="c1", function=FunctionCall(name="read_file", arguments='{"path":"a.txt"}')),
+                response=Message(role="assistant", content="No usage"),
             )
             hook.run(ctx)
 
-            call_args = mock_info.call_args[0][0]
+            call_args = mock_audit.call_args[0][0]
             entry = json.loads(call_args)
-            assert "error" not in entry
-            assert entry["tool"] == "read_file"
-            assert entry["tool_call_id"] == "c1"
+            assert entry["usage"] == "unavailable"
 
-    def test_run_with_unicode_arguments(self):
-        """Unicode 参数在日志中正确处理。"""
-        hook = AuditLogHook(logger=self.logger)
-        with patch.object(self.logger, 'info') as mock_info:
+    def test_run_with_partial_usage(self):
+        """部分 usage 字段为 0 也能正确记录。"""
+        hook = AuditLogHook(logger=self._logger)
+        with patch.object(hook._logger, 'audit') as mock_audit:
+            from kocor.llm_provider.message import Message, Usage
             ctx = HookContext(
                 iteration=1,
                 messages=[],
-                tool_call=ToolCall(id="c1", function=FunctionCall(name="search", arguments='{"q": "中文测试"}')),
+                response=Message(
+                    role="assistant",
+                    content="Partial",
+                    usage=Usage(prompt_tokens=100, completion_tokens=0, total_tokens=100, cached_tokens=0),
+                ),
             )
             hook.run(ctx)
 
-            call_args = mock_info.call_args[0][0]
+            call_args = mock_audit.call_args[0][0]
             entry = json.loads(call_args)
-            assert entry["arguments"] == '{"q": "中文测试"}'
+            assert entry["prompt_tokens"] == 100
+            assert entry["completion_tokens"] == 0
+            assert entry["total_tokens"] == 100
+            assert entry["cached_tokens"] == 0
 
 
 # ═══════════════════════════════════════════════

@@ -174,23 +174,50 @@ class TestAuditLogHook:
 
     def test_hook_point(self):
         hook = AuditLogHook(logger=self._logger)
-        assert hook.hook_point == HookPoint.POST_TOOL
+        assert hook.hook_point == HookPoint.POST_GENERATE
 
     def test_run_returns_continue(self):
         hook = AuditLogHook(logger=self._logger)
-        from kocor.llm_provider.message import ToolCall, FunctionCall
+        from kocor.llm_provider.message import Message, Usage
 
         result = hook.run(HookContext(
             iteration=1,
             messages=[],
-            tool_call=ToolCall(
-                id="call_1",
-                function=FunctionCall(name="read_file", arguments='{"path": "test.txt"}'),
+            response=Message(
+                role="assistant",
+                content="Hello",
+                usage=Usage(prompt_tokens=10, completion_tokens=20, total_tokens=30, cached_tokens=5),
             ),
         ))
         assert result.action == HookAction.CONTINUE
 
-    def test_run_without_tool_call(self):
+    def test_logs_token_usage_fields(self):
+        hook = AuditLogHook(logger=self._logger)
+        from kocor.llm_provider.message import Message, Usage
+
+        result = hook.run(HookContext(
+            iteration=1,
+            messages=[],
+            response=Message(
+                role="assistant",
+                content="Some response",
+                usage=Usage(prompt_tokens=100, completion_tokens=50, total_tokens=150, cached_tokens=20),
+            ),
+        ))
+        assert result.action == HookAction.CONTINUE
+
+    def test_run_without_response(self):
         hook = AuditLogHook(logger=self._logger)
         result = hook.run(HookContext(iteration=1, messages=[]))
+        assert result.action == HookAction.CONTINUE
+
+    def test_run_without_usage(self):
+        hook = AuditLogHook(logger=self._logger)
+        from kocor.llm_provider.message import Message
+
+        result = hook.run(HookContext(
+            iteration=1,
+            messages=[],
+            response=Message(role="assistant", content="No usage info"),
+        ))
         assert result.action == HookAction.CONTINUE
