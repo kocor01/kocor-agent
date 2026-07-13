@@ -96,9 +96,20 @@ class OpenAIClient(LLMClient):
             StreamChunk: 流式数据块
         """
         actual_max_tokens = max_tokens if max_tokens is not None else self.config.max_tokens
+
+        import httpx
+
         client = OpenAI(
             api_key=self.config.openai_api_key,
             base_url=self.config.openai_base_url or None,
+            # 设置 read timeout 确保 blocking socket read 能定期返回 Python 字节码，
+            # 从而让 Windows 上的 KeyboardInterrupt(Ctrl+C) 可以被传递。
+            timeout=httpx.Timeout(
+                connect=30.0,
+                read=3.0,      # Ctrl+C 最多等 3s
+                write=30.0,
+                pool=30.0,
+            ),
         )
 
         openai_messages = self._normalize_in(messages)
@@ -106,66 +117,72 @@ class OpenAIClient(LLMClient):
 
         accumulated_tool_calls: dict[int, ToolCall] = {}
 
-        for chunk in client.chat.completions.create(
-            model=self.config.openai_model,
-            messages=openai_messages,
-            max_tokens=actual_max_tokens,
-            temperature=temperature,
-            tools=openai_tools,
-            stream=True,
-            stream_options={"include_usage": True},
-        ):
-            # 捕获 token 用量（独立 chunk，无 choices，不 yield）
-            if not chunk.choices and chunk.usage:
-                usage_chunk = StreamChunk(
-                    is_final=True,
-                    usage=Usage(
-                        prompt_tokens=getattr(chunk.usage, "prompt_tokens", 0),
-                        completion_tokens=getattr(chunk.usage, "completion_tokens", 0),
-                        total_tokens=getattr(chunk.usage, "total_tokens", 0),
-                        cached_tokens=(
-                            getattr(chunk.usage, "prompt_tokens_details", None)
-                            and getattr(chunk.usage.prompt_tokens_details, "cached_tokens", 0)
-                            or 0
-                        ),
-                    ),
-                )
-                yield usage_chunk
-                continue
-
-            delta = chunk.choices[0].delta
-            finish_reason = chunk.choices[0].finish_reason
-            is_final = finish_reason is not None and finish_reason != ""
-
-            # reasoning 增量（兼容 OpenAI o-series reasoning 和 DeepSeek reasoning_content）
-            reasoning_text = getattr(delta, "reasoning", None) or getattr(delta, "reasoning_content", None)
-
-            # 构建 chunk（reasoning 传增量，与 content 一致）
-            stream_chunk = StreamChunk(
-                content=delta.content or "",
-                reasoning=reasoning_text or "",
-                is_final=is_final,
-            )
-
-            # 累积 tool_calls
-            if delta.tool_calls:
-                for tc_delta in delta.tool_calls:
-                    idx = tc_delta.index
-                    if idx not in accumulated_tool_calls:
-                        accumulated_tool_calls[idx] = ToolCall(
-                            id=tc_delta.id or "",
-                            type=tc_delta.type or "function",
-                            function=FunctionCall(
-                                name=tc_delta.function.name or "",
-                                arguments=tc_delta.function.arguments or "",
+        try:
+            for chunk in client.chat.completions.create(
+                model=self.config.openai_model,
+                messages=openai_messages,
+                max_tokens=actual_max_tokens,
+                temperature=temperature,
+                tools=openai_tools,
+                stream=True,
+                stream_options={"include_usage": True},
+            ):
+                # 捕获 token 用量（独立 chunk，无 choices，不 yield）
+                if not chunk.choices and chunk.usage:
+                    usage_chunk = StreamChunk(
+                        is_final=True,
+                        usage=Usage(
+                            prompt_tokens=getattr(chunk.usage, "prompt_tokens", 0),
+                            completion_tokens=getattr(chunk.usage, "completion_tokens", 0),
+                            total_tokens=getattr(chunk.usage, "total_tokens", 0),
+                            cached_tokens=(
+                                getattr(chunk.usage, "prompt_tokens_details", None)
+                                and getattr(chunk.usage.prompt_tokens_details, "cached_tokens", 0)
+                                or 0
                             ),
-                        )
-                    else:
-                        if tc_delta.function.arguments:
-                            accumulated_tool_calls[idx].function.arguments += tc_delta.function.arguments
-                stream_chunk.tool_calls = list(accumulated_tool_calls.values())
+                        ),
+                    )
+                    yield usage_chunk
+                    continue
 
-            yield stream_chunk
+                delta = chunk.choices[0].delta
+                finish_reason = chunk.choices[0].finish_reason
+                is_final = finish_reason is not None and finish_reason != ""
+
+                # reasoning 增量（兼容 OpenAI o-series reasoning 和 DeepSeek reasoning_content）
+                reasoning_text = getattr(delta, "reasoning", None) or getattr(delta, "reasoning_content", None)
+
+                # 构建 chunk（reasoning 传增量，与 content 一致）
+                stream_chunk = StreamChunk(
+                    content=delta.content or "",
+                    reasoning=reasoning_text or "",
+                    is_final=is_final,
+                )
+
+                # 累积 tool_calls
+                if delta.tool_calls:
+                    for tc_delta in delta.tool_calls:
+                        idx = tc_delta.index
+                        if idx not in accumulated_tool_calls:
+                            accumulated_tool_calls[idx] = ToolCall(
+                                id=tc_delta.id or "",
+                                type=tc_delta.type or "function",
+                                function=FunctionCall(
+                                    name=tc_delta.function.name or "",
+                                    arguments=tc_delta.function.arguments or "",
+                                ),
+                            )
+                        else:
+                            if tc_delta.function.arguments:
+                                accumulated_tool_calls[idx].function.arguments += tc_delta.function.arguments
+                    stream_chunk.tool_calls = list(accumulated_tool_calls.values())
+
+                yield stream_chunk
+
+        except (httpx.ReadTimeout, httpx.ConnectTimeout):
+            # 同 anthropic_client.py：Windows 上 blocking socket read 阻止 KeyboardInterrupt，
+            # 用 read timeout 突破阻塞后跳过超时异常，让上层 KeyboardInterrupt 处理逻辑生效。
+            raise KeyboardInterrupt()
 
     def _normalize_in(self, messages: list[Message]) -> list[dict]:
         """内部消息格式 → OpenAI 消息格式"""

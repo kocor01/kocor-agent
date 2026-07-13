@@ -361,6 +361,21 @@ def _repl_loop(
     """交互式 REPL 循环。"""
     # 会话启动展示已由 _print_welcome 在 main 中完成
 
+    # 注册 SIGINT handler：在 KeyboardInterrupt 之外额外调用 agent.stop()，
+    # 让 _stop_requested 标志尽早设置，配合 loop 中的检查点立即停止循环。
+    # 在 Windows 上，此 handler 与默认 KeyboardInterrupt 行为共存（两者都执行）；
+    # 在 Unix 上，handler 替换默认行为，我们需要手动 raise KeyboardInterrupt。
+    import signal
+
+    def _sigint_handler(signum, frame):
+        agent.stop()
+        # Unix 上自定义 handler 替换默认 KeyboardInterrupt，需手动抛出；
+        # Windows 上 Python 会额外自动抛出 KeyboardInterrupt，双重抛出无害
+        # （第二次抛出在 finally 中会被抑制）。
+        raise KeyboardInterrupt()
+
+    signal.signal(signal.SIGINT, _sigint_handler)
+
     while True:
         try:
             user_input = input("\n\033[1;36m>>> \033[0m").strip()

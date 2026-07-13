@@ -167,6 +167,14 @@ class Loop:
                     self.ctx.messages,
                     tools=self.tool_manager.get_definitions(),
                 ):
+                    # 在 LLM 流式块之间检查停止信号。
+                    # 即使 KeyboardInterrupt 被延迟传递（Windows  blocked I/O），
+                    # 一旦 read timeout 突破阻塞后也能在此处迅速响应。
+                    if self._stop_requested:
+                        msg = self._stopped_message()
+                        yield StreamChunk(content="\n⏹️ " + msg, is_final=True)
+                        return
+
                     if chunk.tool_calls:
                         for tc in chunk.tool_calls:
                             if not any(t.id == tc.id for t in accumulated_tool_calls):
@@ -203,6 +211,11 @@ class Loop:
                     return
 
                 for tool_call in accumulated_tool_calls:
+                    if self._stop_requested:
+                        msg = self._stopped_message()
+                        yield StreamChunk(content="\n⏹️ " + msg, is_final=True)
+                        return
+
                     result_msg = self._execute_one_tool(tool_call)
                     if result_msg is not None:
                         self.ctx.append(result_msg)

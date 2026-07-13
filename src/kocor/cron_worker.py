@@ -28,8 +28,8 @@ def main() -> None:
         # 阻塞等待 stdin EOF：主进程关闭管道时投递 EOF，
         # 作为跨平台停止信号（不依赖 SIGTERM/SIGINT，后者在 Windows 不适用）。
         sys.stdin.read()
-    except (OSError, ValueError):
-        # stdin 异常关闭（竞态、管道损坏等）视为停止信号。
+    except (OSError, ValueError, KeyboardInterrupt):
+        # stdin 异常关闭（竞态、管道损坏等）或 Ctrl+C 传递到子进程时视为停止信号。
         pass
     finally:
         logger.info("cron worker 子进程正在退出...")
