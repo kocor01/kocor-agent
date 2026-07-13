@@ -26,7 +26,9 @@ class ToolManager:
         self._env: LocalEnvironment | None = None
         self.mcp_manager = None
         self.skill_manager = None
-        self._cron_scheduler = None
+        # cron worker 子进程（仅主进程持有；cron worker 子进程内的
+        # ToolManager 通过 include_cron=False 跳过，避免递归 spawn）
+        self._cron_worker = None
 
     def get_or_create_env(self) -> LocalEnvironment:
         """获取或创建 LocalEnvironment 实例（延迟初始化）。
@@ -43,14 +45,19 @@ class ToolManager:
             self._env.cleanup()
         self._env = None
 
-    def register_builtin_tools(self) -> None:
-        """向当前 ToolManager 注册内置工具（文件操作、沙盒执行、bash、cron）。"""
+    def register_builtin_tools(self, include_cron: bool = True) -> None:
+        """向当前 ToolManager 注册内置工具（文件操作、沙盒执行、bash、cron）。
+
+        Args:
+            include_cron: 是否注册 cronjob 工具并创建 cron worker。
+                主进程默认 True。cron worker 子进程内设 False —— 既不注册
+                cronjob 工具（防递归调用），也不创建 worker（避免递归 spawn）。
+        """
         from kocor.tools.toolsets.read_file_tool import ReadFile
         from kocor.tools.toolsets.write_file_tool import WriteFile
         from kocor.tools.toolsets.patch_file_tool import PatchFile
         from kocor.tools.toolsets.search_file_tool import SearchFiles
         from kocor.tools.toolsets.bash_tool import BashTool, ProcessTool
-        from kocor.tools.toolsets.cron_tool import CronTool
 
         self.memory_store = None
         self.todo_store = None
@@ -101,30 +108,33 @@ class ToolManager:
             TodoTool.SAFETY_LEVEL,
         )
 
-        # cron 工具
-        from kocor.tools.toolsets.cron.scheduler import CronScheduler
-        if self._cron_scheduler is None:
-            self._cron_scheduler = CronScheduler()
-        self.register(
-            CronTool.NAME, CronTool.DESCRIPTION, CronTool.PARAMETERS,
-            lambda **kw: CronTool.handler(**kw),
-            CronTool.SAFETY_LEVEL,
-        )
+        # cron 工具：主进程注册 cronjob 工具 + 创建 cron worker 子进程管理器。
+        # cron worker 子进程自身跳过此块（include_cron=False）。
+        if include_cron:
+            from kocor.tools.toolsets.cron_tool import CronTool
+            from kocor.tools.toolsets.cron.worker_process import CronWorkerProcess
+            if self._cron_worker is None:
+                self._cron_worker = CronWorkerProcess()
+            self.register(
+                CronTool.NAME, CronTool.DESCRIPTION, CronTool.PARAMETERS,
+                lambda **kw: CronTool.handler(**kw),
+                CronTool.SAFETY_LEVEL,
+            )
 
     def start_cron_scheduler(self) -> None:
-        """启动 cron 调度器。"""
-        if self._cron_scheduler is not None:
-            self._cron_scheduler.start()
+        """启动 cron worker 子进程。接口名保留以兼容 Agent。"""
+        if self._cron_worker is not None:
+            self._cron_worker.start()
 
     def stop_cron_scheduler(self) -> None:
-        """停止 cron 调度器。"""
-        if self._cron_scheduler is not None:
-            self._cron_scheduler.stop()
+        """停止 cron worker 子进程。接口名保留以兼容 Agent。"""
+        if self._cron_worker is not None:
+            self._cron_worker.stop()
 
     @property
-    def cron_scheduler(self):
-        """获取 cron 调度器实例。"""
-        return self._cron_scheduler
+    def cron_worker(self):
+        """获取 cron worker 子进程管理器实例。"""
+        return self._cron_worker
 
 
     def register_all(self) -> None:

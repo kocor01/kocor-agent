@@ -453,6 +453,10 @@ def main() -> None:
         session_manager=session_manager,
     )
 
+    # 确保进程退出时停止 cron worker 子进程（覆盖 REPL 的 os._exit）
+    import atexit
+    atexit.register(toolManager.stop_cron_scheduler)
+
     if is_repl:
         print()
         try:
@@ -483,3 +487,4 @@ def main() -> None:
                 print(result)
     finally:
         toolManager.mcp_manager.shutdown_all()
+        toolManager.stop_cron_scheduler()

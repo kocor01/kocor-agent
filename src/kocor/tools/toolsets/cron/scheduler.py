@@ -32,15 +32,23 @@ class CronScheduler:
     支持安全的启动/停止生命周期管理。
     """
 
-    def __init__(self, tick_interval: int = DEFAULT_TICK_INTERVAL):
+    def __init__(
+        self,
+        tick_interval: int = DEFAULT_TICK_INTERVAL,
+        agent: Any = None,
+    ):
         """
         Args:
             tick_interval: tick 轮询间隔（秒），默认 60s
+            agent: 子进程内的独立 Agent，用于执行 prompt 作业。
+                仅 cron worker 子进程注入；主进程不构造 CronScheduler。
+                为 None 时 prompt 作业退化为占位输出（兼容无 LLM / 测试场景）。
         """
         self._tick_interval = tick_interval
         self._tick_thread: threading.Thread | None = None
         self._stop_event = threading.Event()
         self._running = False
+        self._agent = agent
 
     # ------------------------------------------------------------------
     # 生命周期
@@ -50,6 +58,11 @@ class CronScheduler:
     def is_running(self) -> bool:
         """调度器是否正在运行。"""
         return self._running
+
+    @property
+    def agent(self) -> Any:
+        """注入的独立 Agent（cron worker 子进程内）。"""
+        return self._agent
 
     def start(self) -> None:
         """启动后台 tick 线程（守护线程，不会阻止进程退出）。"""
@@ -156,12 +169,17 @@ class CronScheduler:
             output = self._run_script(script, job)
             output_parts.append(output)
         elif prompt:
-            # LLM 模式：执行 prompt（无 LLM 时记录意图）
-            output_parts.append(f"[Cron job execution]\nPrompt: {prompt}\n")
-            output_parts.append(
-                "(Scheduler running in headless mode — "
-                "LLM execution requires an active agent session.)"
-            )
+            # prompt 模式：委托子进程内独立 Agent 运行 ReAct 循环。
+            # 无 agent（测试 / 无 LLM）时退化为占位输出。
+            if self._agent is not None:
+                output_parts.append(
+                    self._agent.run_prompt(prompt, job.get("skills") or [])
+                )
+            else:
+                output_parts.append(f"[Cron job execution]\nPrompt: {prompt}\n")
+                output_parts.append(
+                    "(No agent configured — LLM execution unavailable.)"
+                )
 
         # 添加技能信息
         skills = job.get("skills", [])
