@@ -10,7 +10,7 @@ from unittest.mock import MagicMock, call, patch
 
 import pytest
 
-from kocor.event.event_manager import EventEmitter, EventType, HarnessEvent
+from kocor.event.event_manager import EventEmitter, EventType, Event
 from kocor.event.event_subscribe import EventSubscribe
 from kocor.logger import Logger
 from kocor.event.subscribes.logs import Logs
@@ -55,7 +55,7 @@ class TestEventSubscribe:
             sub.subscribe_all(logger)
 
             # 触发 PRE_GENERATE 事件
-            emitter.fire(HarnessEvent(type=EventType.PRE_GENERATE, iteration=1, data={}))
+            emitter.fire(Event(type=EventType.PRE_GENERATE, iteration=1, data={}))
 
             mock_event.assert_called_once_with(
                 EventType.PRE_GENERATE,
@@ -72,9 +72,9 @@ class TestEventSubscribe:
             sub.subscribe_all(logger)
 
             # 触发多个事件
-            emitter.fire(HarnessEvent(type=EventType.PRE_GENERATE, iteration=1, data={}))
-            emitter.fire(HarnessEvent(type=EventType.POST_GENERATE, iteration=1, data={}))
-            emitter.fire(HarnessEvent(type=EventType.PRE_TOOL, iteration=1, data={}))
+            emitter.fire(Event(type=EventType.PRE_GENERATE, iteration=1, data={}))
+            emitter.fire(Event(type=EventType.POST_GENERATE, iteration=1, data={}))
+            emitter.fire(Event(type=EventType.PRE_TOOL, iteration=1, data={}))
 
             assert mock_event.call_count == 3
 
@@ -87,7 +87,7 @@ class TestEventSubscribe:
         with patch.object(logger, 'event') as mock_event:
             sub.subscribe_all(logger)
 
-            emitter.fire(HarnessEvent(type=EventType.ON_ERROR, iteration=1, data={"error": "boom"}))
+            emitter.fire(Event(type=EventType.ON_ERROR, iteration=1, data={"error": "boom"}))
 
             mock_event.assert_called_once_with(
                 EventType.ON_ERROR,
@@ -104,7 +104,7 @@ class TestEventSubscribe:
         with patch.object(logger, 'event') as mock_event:
             sub.subscribe_all(logger)
 
-            emitter.fire(HarnessEvent(
+            emitter.fire(Event(
                 type=EventType.ON_BUDGET_EXHAUSTED,
                 iteration=3,
                 data={"max_iterations": 3},
@@ -125,7 +125,7 @@ class TestEventSubscribe:
         with patch.object(logger, 'event') as mock_event:
             sub.subscribe_all(logger)
 
-            emitter.fire(HarnessEvent(
+            emitter.fire(Event(
                 type=EventType.PRE_GENERATE,
                 iteration=1,
                 data={"messages": [], "tools": []},
@@ -147,7 +147,7 @@ class TestEventSubscribe:
         with patch.object(logger, 'event') as mock_event:
             sub.subscribe_all(logger)
 
-            emitter.fire(HarnessEvent(
+            emitter.fire(Event(
                 type=EventType.POST_TOOL,
                 iteration=1,
                 data={
@@ -182,37 +182,37 @@ class TestLogsHandlers:
 
     def test_handle_pre_generate(self):
         with patch.object(self.logger, 'event') as mock_event:
-            event = HarnessEvent(type=EventType.PRE_GENERATE, iteration=1, data={"messages": []})
+            event = Event(type=EventType.PRE_GENERATE, iteration=1, data={"messages": []})
             self.logs._handle_pre_generate(event)
             mock_event.assert_called_once_with(EventType.PRE_GENERATE, logging.DEBUG, messages=[])
 
     def test_handle_post_generate(self):
         with patch.object(self.logger, 'event') as mock_event:
-            event = HarnessEvent(type=EventType.POST_GENERATE, iteration=1, data={"response": "hi"})
+            event = Event(type=EventType.POST_GENERATE, iteration=1, data={"response": "hi"})
             self.logs._handle_post_generate(event)
             mock_event.assert_called_once_with(EventType.POST_GENERATE, logging.DEBUG, response="hi")
 
     def test_handle_pre_tool(self):
         with patch.object(self.logger, 'event') as mock_event:
-            event = HarnessEvent(type=EventType.PRE_TOOL, iteration=1, data={"tool_call": "read_file"})
+            event = Event(type=EventType.PRE_TOOL, iteration=1, data={"tool_call": "read_file"})
             self.logs._handle_pre_tool(event)
             mock_event.assert_called_once_with(EventType.PRE_TOOL, logging.DEBUG, tool_call="read_file")
 
     def test_handle_post_tool(self):
         with patch.object(self.logger, 'event') as mock_event:
-            event = HarnessEvent(type=EventType.POST_TOOL, iteration=1, data={"tool_name": "write_file", "success": True})
+            event = Event(type=EventType.POST_TOOL, iteration=1, data={"tool_name": "write_file", "success": True})
             self.logs._handle_post_tool(event)
             mock_event.assert_called_once_with(EventType.POST_TOOL, logging.DEBUG, tool_name="write_file", success=True)
 
     def test_handle_on_error(self):
         with patch.object(self.logger, 'event') as mock_event:
-            event = HarnessEvent(type=EventType.ON_ERROR, iteration=1, data={"error": "timeout"})
+            event = Event(type=EventType.ON_ERROR, iteration=1, data={"error": "timeout"})
             self.logs._handle_on_error(event)
             mock_event.assert_called_once_with(EventType.ON_ERROR, logging.ERROR, error="timeout")
 
     def test_handle_on_budget_exhausted(self):
         with patch.object(self.logger, 'event') as mock_event:
-            event = HarnessEvent(type=EventType.ON_BUDGET_EXHAUSTED, iteration=3, data={"max_iterations": 3})
+            event = Event(type=EventType.ON_BUDGET_EXHAUSTED, iteration=3, data={"max_iterations": 3})
             self.logs._handle_on_budget_exhausted(event)
             mock_event.assert_called_once_with(EventType.ON_BUDGET_EXHAUSTED, logging.WARNING, max_iterations=3)
 
@@ -220,7 +220,7 @@ class TestLogsHandlers:
         """未订阅的事件类型不触发任何处理器。"""
         with patch.object(self.logger, 'event') as mock_event:
             # 只订阅了 POST_TOOL
-            self.logs._handle_post_tool(HarnessEvent(type=EventType.POST_TOOL, iteration=1, data={}))
+            self.logs._handle_post_tool(Event(type=EventType.POST_TOOL, iteration=1, data={}))
             mock_event.assert_called_once()
 
             # PRE_GENERATE 未订阅

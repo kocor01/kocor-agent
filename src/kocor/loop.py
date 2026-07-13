@@ -15,7 +15,7 @@ import time
 from typing import Iterator
 
 from kocor.context.context_manager import ContextManager
-from kocor.event.event_manager import HarnessEvent, EventEmitter, EventType
+from kocor.event.event_manager import Event, EventEmitter, EventType
 from kocor.hook.base import HookPoint, HookContext, HookAction
 from kocor.hook.hook_manager import HookManager
 from kocor.llm_provider.llm_client import LLMClient
@@ -97,11 +97,13 @@ class Loop:
 
                 self.ctx.advance_iteration()
 
-                self._emit(EventType.PRE_GENERATE, iteration=self.ctx.iteration, messages=self.ctx.messages,
-                           tools=self.tool_manager.get_definitions())
-                msg = self._run_hooks(HookPoint.PRE_GENERATE)
-                if msg is not None:
-                    return msg
+                hook_msg = self._run_hooks(HookPoint.PRE_GENERATE)
+                self._emit_event(EventType.PRE_GENERATE, iteration=self.ctx.iteration,
+                           messages=self.ctx.messages,
+                           tools=self.tool_manager.get_definitions(),
+                           hook_result=hook_msg)
+                if hook_msg is not None:
+                    return hook_msg
 
                 response = self.llm.generate(
                     self.ctx.messages,
@@ -109,10 +111,11 @@ class Loop:
                 )
                 self.ctx.append(response)
 
-                self._emit(EventType.POST_GENERATE, iteration=self.ctx.iteration, response=response)
-                msg = self._run_hooks(HookPoint.POST_GENERATE, response=response)
-                if msg is not None:
-                    return msg or response.content or ""
+                hook_msg = self._run_hooks(HookPoint.POST_GENERATE, response=response)
+                self._emit_event(EventType.POST_GENERATE, iteration=self.ctx.iteration, response=response,
+                           hook_result=hook_msg)
+                if hook_msg is not None:
+                    return hook_msg or response.content or ""
 
                 if not response.tool_calls:
                     return response.content or ""
@@ -129,9 +132,10 @@ class Loop:
                 self.ctx.usage = response.usage
                 self.ctx.compress_if_needed()
 
-            self._emit(EventType.ON_BUDGET_EXHAUSTED, iteration=self.ctx.iteration,
-                       max_iterations=self.max_iterations)
-            self._run_hooks(HookPoint.ON_BUDGET_EXHAUSTED)
+            hook_msg = self._run_hooks(HookPoint.ON_BUDGET_EXHAUSTED)
+            self._emit_event(EventType.ON_BUDGET_EXHAUSTED, iteration=self.ctx.iteration,
+                       max_iterations=self.max_iterations,
+                       hook_result=hook_msg)
             return self._budget_exhausted_message()
         except KeyboardInterrupt:
             return self._stopped_message()
@@ -154,11 +158,13 @@ class Loop:
 
                 self.ctx.advance_iteration()
 
-                self._emit(EventType.PRE_GENERATE, iteration=self.ctx.iteration, messages=self.ctx.messages,
-                           tools=self.tool_manager.get_definitions())
-                msg = self._run_hooks(HookPoint.PRE_GENERATE)
-                if msg is not None:
-                    yield StreamChunk(content=msg, is_final=True)
+                hook_msg = self._run_hooks(HookPoint.PRE_GENERATE)
+                self._emit_event(EventType.PRE_GENERATE, iteration=self.ctx.iteration,
+                           messages=self.ctx.messages,
+                           tools=self.tool_manager.get_definitions(),
+                           hook_result=hook_msg)
+                if hook_msg is not None:
+                    yield StreamChunk(content=hook_msg, is_final=True)
                     return
 
                 accumulated_tool_calls = []
@@ -200,11 +206,11 @@ class Loop:
                     usage=streaming_usage,
                 )
 
-                self._emit(EventType.POST_GENERATE, iteration=self.ctx.iteration,
-                           response=response)
-                msg = self._run_hooks(HookPoint.POST_GENERATE, response=response)
-                if msg is not None:
-                    yield StreamChunk(content=msg or response.content or "", is_final=True)
+                hook_msg = self._run_hooks(HookPoint.POST_GENERATE, response=response)
+                self._emit_event(EventType.POST_GENERATE, iteration=self.ctx.iteration,
+                           response=response, hook_result=hook_msg)
+                if hook_msg is not None:
+                    yield StreamChunk(content=hook_msg or response.content or "", is_final=True)
                     return
 
                 self.ctx.append(response)
@@ -234,9 +240,10 @@ class Loop:
                 self.ctx.usage = streaming_usage
                 self.ctx.compress_if_needed()
 
-            self._emit(EventType.ON_BUDGET_EXHAUSTED, iteration=self.ctx.iteration,
-                       max_iterations=self.max_iterations)
-            self._run_hooks(HookPoint.ON_BUDGET_EXHAUSTED)
+            hook_msg = self._run_hooks(HookPoint.ON_BUDGET_EXHAUSTED)
+            self._emit_event(EventType.ON_BUDGET_EXHAUSTED, iteration=self.ctx.iteration,
+                       max_iterations=self.max_iterations,
+                       hook_result=hook_msg)
             yield StreamChunk(content=self._budget_exhausted_message(), is_final=True)
         except KeyboardInterrupt:
             msg = self._stopped_message()
@@ -249,10 +256,8 @@ class Loop:
     # ── 工具执行 ──
 
     def _execute_one_tool(self, tool_call) -> Message | None:
-        """执行单个工具调用：事件、权限检查、钩子、执行、审计。"""
+        """执行单个工具调用：权限检查、钩子、事件、执行、审计。"""
         tool_name = tool_call.function.name
-
-        self._emit(EventType.PRE_TOOL, iteration=self.ctx.iteration, tool_call=tool_call)
 
         if not self.permission_mgr.check(tool_call):
             return Message(
@@ -261,11 +266,14 @@ class Loop:
                 tool_call_id=tool_call.id,
             )
 
-        msg = self._run_hooks(HookPoint.PRE_TOOL, tool_call=tool_call)
-        if msg is not None:
-            self._emit(EventType.POST_TOOL, iteration=self.ctx.iteration,
-                       tool_name=tool_name, success=False, skipped_by_hook=True)
-            return Message(role="tool", content=msg or "[Tool Skipped by Hook]", tool_call_id=tool_call.id)
+        # 先执行钩子，再触发事件（事件携带钩子结果供观察者使用）
+        hook_msg = self._run_hooks(HookPoint.PRE_TOOL, tool_call=tool_call)
+        self._emit_event(EventType.PRE_TOOL, iteration=self.ctx.iteration, tool_call=tool_call,
+                   hook_result=hook_msg)
+        if hook_msg is not None:
+            # 钩子跳过工具：不触发 POST_TOOL（工具未执行），
+            # 跳过事实由 PRE_TOOL 的 hook_result 表达
+            return Message(role="tool", content=hook_msg or "[Tool Skipped by Hook]", tool_call_id=tool_call.id)
 
         duration = 0
         start = time.monotonic()
@@ -274,9 +282,11 @@ class Loop:
             duration = (time.monotonic() - start) * 1000
             content = result.content or ""
 
-            self._emit(EventType.POST_TOOL, iteration=self.ctx.iteration,
-                       tool_name=tool_name, duration=duration, success=True, result=result)
-            if self._run_hooks(HookPoint.POST_TOOL, tool_call=tool_call, tool_result=result) is not None:
+            hook_msg = self._run_hooks(HookPoint.POST_TOOL, tool_call=tool_call, tool_result=result)
+            self._emit_event(EventType.POST_TOOL, iteration=self.ctx.iteration,
+                       tool_name=tool_name, duration=duration, success=True, result=result,
+                       hook_result=hook_msg)
+            if hook_msg is not None:
                 self._stop_requested = True
 
             return Message(
@@ -286,11 +296,12 @@ class Loop:
             )
 
         except Exception as e:
-            self._emit(EventType.POST_TOOL, iteration=self.ctx.iteration,
+            hook_msg = self._run_hooks(HookPoint.ON_ERROR, error=e)
+            self._emit_event(EventType.POST_TOOL, iteration=self.ctx.iteration,
                        tool_name=tool_name, duration=duration, success=False, error=str(e))
-            self._emit(EventType.ON_ERROR, iteration=self.ctx.iteration,
-                       component="tool", error=str(e))
-            if self._run_hooks(HookPoint.ON_ERROR, error=e) is not None:
+            self._emit_event(EventType.ON_ERROR, iteration=self.ctx.iteration,
+                       component="tool", error=str(e), hook_result=hook_msg)
+            if hook_msg is not None:
                 self._stop_requested = True
 
             return Message(
@@ -341,9 +352,10 @@ class Loop:
             ))
 
         if self._consecutive_duplicate_count >= 3:
-            self._emit(EventType.ON_BUDGET_EXHAUSTED, iteration=self.ctx.iteration,
-                       max_iterations=self.max_iterations, reason="duplicate_tool_calls")
-            self._run_hooks(HookPoint.ON_BUDGET_EXHAUSTED)
+            hook_msg = self._run_hooks(HookPoint.ON_BUDGET_EXHAUSTED)
+            self._emit_event(EventType.ON_BUDGET_EXHAUSTED, iteration=self.ctx.iteration,
+                       max_iterations=self.max_iterations, reason="duplicate_tool_calls",
+                       hook_result=hook_msg)
             return True
 
         return False
@@ -375,8 +387,8 @@ class Loop:
                 return r.message
         return None
 
-    def _emit(self, event_type: str, **data) -> None:
-        self.event_emitter.fire(HarnessEvent(
+    def _emit_event(self, event_type: str, **data) -> None:
+        self.event_emitter.fire(Event(
             type=event_type,
             iteration=self.ctx.iteration,
             data=data,

@@ -2,7 +2,7 @@
 
 import logging
 
-from kocor.event.event_manager import EventType, HarnessEvent
+from kocor.event.event_manager import EventType, Event
 from kocor.logger import Logger
 
 
@@ -15,20 +15,20 @@ class Logs:
     def __init__(self, logger: Logger):
         self._logger = logger
 
-    def _handle_pre_generate(self, event: HarnessEvent) -> None:
+    def _handle_pre_generate(self, event: Event) -> None:
         self._logger.event(EventType.PRE_GENERATE, logging.DEBUG, **event.data)
 
-    def _handle_post_generate(self, event: HarnessEvent) -> None:
+    def _handle_post_generate(self, event: Event) -> None:
         self._logger.event(EventType.POST_GENERATE, logging.DEBUG, **event.data)
 
-    def _handle_pre_tool(self, event: HarnessEvent) -> None:
+    def _handle_pre_tool(self, event: Event) -> None:
         self._logger.event(EventType.PRE_TOOL, logging.DEBUG, **event.data)
 
-    def _handle_post_tool(self, event: HarnessEvent) -> None:
+    def _handle_post_tool(self, event: Event) -> None:
         self._logger.event(EventType.POST_TOOL, logging.DEBUG, **event.data)
 
-    def _handle_on_error(self, event: HarnessEvent) -> None:
+    def _handle_on_error(self, event: Event) -> None:
         self._logger.event(EventType.ON_ERROR, logging.ERROR, **event.data)
 
-    def _handle_on_budget_exhausted(self, event: HarnessEvent) -> None:
+    def _handle_on_budget_exhausted(self, event: Event) -> None:
         self._logger.event(EventType.ON_BUDGET_EXHAUSTED, logging.WARNING, **event.data)

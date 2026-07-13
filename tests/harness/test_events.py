@@ -1,11 +1,11 @@
-"""HarnessEvent 和 EventEmitter 测试。"""
+"""Event 和 EventEmitter 测试。"""
 
-from kocor.event.event_manager import HarnessEvent, EventEmitter, EventType
+from kocor.event.event_manager import Event, EventEmitter, EventType
 
 
-class TestHarnessEvent:
+class TestEvent:
     def test_create_event(self):
-        event = HarnessEvent(
+        event = Event(
             type=EventType.PRE_TOOL,
             iteration=1,
             data={"tool": "read_file"},
@@ -25,7 +25,7 @@ class TestEventEmitter:
             received.append(event)
 
         emitter.subscribe(EventType.PRE_TOOL, handler)
-        event = HarnessEvent(type=EventType.PRE_TOOL, iteration=1, data={})
+        event = Event(type=EventType.PRE_TOOL, iteration=1, data={})
         emitter.fire(event)
 
         assert len(received) == 1
@@ -38,7 +38,7 @@ class TestEventEmitter:
         emitter.subscribe(EventType.PRE_TOOL, lambda e: results.append("a"))
         emitter.subscribe(EventType.PRE_TOOL, lambda e: results.append("b"))
 
-        emitter.fire(HarnessEvent(type=EventType.PRE_TOOL, iteration=1, data={}))
+        emitter.fire(Event(type=EventType.PRE_TOOL, iteration=1, data={}))
         assert results == ["a", "b"]
 
     def test_unsubscribe(self):
@@ -50,12 +50,12 @@ class TestEventEmitter:
 
         emitter.subscribe(EventType.PRE_TOOL, handler)
         emitter.unsubscribe(EventType.PRE_TOOL, handler)
-        emitter.fire(HarnessEvent(type=EventType.PRE_TOOL, iteration=1, data={}))
+        emitter.fire(Event(type=EventType.PRE_TOOL, iteration=1, data={}))
         assert results == []
 
     def test_no_subscribers_does_not_error(self):
         emitter = EventEmitter()
-        emitter.fire(HarnessEvent(type="unknown", iteration=1, data={}))
+        emitter.fire(Event(type="unknown", iteration=1, data={}))
 
     def test_unregister_all(self):
         emitter = EventEmitter()
@@ -72,6 +72,6 @@ class TestEventEmitter:
         emitter.subscribe(EventType.PRE_TOOL, lambda e: pre.append(e.type))
         emitter.subscribe(EventType.POST_TOOL, lambda e: post.append(e.type))
 
-        emitter.fire(HarnessEvent(type=EventType.PRE_TOOL, iteration=1, data={}))
+        emitter.fire(Event(type=EventType.PRE_TOOL, iteration=1, data={}))
         assert pre == [EventType.PRE_TOOL]
         assert post == []

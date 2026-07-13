@@ -152,7 +152,7 @@ src/kocor/
 │   ├── sandbox.py           # Sandbox — 子进程代码执行
 │   ├── logger.py            # Logger — 按日轮转文件日志
 │   └── event/               # 事件系统
-│       ├── event_manager.py     # EventEmitter + HarnessEvent
+│       ├── event_manager.py     # EventEmitter + Event
 │       ├── event_subscribe.py   # EventSubscribe — 注册标准订阅
 │       └── subscribes/logs.py   # 事件写入日志
 │

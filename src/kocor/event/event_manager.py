@@ -20,7 +20,7 @@ class EventType(str, Enum):
 
 
 @dataclass
-class HarnessEvent:
+class Event:
     """通过观察者和钩子分发的运行时事件。"""
 
     type: str
@@ -53,7 +53,7 @@ class EventEmitter:
             h for h in self._subscribers[event_type] if h is not handler
         ]
 
-    def fire(self, event: HarnessEvent) -> None:
+    def fire(self, event: Event) -> None:
         """将事件分发给所有已注册的处理函数。"""
         for handler in self._subscribers.get(event.type, []):
             handler(event)

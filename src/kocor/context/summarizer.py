@@ -10,7 +10,7 @@ import time
 from kocor.config import Config
 from kocor.context.types import SummaryNode
 from kocor.context.token_counter import TokenCounter
-from kocor.event.event_manager import EventType, HarnessEvent, EventEmitter
+from kocor.event.event_manager import EventType, Event, EventEmitter
 from kocor.hook.base import HookPoint, HookContext
 from kocor.hook.hook_manager import HookManager
 from kocor.llm_provider.message import Message
@@ -84,12 +84,12 @@ class HistorySummarizer:
         prompt = self.summarization_prompt.format(history_text=history_text)
         msg = Message(role="user", content=prompt)
 
-        self._emit(EventType.PRE_SUMMARIZE, history_length=len(history_text), message_count=len(messages))
+        self._emit_event(EventType.PRE_SUMMARIZE, history_length=len(history_text), message_count=len(messages))
         self._run_hooks(HookPoint.PRE_SUMMARIZE, history_length=len(history_text))
 
         result = self.llm.generate([msg])
 
-        self._emit(EventType.POST_SUMMARIZE, summary_length=len(result.content), message_count=len(messages))
+        self._emit_event(EventType.POST_SUMMARIZE, summary_length=len(result.content), message_count=len(messages))
         self._run_hooks(HookPoint.POST_SUMMARIZE, summary_length=len(result.content))
 
         return SummaryNode(
@@ -109,7 +109,7 @@ class HistorySummarizer:
     def _emit(self, event_type: str, **data) -> None:
         if self._event_emitter is None:
             return
-        self._event_emitter.fire(HarnessEvent(
+        self._event_emitter.fire(Event(
             type=event_type,
             iteration=0,
             data=data,
