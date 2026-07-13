@@ -1,6 +1,6 @@
 """钩子系统测试。"""
 
-from kocor.harness.logger import Logger
+from kocor.logger import Logger
 from kocor.hook.base import HookPoint, HookContext, HookResult, HookAction
 from kocor.hook.hook_manager import HookManager
 from kocor.hook.hooks import AuditLogHook

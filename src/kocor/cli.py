@@ -37,7 +37,7 @@ from kocor.tools.permission import PermissionManager
 from kocor.hook.hook_manager import HookManager
 from kocor.event.event_manager import EventEmitter
 from kocor.event.event_subscribe import EventSubscribe
-from kocor.harness.logger import Logger
+from kocor.logger import Logger
 
 # 可选的会话管理
 from kocor.session import SessionManager, SessionResetPolicy, SessionStore

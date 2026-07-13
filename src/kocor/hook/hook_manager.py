@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from kocor.harness.logger import Logger
+from kocor.logger import Logger
 from kocor.hook.base import HookPoint, HookContext, HookResult, HookAction, Hook
 
 

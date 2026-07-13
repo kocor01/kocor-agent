@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from kocor.event.event_manager import EventEmitter, EventType
 from kocor.event.subscribes.logs import Logs
-from kocor.harness.logger import Logger
+from kocor.logger import Logger
 
 
 class EventSubscribe:

@@ -3,7 +3,7 @@
 import json
 from datetime import datetime
 
-from kocor.harness.logger import Logger
+from kocor.logger import Logger
 from kocor.hook.base import HookPoint, HookContext, HookResult, HookAction
 
 

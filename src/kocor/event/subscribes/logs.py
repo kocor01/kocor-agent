@@ -3,7 +3,7 @@
 import logging
 
 from kocor.event.event_manager import EventType, HarnessEvent
-from kocor.harness.logger import Logger
+from kocor.logger import Logger
 
 
 class Logs:

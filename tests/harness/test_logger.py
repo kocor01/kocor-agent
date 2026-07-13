@@ -5,7 +5,7 @@ import logging
 import pytest
 
 from kocor.event.event_manager import EventType
-from kocor.harness.logger import Logger
+from kocor.logger import Logger
 
 
 class TestLogger:
@@ -51,4 +51,4 @@ class TestLogger:
 
     def test_name(self):
         logger = Logger()
-        assert logger.logger.name == "kocor.harness"
+        assert logger.logger.name == "kocor"

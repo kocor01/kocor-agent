@@ -1,4 +1,4 @@
-"""Harness 运行时的结构化日志。"""
+"""Kocor 运行时结构化日志。"""
 
 import logging
 import os
@@ -8,7 +8,7 @@ from kocor.event.event_manager import EventType
 
 
 class Logger:
-    """为 harness 操作提供结构化日志。
+    """为 kocor 操作提供结构化日志。
 
     包装标准库的 logging 模块，提供事件驱动的日志记录。
     日志按天写入对应日期的子目录：实际写入路径为 ``{log_dir}/{日期}/kocor.log``。
@@ -22,7 +22,7 @@ class Logger:
         os.makedirs(daily_dir, exist_ok=True)
         daily_path = os.path.join(daily_dir, "kocor.log")
 
-        self.logger = logging.getLogger("kocor.harness")
+        self.logger = logging.getLogger("kocor")
         self.logger.setLevel(getattr(logging, level.upper(), logging.INFO))
         if not self.logger.handlers:
             handler = logging.FileHandler(daily_path, encoding="utf-8")
@@ -47,5 +47,3 @@ class Logger:
 
     def error(self, message: str) -> None:
         self.logger.error(message)
-
-

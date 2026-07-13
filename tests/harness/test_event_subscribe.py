@@ -12,7 +12,7 @@ import pytest
 
 from kocor.event.event_manager import EventEmitter, EventType, HarnessEvent
 from kocor.event.event_subscribe import EventSubscribe
-from kocor.harness.logger import Logger
+from kocor.logger import Logger
 from kocor.event.subscribes.logs import Logs
 
 

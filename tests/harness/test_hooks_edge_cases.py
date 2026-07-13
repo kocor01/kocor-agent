@@ -10,7 +10,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from kocor.harness.logger import Logger
+from kocor.logger import Logger
 from kocor.hook.base import HookPoint, HookContext, HookResult, HookAction
 from kocor.hook.hook_manager import HookManager
 from kocor.hook.hooks.audit_log import AuditLogHook
