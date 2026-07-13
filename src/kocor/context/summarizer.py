@@ -10,7 +10,7 @@ import time
 from kocor.config import Config
 from kocor.context.types import SummaryNode
 from kocor.context.token_counter import TokenCounter
-from kocor.harness.event.event_manager import EventType, HarnessEvent, EventEmitter
+from kocor.event.event_manager import EventType, HarnessEvent, EventEmitter
 from kocor.hook.base import HookPoint, HookContext
 from kocor.hook.hook_manager import HookManager
 from kocor.llm_provider.message import Message

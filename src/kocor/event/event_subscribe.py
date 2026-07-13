@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from kocor.harness.event.event_manager import EventEmitter, EventType
-from kocor.harness.event.subscribes.logs import Logs
+from kocor.event.event_manager import EventEmitter, EventType
+from kocor.event.subscribes.logs import Logs
 from kocor.harness.logger import Logger
 
 

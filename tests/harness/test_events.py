@@ -1,6 +1,6 @@
 """HarnessEvent 和 EventEmitter 测试。"""
 
-from kocor.harness.event.event_manager import HarnessEvent, EventEmitter, EventType
+from kocor.event.event_manager import HarnessEvent, EventEmitter, EventType
 
 
 class TestHarnessEvent:

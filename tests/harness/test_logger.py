@@ -4,7 +4,7 @@ import logging
 
 import pytest
 
-from kocor.harness.event.event_manager import EventType
+from kocor.event.event_manager import EventType
 from kocor.harness.logger import Logger
 
 

@@ -12,7 +12,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from kocor.harness.budget import IterationBudget
-from kocor.harness.event.event_manager import EventEmitter, EventType
+from kocor.event.event_manager import EventEmitter, EventType
 from kocor.hook.base import HookPoint, HookContext, HookResult, HookAction
 from kocor.hook.hook_manager import HookManager
 from kocor.llm_provider.message import FunctionCall, Message, ToolCall, StreamChunk

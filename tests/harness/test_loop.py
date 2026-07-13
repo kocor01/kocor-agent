@@ -7,7 +7,7 @@ import pytest
 
 from kocor.agent import Agent
 from kocor.harness.budget import IterationBudget
-from kocor.harness.event.event_manager import EventEmitter, EventType
+from kocor.event.event_manager import EventEmitter, EventType
 from kocor.tools.permission import PermissionManager
 from kocor.hook.base import HookPoint, HookContext, HookResult, HookAction
 from kocor.hook.hook_manager import HookManager

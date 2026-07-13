@@ -10,10 +10,10 @@ from unittest.mock import MagicMock, call, patch
 
 import pytest
 
-from kocor.harness.event.event_manager import EventEmitter, EventType, HarnessEvent
-from kocor.harness.event.event_subscribe import EventSubscribe
+from kocor.event.event_manager import EventEmitter, EventType, HarnessEvent
+from kocor.event.event_subscribe import EventSubscribe
 from kocor.harness.logger import Logger
-from kocor.harness.event.subscribes.logs import Logs
+from kocor.event.subscribes.logs import Logs
 
 
 # ═══════════════════════════════════════════════

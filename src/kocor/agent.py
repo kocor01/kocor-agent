@@ -12,7 +12,7 @@ from kocor.config import Config
 from kocor.context.context_manager import ContextManager
 from kocor.memory.store import MemoryStore
 from kocor.harness.budget import IterationBudget
-from kocor.harness.event.event_manager import EventEmitter
+from kocor.event.event_manager import EventEmitter
 from kocor.hook.hook_manager import HookManager
 from kocor.llm_provider.llm_client import LLMClient
 from kocor.llm_provider.message import Message, StreamChunk

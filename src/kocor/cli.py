@@ -36,8 +36,8 @@ from kocor.tools.tool_manager import ToolManager
 from kocor.harness import IterationBudget
 from kocor.tools.permission import PermissionManager
 from kocor.hook.hook_manager import HookManager
-from kocor.harness.event.event_manager import EventEmitter
-from kocor.harness.event.event_subscribe import EventSubscribe
+from kocor.event.event_manager import EventEmitter
+from kocor.event.event_subscribe import EventSubscribe
 from kocor.harness.logger import Logger
 
 # 可选的会话管理

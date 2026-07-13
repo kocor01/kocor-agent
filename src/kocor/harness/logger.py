@@ -4,7 +4,7 @@ import logging
 import os
 from datetime import date
 
-from kocor.harness.event.event_manager import EventType
+from kocor.event.event_manager import EventType
 
 
 class Logger:
