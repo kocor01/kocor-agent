@@ -106,7 +106,7 @@ class HistorySummarizer:
         ctx = HookContext(iteration=0, messages=[], **extra)
         self._hook_manager.run(point, ctx)
 
-    def _emit(self, event_type: str, **data) -> None:
+    def _emit_event(self, event_type: str, **data) -> None:
         if self._event_emitter is None:
             return
         self._event_emitter.fire(Event(
