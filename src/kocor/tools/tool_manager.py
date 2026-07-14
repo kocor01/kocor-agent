@@ -29,6 +29,8 @@ class ToolManager:
         # cron worker 子进程（仅主进程持有；cron worker 子进程内的
         # ToolManager 通过 include_cron=False 跳过，避免递归 spawn）
         self._cron_worker = None
+        # subagent 运行器（运行时注入，由 cli.py/Agent 在 LLM 创建后设置）
+        self._subagent_runner = None
 
     def get_or_create_env(self) -> LocalEnvironment:
         """获取或创建 LocalEnvironment 实例（延迟初始化）。
@@ -45,13 +47,19 @@ class ToolManager:
             self._env.cleanup()
         self._env = None
 
-    def register_builtin_tools(self, include_cron: bool = True) -> None:
-        """向当前 ToolManager 注册内置工具（文件操作、沙盒执行、bash、cron）。
+    def register_builtin_tools(
+        self,
+        include_cron: bool = True,
+        include_subagent: bool = False,
+    ) -> None:
+        """向当前 ToolManager 注册内置工具（文件操作、沙盒执行、bash、cron、subagent）。
 
         Args:
             include_cron: 是否注册 cronjob 工具并创建 cron worker。
                 主进程默认 True。cron worker 子进程内设 False —— 既不注册
                 cronjob 工具（防递归调用），也不创建 worker（避免递归 spawn）。
+            include_subagent: 是否注册 subagent 工具（子代理委派）。
+                cli.py 在注册时通过 ToolManager._subagent_runner 注入运行器。
         """
         from kocor.tools.toolsets.read_file_tool import ReadFile
         from kocor.tools.toolsets.write_file_tool import WriteFile
@@ -121,6 +129,19 @@ class ToolManager:
                 CronTool.SAFETY_LEVEL,
             )
 
+        # subagent 工具：注册委派子代理工具。
+        # 非 orchestrator 角色（子代理自身）由 _build_child_tool_manager 管理。
+        if include_subagent:
+            from kocor.tools.toolsets.subagent.tool import SubagentTool
+            # 在调用时解析 self._subagent_runner（cli.py 在 LLM 创建后注入），
+            # 不在此处闭包绑定（避免 LLM 未就绪时 runner 不存在的问题）
+            self.register(
+                SubagentTool.NAME, SubagentTool.DESCRIPTION, SubagentTool.PARAMETERS,
+                lambda **kw: SubagentTool.handler(runner=self._subagent_runner, **kw),
+                SubagentTool.SAFETY_LEVEL,
+                timeout=0,  # 豁免全局超时（子代理通常需要数分钟）
+            )
+
     def start_cron_scheduler(self) -> None:
         """启动 cron worker 子进程。接口名保留以兼容 Agent。"""
         if self._cron_worker is not None:
@@ -137,9 +158,13 @@ class ToolManager:
         return self._cron_worker
 
 
-    def register_all(self) -> None:
-        """统一注册所有工具：内置工具 → MCP 工具 → 技能工具。"""
-        self.register_builtin_tools()
+    def register_all(self, include_subagent: bool = False) -> None:
+        """统一注册所有工具：内置工具 → MCP 工具 → 技能工具。
+
+        Args:
+            include_subagent: 是否注册 subagent 工具（顶层父代理应启用）。
+        """
+        self.register_builtin_tools(include_subagent=include_subagent)
 
         from kocor.mcp import McpManager
         self.mcp_manager = McpManager(self, Config.load().mcp_config)
@@ -156,6 +181,7 @@ class ToolManager:
         parameters: dict,
         handler: Callable[..., str],
         safety_level: str = PermissionManager.SAFETY_CAUTION,
+        timeout: int | None = None,
     ) -> None:
         """注册工具。
 
@@ -165,12 +191,15 @@ class ToolManager:
             parameters: JSON Schema 参数定义
             handler: 工具处理器，接收 **kwargs 返回结果字符串
             safety_level: 安全等级
+            timeout: 工具级超时覆盖。None=继承 Config.tool_timeout，
+                0=不超时，正数=自定义秒数（供 subagent 等长生命周期工具）
         """
         self._tools[name] = ToolDefinition(
             name=name,
             description=description,
             parameters=parameters,
             safety_level=safety_level,
+            timeout=timeout,
         )
         self._handlers[name] = handler
 
@@ -204,9 +233,17 @@ class ToolManager:
 
         try:
             with ThreadPoolExecutor(max_workers=1) as pool:
-                timeout = Config.load().tool_timeout
+                defn = self._tools.get(name)
+                timeout = defn.timeout if (defn is not None and defn.timeout is not None) else Config.load().tool_timeout
                 future = pool.submit(self._handlers[name], **args)
-                result = future.result(timeout=timeout)
+                result_timeout = None if timeout == 0 else timeout
+                try:
+                    result = future.result(timeout=result_timeout)
+                except KeyboardInterrupt:
+                    # 用户 Ctrl+C：通知子代理运行器停止，然后重新抛出中断
+                    if self._subagent_runner is not None:
+                        self._subagent_runner.stop()
+                    raise
             truncated = ToolOutputTruncator().truncate(str(result))
             return ToolResult(tool_call_id=tool_call.id, content=truncated)
         except PermissionError as e:

@@ -41,7 +41,8 @@ def _resolve_data_path(path: str) -> str:
 #   min/max   — 数值范围（含端点，float 类型）
 #   transform — "lower" / "upper"
 #   resolve   — "config"（_resolve_config_path + 存在性校验）/ "data"（_resolve_data_path）
-# 类型从字段注解（int/float/str/bool）自动推断，不在元数据中重复。
+#   split     — "str"（将 env 字符串按逗号分割为 tuple，仅 str/list/tuple 字段时有效）
+# 类型从字段注解（int/float/str/bool/tuple）自动推断，不在元数据中重复。
 
 
 @dataclass
@@ -207,6 +208,40 @@ class Config:
         "env": "KOCOR_SESSION_NAME",
     })
 
+    # --- 子代理（subagent）工具 ---
+    # 全局开关，false 时 subagent 工具不注册
+    subagent_enabled: bool = field(default=True, metadata={
+        "env": "KOCOR_SUBAGENT_ENABLED",
+    })
+    # 嵌套深度上限（1=扁平，parent(0)→child(1) 不可再 spawn）
+    subagent_max_depth: int = field(default=1, metadata={
+        "env": "KOCOR_SUBAGENT_MAX_DEPTH", "min": 1,
+    })
+    # 批量并行度上限（tasks 超过则整批拒绝）
+    subagent_max_concurrent: int = field(default=3, metadata={
+        "env": "KOCOR_SUBAGENT_MAX_CONCURRENT", "min": 1,
+    })
+    # 每个子代理的迭代预算（小于父级 max_iterations=20）
+    subagent_max_iterations: int = field(default=15, metadata={
+        "env": "KOCOR_SUBAGENT_MAX_ITERATIONS", "min": 1,
+    })
+    # 摘要字符上限（0=禁用截断）
+    subagent_max_summary_chars: int = field(default=8000, metadata={
+        "env": "KOCOR_SUBAGENT_MAX_SUMMARY_CHARS", "min": 0,
+    })
+    # 单子代理 wall-clock 超时秒（0=关，靠 max_iterations + tool_timeout 有界）
+    subagent_timeout: int = field(default=0, metadata={
+        "env": "KOCOR_SUBAGENT_TIMEOUT", "min": 0,
+    })
+    # 子代理危险命令审批：False=自动拒（默认安全），True=自动批（opt-in YOLO）
+    subagent_auto_approve: bool = field(default=False, metadata={
+        "env": "KOCOR_SUBAGENT_AUTO_APPROVE",
+    })
+    # 子代理额外屏蔽工具（逗号分隔，如 "memory,cron"）
+    subagent_blocked_tools: tuple[str, ...] = field(default=("memory",), metadata={
+        "env": "KOCOR_SUBAGENT_BLOCKED_TOOLS", "split": "str",
+    })
+
     # -----------------------------------------------------------------------
     # 单例访问
     # -----------------------------------------------------------------------
@@ -273,6 +308,7 @@ class ConfigLoader:
             value = cls._coerce(f.type, env_name, raw) if raw is not None else default
 
             value = cls._apply_transform(value, meta)
+            value = cls._apply_split(value, meta)
             value = cls._apply_resolve(value, meta)
             cls._validate(f.name, env_name, value, meta)
             kwargs[f.name] = value
@@ -316,6 +352,15 @@ class ConfigLoader:
             return value.lower()
         if transform == "upper":
             return value.upper()
+        return value
+
+    @staticmethod
+    def _apply_split(value: Any, meta: dict) -> Any:
+        """split：将字符串按逗号分割为 tuple（仅 str 类型有效）。"""
+        split = meta.get("split")
+        if split == "str" and isinstance(value, str):
+            parts = [p.strip() for p in value.split(",") if p.strip()]
+            return tuple(parts) if parts else value
         return value
 
     @staticmethod

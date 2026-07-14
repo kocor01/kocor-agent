@@ -425,7 +425,22 @@ def main() -> None:
     logger = Logger(Config.load().log_level, log_dir=Config.load().log_dir)
 
     toolManager = ToolManager()
-    toolManager.register_all()
+    # 创建事件发射器（在 SubagentRunner 之前，因为 runner 需要引用 emitter）
+    event_emitter = EventEmitter()
+
+    # 创建 LLM 与 SubagentRunner（在 register_all 之前，因为 subagent 工具注册
+    # 需要在闭包中解析 runner；runner 的 lambda 在调用时从 toolManager._subagent_runner 读取）
+    llm = LlmFactory.create()
+    if Config.load().subagent_enabled:
+        from kocor.tools.toolsets.subagent.runner import SubagentRunner
+        runner = SubagentRunner(
+            parent_llm=llm,
+            parent_tool_manager=toolManager,
+            parent_event_emitter=event_emitter,
+            depth=0,
+        )
+        toolManager._subagent_runner = runner
+    toolManager.register_all(include_subagent=Config.load().subagent_enabled)
 
     permission_mgr = PermissionManager(
         policy=Config.load().permission_policy,
@@ -437,8 +452,6 @@ def main() -> None:
 
     hook_manager = HookManager()
     hook_manager.register_all(logger=logger)
-
-    event_emitter = EventEmitter()
 
     EventSubscribe(event_emitter).subscribe_all(logger=logger)
 
@@ -456,7 +469,7 @@ def main() -> None:
         )
 
     agent = Agent(
-        llm=LlmFactory.create(),
+        llm=llm,
         tool_manager=toolManager,
         permission_mgr=permission_mgr,
         hook_manager=hook_manager,

@@ -17,6 +17,8 @@ class EventType(str, Enum):
     POST_SUMMARIZE = "post_summarize"      # 摘要生成后
     ON_ERROR = "on_error"                  # 发生错误时
     ON_BUDGET_EXHAUSTED = "on_budget_exhausted"  # 预算耗尽时
+    SUBAGENT_START = "subagent_start"            # 子代理开始执行
+    SUBAGENT_COMPLETE = "subagent_complete"     # 子代理执行完毕
 
 
 @dataclass

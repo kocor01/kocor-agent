@@ -75,3 +75,56 @@ class TestEventEmitter:
         emitter.fire(Event(type=EventType.PRE_TOOL, iteration=1, data={}))
         assert pre == [EventType.PRE_TOOL]
         assert post == []
+
+
+class TestSubagentEvents:
+    """测试子代理事件类型。"""
+
+    def test_subagent_start_event_type_exists(self):
+        assert EventType.SUBAGENT_START == "subagent_start"
+
+    def test_subagent_complete_event_type_exists(self):
+        assert EventType.SUBAGENT_COMPLETE == "subagent_complete"
+
+    def test_subagent_start_fire_and_receive(self):
+        emitter = EventEmitter()
+        received = []
+
+        def handler(event):
+            received.append(event)
+
+        emitter.subscribe(EventType.SUBAGENT_START, handler)
+        event = Event(
+            type=EventType.SUBAGENT_START,
+            iteration=0,
+            data={"subagent_id": "sa-1", "goal": "test", "depth": 1},
+        )
+        emitter.fire(event)
+
+        assert len(received) == 1
+        assert received[0].data["subagent_id"] == "sa-1"
+        assert received[0].data["depth"] == 1
+
+    def test_subagent_complete_fire_with_usage(self):
+        emitter = EventEmitter()
+        received = []
+
+        def handler(event):
+            received.append(event)
+
+        emitter.subscribe(EventType.SUBAGENT_COMPLETE, handler)
+        event = Event(
+            type=EventType.SUBAGENT_COMPLETE,
+            iteration=0,
+            data={
+                "subagent_id": "sa-1",
+                "status": "completed",
+                "duration": 12.3,
+                "usage": {"prompt_tokens": 500, "completion_tokens": 200},
+            },
+        )
+        emitter.fire(event)
+
+        assert len(received) == 1
+        assert received[0].data["status"] == "completed"
+        assert received[0].data["usage"]["prompt_tokens"] == 500

@@ -8,6 +8,8 @@ import json
 import sys
 from collections import OrderedDict
 
+from kocor.config import Config
+
 
 class PermissionManager:
     """所有工具类型的统一权限管理器。
@@ -29,6 +31,7 @@ class PermissionManager:
     POLICY_PERMISSIVE = "permissive"
     POLICY_DEFAULT = "default"
     POLICY_STRICT = "strict"
+    POLICY_NONINTERACTIVE = "noninteractive"
 
     # 安全等级常量
     SAFETY_SAFE = "safe"
@@ -71,6 +74,9 @@ class PermissionManager:
 
         # 3. 始终询问列表强制提示
         if tool_name in self._always_ask:
+            if self.policy == PermissionManager.POLICY_NONINTERACTIVE:
+                # 非交互模式：永不询问，静默拒绝
+                return False
             return self._ask_user(tool_name, args)
 
         # 4. 基于策略的决策
@@ -85,6 +91,12 @@ class PermissionManager:
             if safety == PermissionManager.SAFETY_DANGEROUS:
                 return False
             return self._ask_user(tool_name, args)
+
+        # 非交互策略（子代理）：safe/caution 放行，dangerous 按 auto_approve 决定，永不调用 input()
+        if self.policy == PermissionManager.POLICY_NONINTERACTIVE:
+            if safety == PermissionManager.SAFETY_DANGEROUS:
+                return Config.load().subagent_auto_approve
+            return True
 
         # default 策略
         if safety == PermissionManager.SAFETY_SAFE:
