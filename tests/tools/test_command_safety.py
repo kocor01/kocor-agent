@@ -156,6 +156,59 @@ class TestDetectDangerousCommand:
         level, reason = detect_dangerous_command("echo 'rm -rf / is dangerous'")
         assert level != "dangerous", f"Expected not dangerous, got {level!r}: {reason}"
 
+    # --- 新增：变量混淆绕过检测 ---
+
+    def test_variable_masking_rm_via_var(self):
+        """x=rm;$x -rf / 应被检测为 dangerous。"""
+        level, reason = detect_dangerous_command("x=rm;$x -rf /")
+        assert level == "dangerous", f"Expected 'dangerous', got {level!r}: {reason}"
+
+    def test_variable_masking_dd(self):
+        """cmd=dd; 变量赋值隐藏危险工具。"""
+        level, reason = detect_dangerous_command("cmd=dd; $cmd if=/dev/zero of=/dev/sda")
+        assert level == "dangerous", f"Expected 'dangerous', got {level!r}: {reason}"
+
+    # --- 新增：xargs 间接执行检测 ---
+
+    def test_xargs_rm(self):
+        """xargs rm 应被检测为 dangerous。"""
+        level, reason = detect_dangerous_command("find /tmp -name '*.tmp' | xargs rm")
+        assert level == "dangerous", f"Expected 'dangerous', got {level!r}: {reason}"
+
+    def test_xargs_chmod(self):
+        """xargs chmod 应被检测为 dangerous。"""
+        level, reason = detect_dangerous_command("find . -type f | xargs chmod 777")
+        assert level == "dangerous", f"Expected 'dangerous', got {level!r}: {reason}"
+
+    # --- 新增：需要审批模式检测 ---
+
+    def test_eval_caution(self):
+        """eval 应被检测为 caution。"""
+        level, reason = detect_dangerous_command("eval 'rm -rf /tmp/*'")
+        assert level == "caution", f"Expected 'caution', got {level!r}: {reason}"
+
+    def test_find_exec_caution(self):
+        """find 带 -exec 应被检测为 caution。"""
+        level, reason = detect_dangerous_command("find /tmp -name '*.log' -exec rm {} \\;")
+        assert level == "caution", f"Expected 'caution', got {level!r}: {reason}"
+
+    def test_find_delete_caution(self):
+        """find 带 -delete 应被检测为 caution。"""
+        level, reason = detect_dangerous_command("find /tmp -type f -delete")
+        assert level == "caution", f"Expected 'caution', got {level!r}: {reason}"
+
+    # --- 不误报验证 ---
+
+    def test_no_false_positive_normal_xargs(self):
+        """xargs 与安全命令组合不应误报为 dangerous。"""
+        level, reason = detect_dangerous_command("echo 'test' | xargs")
+        assert level != "dangerous", f"Expected not dangerous, got {level!r}: {reason}"
+
+    def test_no_false_positive_normal_eval(self):
+        """不含 eval 的 find 命令不应误报为 caution。"""
+        level, reason = detect_dangerous_command("find /tmp -name '*.py'")
+        assert level == "safe", f"Expected 'safe', got {level!r}: {reason}"
+
 
 class TestValidateWorkdir:
     """workdir 验证测试（保持现有行为）。"""

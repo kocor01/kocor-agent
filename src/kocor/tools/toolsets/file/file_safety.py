@@ -56,6 +56,7 @@ def _build_write_denied_prefixes() -> list[str]:
             os.path.join(home, ".docker"),
             os.path.join(home, ".config", "gh"),
             os.path.join(home, ".config", "gcloud"),
+            os.path.join(home, ".config", "autostart"),
         ]
     ]
 
@@ -66,6 +67,8 @@ _WRITE_DENIED_PREFIXES: list[str] = _build_write_denied_prefixes()
 
 # 项目级 .env 文件模式
 _ENV_FILE_PATTERN = re.compile(r"\.env(\..+)?$")
+# Shell 启动文件模式
+_SHELL_RC_PATTERN = re.compile(r"\.(?:bashrc|bash_profile|bash_login|profile|zshrc|zprofile|zlogin|cshrc|tcshrc|kshrc|shrc)$")
 
 
 def is_write_denied(path: str) -> bool:
@@ -94,6 +97,10 @@ def is_write_denied(path: str) -> bool:
     # .env 文件检查（任意路径）
     filename = os.path.basename(resolved)
     if _ENV_FILE_PATTERN.search(filename):
+        return True
+
+    # Shell 启动文件检查（任意路径，防写入 ~/.bashrc 等）
+    if _SHELL_RC_PATTERN.search(filename):
         return True
 
     return False

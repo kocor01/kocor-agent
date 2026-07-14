@@ -33,6 +33,10 @@ DANGEROUS_PATTERNS: list[tuple[str, str]] = [
     # Base64 解码后管道到 shell
     (r"\bbase64\s+(?:-d|--decode)\s*\|\s*(?:bash|sh)\b", "Dangerous: base64 decode to shell"),
     (r"\|\s*base64\s+(?:-d|--decode)\s*\|\s*(?:bash|sh)\b", "Dangerous: piped base64 decode to shell"),
+    # 危险工具通过 xargs 间接执行
+    (r"\bxargs\s+(?:rm|dd|mkfs|chmod|chown|mv)\b", "Dangerous: xargs with destructive command"),
+    # 通过变量赋值隐藏危险工具（如 x=rm;$x -rf /）
+    (r"\b\w+=(?:rm|dd|mkfs|chmod|chown|sudo)\b.*\$\{?\w+\}?", "Dangerous: variable masking dangerous tool"),
 ]
 
 # ---------------------------------------------------------------------------
@@ -51,6 +55,11 @@ REQUIRE_APPROVAL_PATTERNS: list[tuple[str, str]] = [
     (r"\bwget\b", "Approval needed: wget download"),
     (r"\bchmod\s+4[0-7][0-7]\s", "Approval needed: file permission change"),
     (r"\bsudo\s+(?!-S\s)", "Approval needed: sudo (use -S flag)"),
+    # eval 可用于绕过所有安全检查
+    (r"\beval\s", "Approval needed: eval (possible safety bypass)"),
+    # find 递归执行/删除
+    (r"\bfind\s+.*\s+-exec\s", "Approval needed: find with exec"),
+    (r"\bfind\s+.*\s+-delete\b", "Approval needed: find with delete"),
 ]
 
 # ---------------------------------------------------------------------------

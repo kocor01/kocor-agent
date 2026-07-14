@@ -237,8 +237,8 @@ class Config:
     subagent_auto_approve: bool = field(default=False, metadata={
         "env": "KOCOR_SUBAGENT_AUTO_APPROVE",
     })
-    # 子代理额外屏蔽工具（逗号分隔，如 "memory,cron"）
-    subagent_blocked_tools: tuple[str, ...] = field(default=("memory",), metadata={
+    # 子代理额外屏蔽工具（逗号分隔，如 "memory,cronjob"）
+    subagent_blocked_tools: tuple[str, ...] = field(default=("memory", "cronjob"), metadata={
         "env": "KOCOR_SUBAGENT_BLOCKED_TOOLS", "split": "str",
     })
 

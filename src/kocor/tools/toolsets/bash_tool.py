@@ -211,7 +211,7 @@ class ProcessTool:
         "'log' (full output with pagination), 'wait' (block until done), "
         "'kill' (terminate)."
     )
-    SAFETY_LEVEL = PermissionManager.SAFETY_CAUTION
+    SAFETY_LEVEL = PermissionManager.SAFETY_DANGEROUS
     PARAMETERS = {
         "type": "object",
         "properties": {

@@ -72,7 +72,7 @@ class TestSubagentConfig:
 
     def test_default_subagent_blocked_tools(self):
         cfg = Config()
-        assert cfg.subagent_blocked_tools == ("memory",)
+        assert cfg.subagent_blocked_tools == ("memory", "cronjob")
 
     # --- 环境变量加载 ---
     def test_load_subagent_enabled_from_env(self):
@@ -164,4 +164,4 @@ class TestSubagentConfig:
         os.environ.pop("KOCOR_SUBAGENT_BLOCKED_TOOLS", None)
         # 需要重建 Config 以读取默认值
         cfg = Config()
-        assert cfg.subagent_blocked_tools == ("memory",)
+        assert cfg.subagent_blocked_tools == ("memory", "cronjob")
