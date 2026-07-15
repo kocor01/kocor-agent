@@ -24,9 +24,12 @@ def test_cron_worker_module_importable():
 
 
 @pytest.mark.skipif(
-    not (Path.home() / ".kocor" / ".env").exists()
-    and "KOCOR_API_KEY" not in (getattr(os, "environ", {})),
-    reason="需要 LLM 配置（~/.kocor/.env 或 KOCOR_API_KEY）才能 spawn 子进程",
+    not (
+        (Path(".env").exists())
+        or "OPENAI_API_KEY" in os.environ
+        or "ANTHROPIC_API_KEY" in os.environ
+    ),
+    reason="需要 LLM 配置（.env、OPENAI_API_KEY 或 ANTHROPIC_API_KEY）才能 spawn 子进程",
 )
 def test_worker_spawn_exits_on_stdin_eof():
     """spawn cron_worker，关闭 stdin 后子进程应正常退出。"""
@@ -41,7 +44,7 @@ def test_worker_spawn_exits_on_stdin_eof():
     proc.stdin.close()
 
     try:
-        stdout, stderr = proc.wait(timeout=20)
+        stdout, stderr = proc.communicate(timeout=20)
     except subprocess.TimeoutExpired:
         proc.kill()
         pytest.fail("cron_worker 未在 20s 内退出")
