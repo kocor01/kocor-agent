@@ -108,14 +108,12 @@ class Agent:
 
     # ── 公开方法 ──
 
-    def stop(self) -> None:
-        """请求在当前迭代边界停止 ReAct 循环。"""
-        self.tool_manager.stop_cron_scheduler()
-        self._cron_started = False
-        self.loop.stop()
+    def _execute_with_session(self, user_input: str) -> str | None:
+        """执行会话管理前置/后置工作。
 
-    def run(self, user_input: str) -> str:
-        """执行一次完整的 Agent 循环。"""
+        返回 None 表示继续执行 ReAct 循环；
+        返回非 None 表示命令已处理完毕（如内置命令、slash 命令），可直接返回结果。
+        """
         self._ensure_cron_started()
         if user_input.startswith("/"):
             cmd_result = self._handle_builtin_commands(user_input)
@@ -126,6 +124,19 @@ class Agent:
             result = self._handle_slash_command(user_input)
             self._session_after_run()
             self._check_nudge()
+            return result
+        return None  # 继续执行 ReAct 循环
+
+    def stop(self) -> None:
+        """请求在当前迭代边界停止 ReAct 循环。"""
+        self.tool_manager.stop_cron_scheduler()
+        self._cron_started = False
+        self.loop.stop()
+
+    def run(self, user_input: str) -> str:
+        """执行一次完整的 Agent 循环。"""
+        result = self._execute_with_session(user_input)
+        if result is not None:
             return result
         result = self.loop.run(user_input)
         self._session_after_run()
@@ -165,17 +176,8 @@ class Agent:
 
     def stream(self, user_input: str) -> Iterator[StreamChunk]:
         """流式执行 Agent 循环。"""
-        self._ensure_cron_started()
-        if user_input.startswith("/"):
-            cmd_result = self._handle_builtin_commands(user_input)
-            if cmd_result is not None:
-                yield StreamChunk(content=cmd_result, is_final=True)
-                return
-        self._session_before_run()
-        if self.tool_manager.skill_manager and user_input.startswith("/"):
-            result = self._handle_slash_command(user_input)
-            self._session_after_run()
-            self._check_nudge()
+        result = self._execute_with_session(user_input)
+        if result is not None:
             yield StreamChunk(content=result, is_final=True)
             return
         yield from self.loop.stream(user_input)
