@@ -51,7 +51,7 @@ class TestAgentBuilderSubagent:
 
     def test_build_subagent_enabled(self, mock_llm_factory):
         """subagent_enabled=True 时 build_subagent 应设置 _subagent_runner。"""
-        from kocor.cli_builder import AgentBuilder
+        from kocor._cli.builder import AgentBuilder
         builder = AgentBuilder()
         builder.build_llm()
         result = builder.build_subagent()
@@ -64,7 +64,7 @@ class TestAgentBuilderSubagent:
         original = cfg.subagent_enabled
         cfg.subagent_enabled = False
         try:
-            from kocor.cli_builder import AgentBuilder
+            from kocor._cli.builder import AgentBuilder
             builder = AgentBuilder()
             builder.build_llm()
             builder.build_subagent()
@@ -78,7 +78,7 @@ class TestAgentBuilderAssembly:
 
     def test_build_llm(self, mock_llm_factory):
         """build_llm 应创建 LLM 并返回 self 以支持链式调用。"""
-        from kocor.cli_builder import AgentBuilder
+        from kocor._cli.builder import AgentBuilder
         builder = AgentBuilder()
         result = builder.build_llm()
         assert result is builder
@@ -86,7 +86,7 @@ class TestAgentBuilderAssembly:
 
     def test_build_tools(self):
         """build_tools 应注册工具并返回 self。"""
-        from kocor.cli_builder import AgentBuilder
+        from kocor._cli.builder import AgentBuilder
         builder = AgentBuilder()
         result = builder.build_tools()
         assert result is builder
@@ -94,7 +94,7 @@ class TestAgentBuilderAssembly:
 
     def test_build_permission(self):
         """build_permission 应创建 PermissionManager 并返回 self。"""
-        from kocor.cli_builder import AgentBuilder
+        from kocor._cli.builder import AgentBuilder
         builder = AgentBuilder()
         result = builder.build_permission()
         assert result is builder
@@ -104,7 +104,7 @@ class TestAgentBuilderAssembly:
 
     def test_build_hooks(self, mock_llm_factory):
         """build_hooks 应注册钩子并返回 self。"""
-        from kocor.cli_builder import AgentBuilder
+        from kocor._cli.builder import AgentBuilder
         builder = AgentBuilder()
         logger = MagicMock()
         result = builder.build_llm().build_hooks(logger=logger)
@@ -116,7 +116,7 @@ class TestAgentBuilderAssembly:
         original = cfg.session_enabled
         cfg.session_enabled = True
         try:
-            from kocor.cli_builder import AgentBuilder
+            from kocor._cli.builder import AgentBuilder
             builder = AgentBuilder()
             result = builder.build_session()
             assert result is builder
@@ -130,7 +130,7 @@ class TestAgentBuilderAssembly:
         original = cfg.session_enabled
         cfg.session_enabled = False
         try:
-            from kocor.cli_builder import AgentBuilder
+            from kocor._cli.builder import AgentBuilder
             builder = AgentBuilder()
             result = builder.build_session()
             assert result is builder
@@ -140,7 +140,7 @@ class TestAgentBuilderAssembly:
 
     def test_full_assembly(self, mock_llm_factory):
         """完整链式调用应返回组装正确的 Agent。"""
-        from kocor.cli_builder import AgentBuilder
+        from kocor._cli.builder import AgentBuilder
         agent = (
             AgentBuilder()
             .build_llm()
@@ -155,7 +155,7 @@ class TestAgentBuilderAssembly:
 
     def test_agent_can_run(self, mock_llm_factory):
         """组装后的 Agent 应能正常执行 run()。"""
-        from kocor.cli_builder import AgentBuilder
+        from kocor._cli.builder import AgentBuilder
         agent = (
             AgentBuilder()
             .build_llm()
@@ -168,7 +168,7 @@ class TestAgentBuilderAssembly:
 
     def test_builder_chain_returns_self(self, mock_llm_factory):
         """链式调用各方法应返回 self。"""
-        from kocor.cli_builder import AgentBuilder
+        from kocor._cli.builder import AgentBuilder
         builder = AgentBuilder()
         assert builder.build_llm() is builder
         assert builder.build_tools() is builder

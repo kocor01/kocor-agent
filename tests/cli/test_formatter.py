@@ -8,7 +8,7 @@ from unittest.mock import patch
 
 import pytest
 
-from kocor.cli import _StreamFormatter
+from kocor._cli.output import _StreamFormatter
 from kocor.llm_provider.message import StreamChunk
 
 

@@ -1,0 +1,298 @@
+"""CLI 输出渲染模块 — 流式格式化、欢迎界面、Markdown 渲染。
+
+从 cli.py 提取，职责单一化：所有打印/渲染逻辑汇集于此。
+"""
+
+from __future__ import annotations
+
+import re
+import shutil
+from io import StringIO
+from typing import Any, Iterator
+
+from rich import box
+from rich.console import Console
+from rich.markdown import Markdown
+from rich.panel import Panel
+from rich.text import Text
+
+from kocor import __version__
+from kocor.llm_provider.message import StreamChunk
+from kocor.skill.types import InvokeStrategy
+
+
+class _StreamFormatter:
+    """管理流式输出的格式状态。"""
+
+    @staticmethod
+    def _detect_width() -> int:
+        """检测终端宽度，设置合理的下限和上限。"""
+        try:
+            cols = shutil.get_terminal_size().columns
+            return max(58, min(cols, 150))
+        except Exception:
+            return 58
+
+    def __init__(self, width: int | None = None):
+        if width is None:
+            width = self._detect_width()
+        self.width = width
+        self.round_num = 0
+        self.pending_round = False
+        self.tool_calls: list = []
+        self.has_reasoning = False
+        self.has_content = False
+        self.has_tool_section = False
+        self.tool_result_idx = 0
+        self._content_has_printed_any = False
+        self._content_buffer: str = ""
+        self._in_code_block: bool = False
+        self._code_block_buffer: str = ""
+        self._block_buffer: str = ""
+
+    @staticmethod
+    def _output(*args, **kwargs) -> None:
+        """统一的输出出口。所有输出通过此方法，便于测试拦截和后续重构。"""
+        print(*args, **kwargs)
+
+    def _round_header(self, n: int) -> None:
+        title = f"⚡ 第 {n} 次请求"
+        fill = self.width - 2 - len(title)
+        self._output(f"\n── {title} {'─' * max(0, fill)}")
+
+    def _sep(self, style: str = "dim") -> None:
+        """打印一条自适应宽度的彩色分隔线。"""
+        buf = StringIO()
+        Console(file=buf, width=self.width).print(Text("─" * self.width, style=style))
+        self._output(buf.getvalue())
+
+    def _render_markdown(self, text: str) -> None:
+        """将已完整的段落文本通过 rich Markdown 渲染后输出。"""
+        text = text.strip()
+        if not text:
+            return
+        buf = StringIO()
+        Console(file=buf, width=self.width).print(Markdown(text))
+        rendered = buf.getvalue()
+        if rendered:
+            self._output(rendered, end="", flush=True)
+
+    def _flush_block(self) -> None:
+        """刷新并渲染已累积的文本块（表格、段落等）。"""
+        block = self._block_buffer.strip()
+        self._block_buffer = ""
+        if block:
+            self._render_markdown(block)
+
+    def handle_chunk(self, chunk) -> None:
+        if not chunk.tool_result and not self._in_round():
+            self.round_num += 1
+            self.pending_round = True
+
+        if self.pending_round and (chunk.reasoning or chunk.content or chunk.tool_calls or chunk.is_final):
+            self._round_header(self.round_num)
+            self.pending_round = False
+
+        self._handle_reasoning(chunk)
+        self._handle_content(chunk)
+        self._handle_tool_calls(chunk)
+        self._handle_tool_results(chunk)
+        self._handle_end_of_round(chunk)
+
+    def _in_round(self) -> bool:
+        return bool(self.pending_round or self.has_reasoning or self.has_content or self.has_tool_section)
+
+    def _handle_reasoning(self, chunk) -> None:
+        if not chunk.reasoning:
+            return
+        if not self.has_reasoning:
+            self._output("\n\U0001f9e0 思维过程")
+            self._sep("dim yellow")
+            self.has_reasoning = True
+        self._output(chunk.reasoning, end="", flush=True)
+
+    def _handle_content(self, chunk) -> None:
+        if not chunk.content:
+            return
+        content = self._prepare_content(chunk.content)
+        if not content:
+            return
+        self._ensure_content_section()
+
+        self._content_buffer += content
+        while "\n" in self._content_buffer:
+            line, self._content_buffer = self._content_buffer.split("\n", 1)
+            self._process_line(line.rstrip())
+
+    def _prepare_content(self, content: str) -> str:
+        """去除前导空行（只在首次输出时）。"""
+        if not self._content_has_printed_any:
+            content = content.lstrip("\n")
+        return content
+
+    def _ensure_content_section(self) -> None:
+        """确保内容区块头部已输出（仅首次调用时打印）。"""
+        if not self.has_content:
+            self._output("\n\U0001f4ac 回答内容")
+            self._sep("dim cyan")
+            self.has_content = True
+            self._content_has_printed_any = True
+
+    def _process_line(self, line: str) -> None:
+        """处理一行内容，根据行上下文分发到不同渲染路径。"""
+        # 代码块闭合检测：在代码块中时，仅精确匹配 ``` 才闭合
+        if self._in_code_block and line == "```":
+            self._flush_block()
+            self._code_block_buffer += line
+            self._render_markdown(self._code_block_buffer)
+            self._code_block_buffer = ""
+            self._in_code_block = False
+            return
+        # 代码块开启检测：``` 或 ```lang 标准 fence 格式
+        if not self._in_code_block and re.fullmatch(r"```\S*", line):
+            self._flush_block()
+            self._in_code_block = True
+            self._code_block_buffer = line + "\n"
+            return
+
+        if self._in_code_block:
+            self._code_block_buffer += line + "\n"
+        elif line == "":
+            # 空行 = 块边界，渲染已累积的表格块
+            self._flush_block()
+        elif re.fullmatch(r"[-*_]{3,}\s*", line):
+            # Markdown 水平线（--- / *** / ___）→ 输出简洁分隔线
+            self._flush_block()
+            self._sep("dim white")
+        elif line.startswith("|"):
+            # 表格行——累积到缓冲区，等待整表渲染
+            self._block_buffer += line + "\n"
+        else:
+            # 普通行——先刷新未闭合的表格块，再即时渲染
+            self._flush_block()
+            self._render_markdown(line)
+
+    def _handle_tool_calls(self, chunk) -> None:
+        if not chunk.tool_calls:
+            return
+        seen_ids = {tc.id for tc in self.tool_calls}
+        for tc in chunk.tool_calls:
+            if tc.id not in seen_ids:
+                self.tool_calls.append(tc)
+                seen_ids.add(tc.id)
+        if not self.has_tool_section and not chunk.tool_result:
+            self._output("\n\U0001f527 工具调用")
+            self._sep("dim green")
+            self.has_tool_section = True
+
+    def _handle_tool_results(self, chunk) -> None:
+        if not chunk.tool_result:
+            return
+        if self.tool_result_idx < len(self.tool_calls):
+            tc = self.tool_calls[self.tool_result_idx]
+            content = chunk.tool_result.content
+            # 智能截断：保留首尾，确保关键信息（尤其是错误消息）不丢失
+            if len(content) > 1000:
+                head = content[:500]
+                tail = content[-400:]
+                content = f"{head}\n...\n{tail}"
+            if self.tool_result_idx > 0:
+                self._output()
+            self._output(f"{self.tool_result_idx + 1:2}. {tc.function.name}({tc.function.arguments})")
+            self._sep("dim magenta")
+            self._output(f"{content}")
+            self.tool_result_idx += 1
+
+    def _flush_all_buffers(self) -> None:
+        """刷新所有残留缓冲区中的内容。"""
+        self._flush_block()
+        if self._content_buffer.strip():
+            self._render_markdown(self._content_buffer)
+        self._content_buffer = ""
+        if self._code_block_buffer:
+            self._render_markdown(self._code_block_buffer)
+            self._code_block_buffer = ""
+            self._in_code_block = False
+
+    def _handle_end_of_round(self, chunk) -> None:
+        if not chunk.is_final:
+            return
+        self._flush_all_buffers()
+        self.has_reasoning = False
+        self.has_content = False
+        self.has_tool_section = False
+        self._content_has_printed_any = False
+        if chunk.tool_result and self.tool_result_idx >= len(self.tool_calls) and self.tool_calls:
+            self.tool_calls.clear()
+            self.tool_result_idx = 0
+
+    def flush_remaining(self) -> None:
+        self._flush_all_buffers()
+        for tc in self.tool_calls[self.tool_result_idx:]:
+            self._output(f"• {tc.function.name}({tc.function.arguments})")
+
+
+def _print_welcome(
+    session_manager: Any = None,
+    skill_manager: Any = None,
+) -> None:
+    """打印彩色启动欢迎界面，包含品牌头部、会话信息和 Slash 命令。"""
+    console = Console()
+
+    # ── 品牌头部（使用 Rich Panel + 圆角边框 + 青色主题） ──
+    header = Text()
+    header.append("⚡ Kocor Agent", style="bold cyan")
+    header.append(" - ")
+    header.append("小而美的 LLM 自主 Agent 助手", style="italic dim white")
+    header.append("\n")
+    header.append(f" V{__version__}", style="yellow")
+
+    console.print(Panel(
+        header,
+        box=box.ROUNDED,
+        border_style="cyan",
+        padding=(1, 2),
+    ))
+
+    # ── 会话信息 ──
+    if session_manager:
+        entry = session_manager.get_or_create_session()
+        if entry.was_auto_reset:
+            reason_map = {"idle": "空闲超时", "daily": "每日重置"}
+            reason = reason_map.get(entry.auto_reset_reason or "", entry.auto_reset_reason or "")
+            print(f" ⏳  会话已重置（{reason}）")
+        elif entry.message_count > 0:
+            title = f"「{entry.title}」" if entry.title else ""
+            print(f"")
+            print(f" 📋  继续上次会话 {title} · ID: {entry.session_id} · {entry.message_count} 条消息")
+        else:
+            print(f"")
+            print(f" 📋  新会话")
+        print()
+
+    # ── Slash 命令列表 ──
+    if skill_manager:
+        skills = skill_manager.list_skills(enabled_only=True)
+        slash_names = sorted(
+            f"/{s.name}" for s in skills
+            if s.invoke_strategy in (InvokeStrategy.SLASH, InvokeStrategy.BOTH)
+        )
+        if slash_names:
+            cmd = Text(" 快速命令:  ", style="bold")
+            for i, name in enumerate(slash_names):
+                if i > 0:
+                    cmd.append("  ", style="dim")
+                cmd.append(name, style="bold green")
+            console.print(cmd)
+
+    # ── 底部提示 ──
+    console.print(Text("─" * max(4, _StreamFormatter._detect_width() - 2), style="dim"))
+    print(" 输入 exit 或 Ctrl+C 退出")
+    print()
+
+
+def _print_stream_formatted(chunks: Iterator[StreamChunk]) -> None:
+    formatter = _StreamFormatter()
+    for chunk in chunks:
+        formatter.handle_chunk(chunk)
+    formatter.flush_remaining()

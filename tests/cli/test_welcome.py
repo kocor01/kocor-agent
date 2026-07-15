@@ -28,7 +28,7 @@ class TestPrintWelcome:
 
     def _capture_welcome(self, session_manager=None, skill_manager=None) -> str:
         """捕获 _print_welcome 的全部输出（包括 Rich console.print）。"""
-        from kocor.cli import _print_welcome
+        from kocor._cli.output import _print_welcome
 
         buf = io.StringIO()
         with patch("sys.stdout", buf):
