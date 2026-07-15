@@ -209,6 +209,35 @@ class TestDetectDangerousCommand:
         level, reason = detect_dangerous_command("find /tmp -name '*.py'")
         assert level == "safe", f"Expected 'safe', got {level!r}: {reason}"
 
+    # --- 新增：shlex 语义解析层检测 ---
+
+    def test_shlex_indirect_sh_caution(self):
+        """sh 间接调用应被 shlex 层检测为 caution。"""
+        level, reason = detect_dangerous_command("sh -c 'echo hello'")
+        assert level == "caution", f"Expected 'caution', got {level!r}: {reason}"
+
+    def test_shlex_indirect_bash_caution(self):
+        """bash 间接调用（无害内容）应被检测为 caution。"""
+        level, reason = detect_dangerous_command("bash -c 'echo hello'")
+        assert level == "caution", f"Expected 'caution', got {level!r}: {reason}"
+
+    def test_shlex_indirect_other_shells(self):
+        """zsh/ksh/dash 间接调用应触发 caution。"""
+        for shell in ("zsh", "dash", "ksh"):
+            level, reason = detect_dangerous_command(f"{shell} -c 'echo test'")
+            assert level == "caution", f"{shell} -c should be caution, got {level!r}"
+
+    def test_shlex_function_definition_caught(self):
+        """函数定义内嵌 rm -rf / 不应低于 caution。"""
+        level, reason = detect_dangerous_command("f() { rm -rf /; }; f")
+        assert level != "safe", f"Should not be safe, got {level!r}: {reason}"
+
+    def test_shlex_safe_commands_still_safe(self):
+        """安全命令经过 shlex 层仍为 safe。"""
+        for cmd in ("ls -la", "echo hello", "python3 --version", "git status"):
+            level, reason = detect_dangerous_command(cmd)
+            assert level == "safe", f"{cmd!r} should be safe, got {level!r}: {reason}"
+
 
 class TestValidateWorkdir:
     """workdir 验证测试（保持现有行为）。"""

@@ -1,15 +1,135 @@
 """命令安全审查模块：危险命令检测、workdir 验证。
 
 提供三层防护：
-1. 硬阻断模式 — 无论如何都不允许执行
-2. 需要审批模式 — 默认/strict 策略下需要用户确认
-3. 命令规范化 — 在检测前处理常见的 shell 混淆绕过（引号分段、base64 等）
+1. shlex 语义解析层 — 准确识别命令名和参数，避免正则误匹配和安全绕过
+2. 正则匹配层 — 兜底捕获 shlex 无法解析的混淆命令
+3. 命令规范化 — 在检测前处理常见的 shell 混淆绕过（引号分段等）
 
 规范化只用于模式匹配检测，实际执行的命令不变。
 """
 
 import re
+import shlex
 from typing import Optional
+
+# ---------------------------------------------------------------------------
+# shlex 语义解析：准确识别命令名和参数
+# ---------------------------------------------------------------------------
+
+# 已知危险命令：命令名一经出现即视为 dangerous
+_DANGEROUS_COMMANDS: frozenset[str] = frozenset({
+    "mkfs", "mkfs.ext2", "mkfs.ext3", "mkfs.ext4", "mkfs.btrfs",
+    "mkfs.xfs", "mkfs.fat", "mkfs.ntfs",
+    "dd", "usermod", "passwd", "xmrig", "minerd", "cryptominer",
+})
+
+# 已知危险命令及触发危险级别的参数组合
+# 注意：rm 的危险级别（rm -rf /）由 regex 层处理（需检查目标路径是否为 /），
+# shlex 层不包含 rm 的 dangerous 规则，避免误判 rm -rf ./node_modules。
+_DANGEROUS_COMMAND_RULES: dict[str, list[tuple[list[str], str]]] = {
+}
+
+# 已知需审批命令及触发 caution 的参数组合
+# 空 trigger_args（如 "rm": [([], "…")]）表示任何该命令调用都触发 caution。
+# 若需对特定参数跳过检查（如 sudo -S），在 _SAFE_SKIP_FLAGS 中定义。
+_REQUIRE_APPROVAL_COMMANDS: dict[str, list[tuple[list[str], str]]] = {
+    "rm": [
+        ([], "Approval needed: rm command"),
+    ],
+    "chmod": [
+        (["-R", "--recursive"], "Approval needed: recursive chmod"),
+        ([], "Approval needed: file permission change"),
+    ],
+    "chown": [
+        (["-R", "--recursive"], "Approval needed: recursive chown"),
+    ],
+    "kill": [
+        ([], "Approval needed: kill process"),
+    ],
+    "killall": [
+        ([], "Approval needed: killall process"),
+    ],
+    "pkill": [
+        ([], "Approval needed: pkill process"),
+    ],
+    "nohup": [
+        ([], "Approval needed: nohup background"),
+    ],
+    "wget": [
+        ([], "Approval needed: wget download"),
+    ],
+    "sudo": [
+        ([], "Approval needed: sudo (use -S flag if needed)"),
+    ],
+    "eval": [
+        ([], "Approval needed: eval (possible safety bypass)"),
+    ],
+    "find": [
+        (["-exec"], "Approval needed: find with exec"),
+        (["-delete"], "Approval needed: find with delete"),
+    ],
+}
+
+# 安全跳过标记：某些命令带特定参数时无需 caution
+# 如 sudo -S（从 stdin 读密码）是安全用法
+_SAFE_SKIP_FLAGS: dict[str, frozenset[str]] = {
+    "sudo": frozenset({"-S"}),
+}
+
+
+def _parse_command_tokens(command: str) -> list[str]:
+    """将命令解析为 token 列表，失败时返回空列表。"""
+    try:
+        return shlex.split(command)
+    except ValueError:
+        return []
+
+
+def _check_tokens(tokens: list[str]) -> tuple[str, str]:
+    """基于 token 语义检查命令安全性。
+
+    Returns:
+        ("safe"/"caution"/"dangerous", 原因描述或 "")
+    """
+    if not tokens:
+        return "safe", ""
+
+    cmd_name = tokens[0]
+    args = tokens[1:]
+
+    # 危险命令（命令名匹配即危险）
+    if cmd_name in _DANGEROUS_COMMANDS:
+        return "dangerous", f"Dangerous: {cmd_name} command"
+
+    # 危险命令规则（参数匹配）
+    if cmd_name in _DANGEROUS_COMMAND_RULES:
+        rules = _DANGEROUS_COMMAND_RULES[cmd_name]
+        for trigger_args, reason in rules:
+            if not trigger_args:
+                return "dangerous", reason
+            if any(ta in args for ta in trigger_args):
+                return "dangerous", reason
+        # 命令名匹配但无危险参数 → 降级 caution
+        return "caution", f"Approval needed: {cmd_name} command"
+
+    # 安全跳过检查：某些命令带特定参数时无需 caution
+    # 如 sudo -S（从 stdin 读密码）是安全用法
+    if cmd_name in _SAFE_SKIP_FLAGS:
+        if any(flag in args for flag in _SAFE_SKIP_FLAGS[cmd_name]):
+            return "safe", ""
+
+    # 需审批命令规则
+    if cmd_name in _REQUIRE_APPROVAL_COMMANDS:
+        rules = _REQUIRE_APPROVAL_COMMANDS[cmd_name]
+        for trigger_args, reason in rules:
+            if not trigger_args or any(ta in args for ta in trigger_args):
+                return "caution", reason
+
+    # 间接 shell 调用检测
+    if cmd_name in ("sh", "bash", "zsh", "dash", "ksh"):
+        return "caution", f"Approval needed: {cmd_name} shell invocation"
+
+    return "safe", ""
 
 # ---------------------------------------------------------------------------
 # 硬阻断模式：无论如何都不允许执行
@@ -130,7 +250,10 @@ def _normalize_command(command: str) -> str:
 def detect_dangerous_command(command: str) -> tuple[str, str]:
     """检测命令风险等级。
 
-    先检查原始命令，再检查规范化后的命令（防绕过）。
+    三层防护：
+    1. 正则 dangerous 层 — 最高优先级，直接命中危险模式（如 rm -rf /）
+    2. shlex 语义解析层 — 准确识别命令名和参数
+    3. 正则 caution 层 — 兜底捕获需审批的命令
 
     Returns:
         ("safe"/"caution"/"dangerous", 原因描述或 "")
@@ -138,15 +261,22 @@ def detect_dangerous_command(command: str) -> tuple[str, str]:
     if not command:
         return "safe", ""
 
-    # 规范化（仅用于模式匹配检测，不影响实际执行）
     normalized = _normalize_command(command)
 
-    # 检查原始命令和规范化版本的并集（优先用原始命令检测 "dangerous"）
+    # 1. 正则 dangerous 层（最高优先级）：直接命中危险模式
     for cmd in (command, normalized):
         for pattern, reason in DANGEROUS_PATTERNS:
             if re.search(pattern, cmd):
                 return "dangerous", reason
 
+    # 2. shlex 语义解析层：准确识别命令名和参数，防遗漏
+    tokens = _parse_command_tokens(command)
+    if tokens:
+        level, reason = _check_tokens(tokens)
+        if level != "safe":
+            return level, reason
+
+    # 3. 正则 caution 层：兜底捕获需审批的命令
     for cmd in (command, normalized):
         for pattern, reason in REQUIRE_APPROVAL_PATTERNS:
             if re.search(pattern, cmd):
