@@ -11,6 +11,28 @@ from kocor.llm_provider.message import Message
 from kocor.tools.definitions import ToolDefinition
 
 
+def _is_cjk(char: str) -> bool:
+    """判断字符是否为 CJK 字符（含全角标点、扩展区汉字等）。
+
+    覆盖范围：
+    - CJK Unified Ideographs (U+4E00-U+9FFF)
+    - CJK Extension A (U+3400-U+4DBF)
+    - CJK Extension B (U+20000-U+2A6DF)
+    - CJK Extension C (U+2A700-U+2B73F)
+    - CJK Symbols and Punctuation (U+3000-U+303F)
+    - Fullwidth Forms (U+FF00-U+FFEF)
+    """
+    cp = ord(char)
+    return (
+        (0x4E00 <= cp <= 0x9FFF)   # CJK Unified Ideographs
+        or (0x3400 <= cp <= 0x4DBF)  # CJK Extension A
+        or (0x20000 <= cp <= 0x2A6DF)  # CJK Extension B
+        or (0x2A700 <= cp <= 0x2B73F)  # CJK Extension C
+        or (0x3000 <= cp <= 0x303F)  # CJK Symbols and Punctuation
+        or (0xFF00 <= cp <= 0xFFEF)  # Fullwidth Forms
+    )
+
+
 class TokenCounter:
     """Token 估算器。
 
@@ -38,7 +60,7 @@ class TokenCounter:
         if not text:
             return 0
 
-        chinese_chars = sum(1 for c in text if '一' <= c <= '鿿')
+        chinese_chars = sum(1 for c in text if _is_cjk(c))
         ascii_chars = len(text) - chinese_chars
 
         token_estimate = (ascii_chars / self.ENGLISH_RATE) + (chinese_chars / self.CHINESE_RATE)

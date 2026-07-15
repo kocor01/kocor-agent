@@ -49,6 +49,42 @@ class TestTokenCounter:
         # total ~= 6.75
         assert 4 <= n <= 10
 
+    # ---- CJK 范围扩展测试 ----
+
+    def test_cjk_fullwidth_punctuation(self):
+        """全角逗号、句号等应被识别为 CJK 字符。"""
+        text = "，。！？"
+        n = self.counter.count(text)
+        # 4 个全角标点 / 1.5 ≈ 2.67
+        assert 2 <= n <= 4
+
+    def test_cjk_extension_a(self):
+        """CJK Extension A 区汉字（U+3400）应被识别为 CJK。"""
+        # 用足量字符让 CJK/ASCII 估算差异明显
+        text = "㐀㐁㐂㐃㐄㐅㐆㐇"  # 8 chars, U+3400+
+        n = self.counter.count(text)
+        # 如果被当作 CJK: 8/1.5 ≈ 5; 如果被当作 ASCII: 8/4 = 2
+        assert n >= 3, f"Expected ≥3 if CJK, got {n}"
+
+    def test_cjk_fullwidth_forms(self):
+        """全角字母（U+FF21 Ａ）应被识别为 CJK。"""
+        text = "ＡＢＣＤＥＦＧＨ"  # 8 chars
+        n = self.counter.count(text)
+        assert n >= 3, f"Expected ≥3 if CJK, got {n}"
+
+    def test_cjk_symbols_punctuation(self):
+        """CJK Symbols and Punctuation（U+3000-U+303F）应被识别。"""
+        text = "　、。〃〄々"  # 6 chars
+        n = self.counter.count(text)
+        assert n >= 3, f"Expected ≥3 if CJK, got {n}"
+
+    def test_cjk_basic_unchanged(self):
+        """基本区汉字（你好）仍被识别为 CJK。"""
+        text = "你好"
+        n = self.counter.count(text)
+        # 2 / 1.5 ≈ 1.33
+        assert 1 <= n <= 3
+
     def test_count_message_plain_text(self):
         msg = Message(role="assistant", content="你好")
         n = self.counter.count_message(msg)
