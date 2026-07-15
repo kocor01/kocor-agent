@@ -316,6 +316,18 @@ class TestOpenAINormalizeOutEdgeCases:
         Config.reset()
         Config._instance = Config(provider="openai")
 
+    def _make_response(self, mock_choice):
+        """将 mock choice 包装为完整 response 对象。"""
+        mock_response = MagicMock()
+        mock_response.choices = [mock_choice]
+        mock_response.usage = MagicMock(
+            prompt_tokens=0,
+            completion_tokens=0,
+            total_tokens=0,
+            prompt_tokens_details=None,
+        )
+        return mock_response
+
     def test_choice_without_tool_calls(self):
         """无 tool_calls 的 choice。"""
         client = OpenAIClient()
@@ -325,7 +337,8 @@ class TestOpenAINormalizeOutEdgeCases:
         mock_choice.message.tool_calls = None
         mock_choice.message.reasoning = None
 
-        result = client._normalize_out(mock_choice)
+        mock_response = self._make_response(mock_choice)
+        result = client._normalize_out(mock_response)
 
         assert result.content == "Hello world"
         assert result.tool_calls == []
@@ -340,7 +353,8 @@ class TestOpenAINormalizeOutEdgeCases:
         mock_choice.message.tool_calls = None
         mock_choice.message.reasoning = "这是推理过程"
 
-        result = client._normalize_out(mock_choice)
+        mock_response = self._make_response(mock_choice)
+        result = client._normalize_out(mock_response)
 
         assert result.content == "解析结果"
         assert result.reasoning == "这是推理过程"
@@ -360,7 +374,8 @@ class TestOpenAINormalizeOutEdgeCases:
         mock_choice.message.tool_calls = [mock_tc]
         mock_choice.message.reasoning = "读取文件..."
 
-        result = client._normalize_out(mock_choice)
+        mock_response = self._make_response(mock_choice)
+        result = client._normalize_out(mock_response)
 
         assert len(result.tool_calls) == 1
         assert result.tool_calls[0].function.name == "read_file"
@@ -387,7 +402,8 @@ class TestOpenAINormalizeOutEdgeCases:
         mock_choice.message.tool_calls = [mock_tc1, mock_tc2]
         mock_choice.message.reasoning = None
 
-        result = client._normalize_out(mock_choice)
+        mock_response = self._make_response(mock_choice)
+        result = client._normalize_out(mock_response)
 
         assert len(result.tool_calls) == 2
 
@@ -400,8 +416,9 @@ class TestOpenAINormalizeOutEdgeCases:
         mock_choice.message.tool_calls = None
         mock_choice.message.reasoning = None
 
+        mock_response = self._make_response(mock_choice)
         usage = Usage(prompt_tokens=10, completion_tokens=20, total_tokens=30, cached_tokens=5)
-        result = client._normalize_out(mock_choice, usage=usage)
+        result = client._normalize_out(mock_response, usage=usage)
 
         assert result.usage is not None
         assert result.usage.prompt_tokens == 10
@@ -417,7 +434,8 @@ class TestOpenAINormalizeOutEdgeCases:
         mock_choice.message.tool_calls = None
         mock_choice.message.reasoning = None
 
-        result = client._normalize_out(mock_choice)
+        mock_response = self._make_response(mock_choice)
+        result = client._normalize_out(mock_response)
 
         assert result.content == ""
 
@@ -428,16 +446,16 @@ class TestOpenAINormalizeOutEdgeCases:
 
 
 class TestOpenAIToolConversion:
-    """_to_openai_tool 工具格式转换。"""
+    """_normalize_tool 工具格式转换。"""
 
-    def test_to_openai_tool_format(self):
+    def test_normalize_tool_format(self):
         client = OpenAIClient()
         tool = ToolDefinition(
             name="test_tool",
             description="A test tool",
             parameters={"type": "object", "properties": {"x": {"type": "string"}}},
         )
-        result = client._to_openai_tool(tool)
+        result = client._normalize_tool(tool)
         assert result["type"] == "function"
         assert result["function"]["name"] == "test_tool"
         assert result["function"]["description"] == "A test tool"
@@ -449,18 +467,18 @@ class TestOpenAIToolConversion:
 # ═══════════════════════════════════════════════
 
 
-class TestAnthropicExtractSystem:
-    """_extract_system 边界。"""
+class TestAnthropicPrepareMessages:
+    """_prepare_messages 边界。"""
 
     def setup_method(self):
         Config.reset()
         Config._instance = Config(provider="anthropic")
 
     def test_no_system_messages(self):
-        """无 system 消息时返回 None 和不变化的列表。"""
+        """无 system 消息时返回 None 和原列表。"""
         client = AnthropicClient()
         messages = [Message(role="user", content="hi")]
-        system, filtered = client._extract_system(messages)
+        system, filtered = client._prepare_messages(messages)
         assert system is None
         assert len(filtered) == 1
 
@@ -472,7 +490,7 @@ class TestAnthropicExtractSystem:
             Message(role="user", content="hi"),
             Message(role="system", content="[摘要] 历史摘要"),
         ]
-        system, filtered = client._extract_system(messages)
+        system, filtered = client._prepare_messages(messages)
         assert "你是助手" in system
         assert "历史摘要" in system
         assert "---" in system
@@ -485,6 +503,6 @@ class TestAnthropicExtractSystem:
             Message(role="system", content=""),
             Message(role="user", content="hi"),
         ]
-        system, filtered = client._extract_system(messages)
+        system, filtered = client._prepare_messages(messages)
         assert system is None
         assert len(filtered) == 1
