@@ -90,6 +90,27 @@ class TestBaseEnvironment:
         assert marker.startswith("__KOCOR_CWD_")
         assert marker.endswith("__")
 
+    # ── P1.6 防御纵深：execute 层安全检查 ──
+
+    def test_execute_rejects_dangerous_commands(self):
+        """execute("rm -rf /") 应抛出 PermissionError。"""
+        env = _make_test_env()
+        with pytest.raises(PermissionError, match="Blocked by execute-level safety check"):
+            env.execute("rm -rf /")
+
+    def test_execute_allows_safe_commands(self):
+        """execute("echo hello") 应正常执行。"""
+        env = _make_test_env(command_output="hello world", exit_code=0)
+        result = env.execute("echo hello")
+        assert result["stdout"].strip() == "hello world"
+        assert result["exit_code"] == 0
+
+    def test_execute_rejects_dangerous_normalized(self):
+        """execute("'mkfs''.ext4'") 规范化后触发 PermissionError。"""
+        env = _make_test_env()
+        with pytest.raises(PermissionError, match="Blocked by execute-level safety check"):
+            env.execute("'mkfs''.ext4'")
+
 
 # =============================================================================
 # LocalEnvironment 集成测试

@@ -478,9 +478,19 @@ class BaseEnvironment(ABC):
         timeout: int | None = None,
         stdin_data: str | None = None,
     ) -> dict:
-        """执行命令，返回 {"stdout": str, "exit_code": int}。"""
+        """执行命令，返回 {"stdout": str, "exit_code": int}。
+
+        包含 execute 级别的防御纵深安全检查（不替代上层 PermissionManager）。
+        危险命令（如 rm -rf /）直接抛出 PermissionError。
+        """
         if not command:
             return {"stdout": "Error: empty command", "exit_code": 1}
+
+        # 防御纵深：execute 层安全检查（不替代 PermissionManager）
+        from kocor.tools.toolsets.bash.command_safety import detect_dangerous_command
+        level, reason = detect_dangerous_command(command)
+        if level == "dangerous":
+            raise PermissionError(f"Blocked by execute-level safety check: {reason}")
 
         effective_timeout = timeout or self.timeout
         effective_cwd = cwd or self.cwd
