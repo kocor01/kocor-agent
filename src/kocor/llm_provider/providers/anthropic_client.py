@@ -21,6 +21,11 @@ class AnthropicClient(LLMClient):
 
     def __init__(self):
         self.config = Config.load()
+        self._client = Anthropic(
+            api_key=self.config.anthropic_api_key,
+            auth_token=self.config.anthropic_api_key,  # anthropic 兼容不同厂商模型
+            base_url=self.config.anthropic_base_url or None,
+        )
 
     @property
     def provider(self) -> str:
@@ -45,18 +50,13 @@ class AnthropicClient(LLMClient):
             Message: 响应消息
         """
         actual_max_tokens = max_tokens if max_tokens is not None else self.config.max_tokens
-        client = Anthropic(
-            api_key=self.config.anthropic_api_key,
-            auth_token=self.config.anthropic_api_key,  # anthropic 兼容不同厂商模型
-            base_url=self.config.anthropic_base_url or None,
-        )
 
         system_content, filtered_messages = self._extract_system(messages)
         anthropic_messages = self._normalize_in(filtered_messages)
         anthropic_tools = [self._normalize_tool(t) for t in tools] if tools else None
 
-        # 调用 API
-        response = client.messages.create(
+        # 调用 API（复用 __init__ 中创建的 SDK 客户端，利用连接池）
+        response = self._client.messages.create(
             model=self.config.anthropic_model,
             system=system_content,
             messages=anthropic_messages,
@@ -90,6 +90,9 @@ class AnthropicClient(LLMClient):
 
         import httpx
 
+        # 流式场景需要短 read timeout（3s）以保证 Windows 上 Ctrl+C 的响应性。
+        # 因为此超时与 generate() 场景（需要更长 read timeout）不同，所以使用
+        # 独立的 SDK 客户端创建，不共享 __init__ 中的 self._client。
         client = Anthropic(
             api_key=self.config.anthropic_api_key,
             auth_token=self.config.anthropic_api_key,  # anthropic 兼容不同厂商模型

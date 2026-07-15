@@ -20,6 +20,16 @@ class OpenAIClient(LLMClient):
 
     def __init__(self):
         self.config = Config.load()
+        self._client = None  # 懒加载：首次 generate() 时创建
+
+    def _get_client(self) -> OpenAI:
+        """获取或创建 SDK 客户端实例（懒加载，复用连接池）。"""
+        if self._client is None:
+            self._client = OpenAI(
+                api_key=self.config.openai_api_key,
+                base_url=self.config.openai_base_url or None,
+            )
+        return self._client
 
     @property
     def provider(self) -> str:
@@ -44,17 +54,13 @@ class OpenAIClient(LLMClient):
             Message: 响应消息
         """
         actual_max_tokens = max_tokens if max_tokens is not None else self.config.max_tokens
-        client = OpenAI(
-            api_key=self.config.openai_api_key,
-            base_url=self.config.openai_base_url or None,
-        )
 
         # 内部格式 → OpenAI 格式
         openai_messages = self._normalize_in(messages)
         openai_tools = [self._to_openai_tool(t) for t in tools] if tools else None
 
-        # 调用 API
-        response = client.chat.completions.create(
+        # 调用 API（复用 SDK 客户端，利用连接池）
+        response = self._get_client().chat.completions.create(
             model=self.config.openai_model,
             messages=openai_messages,
             max_tokens=actual_max_tokens,
@@ -99,6 +105,8 @@ class OpenAIClient(LLMClient):
 
         import httpx
 
+        # 流式场景需要短 read timeout（3s）以保证 Windows 上 Ctrl+C 的响应性。
+        # 因为此超时与 generate() 不同，使用独立的 SDK 客户端。
         client = OpenAI(
             api_key=self.config.openai_api_key,
             base_url=self.config.openai_base_url or None,
