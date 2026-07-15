@@ -27,20 +27,10 @@ from kocor import __version__
 
 from kocor.agent import Agent
 from kocor.config import Config
-from kocor.llm_provider.llm_factory import LlmFactory
 from kocor.llm_provider.message import StreamChunk
 from kocor.skill.types import InvokeStrategy
-from kocor.tools.tool_manager import ToolManager
-
-# Harness imports
 from kocor.tools.permission import PermissionManager
-from kocor.hook.hook_manager import HookManager
-from kocor.event.event_manager import EventEmitter
-from kocor.event.event_subscribe import EventSubscribe
 from kocor.logger import Logger
-
-# 可选的会话管理
-from kocor.session import SessionManager, SessionResetPolicy, SessionStore
 
 class _StreamFormatter:
     """管理流式输出的格式状态。"""
@@ -424,63 +414,18 @@ def main() -> None:
 
     logger = Logger(Config.load().log_level, log_dir=Config.load().log_dir)
 
-    toolManager = ToolManager()
-    # 创建事件发射器（在 SubagentRunner 之前，因为 runner 需要引用 emitter）
-    event_emitter = EventEmitter()
-
-    # 创建 LLM 与 SubagentRunner（在 register_all 之前，因为 subagent 工具注册
-    # 需要在闭包中解析 runner；runner 的 lambda 在调用时从 toolManager._subagent_runner 读取）
-    llm = LlmFactory.create()
-    if Config.load().subagent_enabled:
-        from kocor.tools.toolsets.subagent.runner import SubagentRunner
-        runner = SubagentRunner(
-            parent_llm=llm,
-            parent_tool_manager=toolManager,
-            parent_event_emitter=event_emitter,
-            depth=0,
-        )
-        toolManager._subagent_runner = runner
-    toolManager.register_all(include_subagent=Config.load().subagent_enabled)
-
-    permission_mgr = PermissionManager(
-        policy=Config.load().permission_policy,
-        tool_manager=toolManager,
+    # 使用 AgentBuilder 装配 Agent 及其所有依赖组件
+    from kocor.cli_builder import AgentBuilder
+    agent = (
+        AgentBuilder()
+        .build_llm()
+        .build_subagent()
+        .build_tools()
+        .build_permission()
+        .build_hooks(logger)
+        .build_session()
+        .build()
     )
-
-    # Build Harness components
-    max_iterations = Config.load().max_iterations
-
-    hook_manager = HookManager()
-    hook_manager.register_all(logger=logger)
-
-    EventSubscribe(event_emitter).subscribe_all(logger=logger)
-
-    # 可选地构建会话管理器
-    session_manager = None
-    if Config.load().session_enabled:
-        db_path = Config.load().session_db_path
-        session_name = Config.load().session_name or None
-        store = SessionStore(db_path=db_path)
-        policy = SessionResetPolicy(mode="none")  # 默认不自动重置，后续可配置
-        session_manager = SessionManager(
-            store=store,
-            policy=policy,
-            profile=session_name,
-        )
-
-    agent = Agent(
-        llm=llm,
-        tool_manager=toolManager,
-        permission_mgr=permission_mgr,
-        hook_manager=hook_manager,
-        event_emitter=event_emitter,
-        max_iterations=max_iterations,
-        session_manager=session_manager,
-    )
-
-    # 确保进程退出时停止 cron worker 子进程（覆盖 REPL 的 os._exit）
-    import atexit
-    atexit.register(toolManager.stop_cron_scheduler)
 
     if is_repl:
         print()
@@ -488,7 +433,7 @@ def main() -> None:
             import readline  # 提供行编辑和上下键历史
         except ImportError:
             pass
-        _print_welcome(session_manager, toolManager.skill_manager)
+        _print_welcome(agent.session_manager, agent.tool_manager.skill_manager)
         _repl_loop(agent, stream_enabled)
         return
 
@@ -511,5 +456,5 @@ def main() -> None:
             if result:
                 print(result)
     finally:
-        toolManager.mcp_manager.shutdown_all()
-        toolManager.stop_cron_scheduler()
+        agent.tool_manager.mcp_manager.shutdown_all()
+        agent.tool_manager.stop_cron_scheduler()
