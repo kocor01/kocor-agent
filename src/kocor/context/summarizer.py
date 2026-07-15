@@ -13,6 +13,7 @@ from kocor.context.token_counter import TokenCounter
 from kocor.event.event_manager import EventType, Event, EventEmitter
 from kocor.hook.base import HookPoint, HookContext
 from kocor.hook.hook_manager import HookManager
+from kocor.llm_provider.llm_client import LLMClient
 from kocor.llm_provider.message import Message
 
 
@@ -34,11 +35,14 @@ class HistorySummarizer:
 
     def __init__(
         self,
+        llm: LLMClient | None = None,
         event_emitter: EventEmitter | None = None,
         hook_manager: HookManager | None = None,
     ):
-        from kocor.llm_provider.llm_factory import LlmFactory
-        self.llm = LlmFactory.create()
+        if llm is None:
+            from kocor.llm_provider.llm_factory import LlmFactory
+            llm = LlmFactory.create()
+        self.llm = llm
         self.summarization_prompt = self.DEFAULT_PROMPT
         self._token_counter = TokenCounter()
         self._event_emitter = event_emitter

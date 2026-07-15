@@ -165,3 +165,27 @@ class TestHistorySummarizer:
                 Message(role="user", content="hi"),
             ])
         assert result is not None
+
+    # ── P1.4 修复 ──
+
+    def test_summarizer_with_mock_llm(self):
+        """直接注入 MockLLM，不通过 LlmFactory 创建。"""
+        fake_llm = FakeLLMForSummary(summary_text="直接注入的摘要")
+        summarizer = HistorySummarizer(llm=fake_llm)
+        msgs = [
+            Message(role="user", content="你好"),
+            Message(role="assistant", content="你好！"),
+        ]
+        node = summarizer.summarize(msgs)
+        assert isinstance(node, SummaryNode)
+        assert node.summary == "直接注入的摘要"
+        assert fake_llm.call_count == 1
+
+    def test_summarizer_null_event_emitter(self):
+        """event_emitter=None 时 _emit_event 不抛异常。"""
+        with _patch_llm():
+            summarizer = HistorySummarizer(event_emitter=None)
+            result = summarizer.summarize([
+                Message(role="user", content="hi"),
+            ])
+        assert result is not None

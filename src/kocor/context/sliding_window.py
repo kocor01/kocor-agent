@@ -8,6 +8,8 @@ from __future__ import annotations
 
 from kocor.context.types import SummaryNode
 from kocor.context.summarizer import HistorySummarizer
+from kocor.event.event_manager import EventEmitter
+from kocor.hook.hook_manager import HookManager
 from kocor.llm_provider.message import Message
 
 
@@ -27,10 +29,15 @@ class SlidingWindowStrategy:
 
     def __init__(
         self,
-        preserve_last_rounds: int = 3,
-        preserve_first_rounds: int = 1,
+        preserve_last_rounds: int,
+        preserve_first_rounds: int,
+        event_emitter: EventEmitter | None = None,
+        hook_manager: HookManager | None = None,
     ):
-        self.summarizer = HistorySummarizer()
+        self.summarizer = HistorySummarizer(
+            event_emitter=event_emitter,
+            hook_manager=hook_manager,
+        )
         self.preserve_last_rounds = preserve_last_rounds
         self.preserve_first_rounds = preserve_first_rounds
 
