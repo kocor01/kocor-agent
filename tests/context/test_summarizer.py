@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 
 from kocor.context.types import SummaryNode
 from kocor.context.summarizer import HistorySummarizer
+from kocor.hook.base import HookPoint, HookContext, HookResult, HookAction
 from kocor.llm_provider.message import FunctionCall, Message, ToolCall
 
 
@@ -129,3 +130,38 @@ class TestHistorySummarizer:
             summarizer = HistorySummarizer()
         assert summarizer.llm is not None
         assert summarizer.llm.provider == "fake"
+
+    def test_summarizer_hooks_fire(self):
+        """PRE_SUMMARIZE 钩子被调用并收到 history_length（P0.2 回归）。"""
+        captured_pre = []
+
+        class CaptureHook:
+            hook_point = HookPoint.PRE_SUMMARIZE
+            def run(self, ctx: HookContext) -> HookResult:
+                if ctx.extra.get("history_length") is not None:
+                    captured_pre.append({
+                        "history_length": ctx.extra["history_length"],
+                        "message_count": ctx.extra.get("message_count"),
+                    })
+                return HookResult(action=HookAction.CONTINUE)
+
+        hook_mgr = MagicMock()
+        hook_mgr.run.side_effect = lambda point, ctx: [CaptureHook().run(ctx)]
+
+        with _patch_llm():
+            summarizer = HistorySummarizer(hook_manager=hook_mgr)
+            summarizer.summarize([
+                Message(role="user", content="hi"),
+            ])
+
+        assert len(captured_pre) == 1, f"got {captured_pre}"
+        assert captured_pre[0]["history_length"] > 0
+
+    def test_summarizer_null_hook_manager(self):
+        """hook_manager=None 时 _run_hooks 不抛异常。"""
+        with _patch_llm():
+            summarizer = HistorySummarizer(hook_manager=None)
+            result = summarizer.summarize([
+                Message(role="user", content="hi"),
+            ])
+        assert result is not None

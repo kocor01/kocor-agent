@@ -387,11 +387,24 @@ class Loop:
         """执行指定生命周期点的钩子。
 
         返回 abort 消息（钩子终止循环）或 None（继续执行）。
+
+        已知字段传给 HookContext 命名参数，未知字段放入 extra 字典，
+        避免因未知字段导致 TypeError（P0.2 回归）。
         """
+        known_fields = {"tool_call", "tool_result", "response", "error", "config"}
+        context_kwargs = {}
+        extra_data = {}
+        for k, v in extra.items():
+            if k in known_fields:
+                context_kwargs[k] = v
+            else:
+                extra_data[k] = v
+        context_kwargs["extra"] = extra_data
+
         ctx = HookContext(
             iteration=self.ctx.iteration,
             messages=self.ctx.messages,
-            **extra,
+            **context_kwargs,
         )
         for r in self.hook_manager.run(point, ctx):
             if r.action == HookAction.ABORT:

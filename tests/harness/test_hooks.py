@@ -95,6 +95,24 @@ class TestHookManager:
         assert "boom" in results[0].message
         assert results[1].action == HookAction.CONTINUE
 
+    def test_hook_context_with_extra_fields_does_not_crash(self):
+        """HookContext 接受未知字段（P0.2 回归：TypeError 被吞没）。"""
+        ctx = HookContext(iteration=0, messages=[], history_length=123, unknown_key="val")
+        assert ctx.iteration == 0
+        assert ctx.extra["history_length"] == 123
+        assert ctx.extra["unknown_key"] == "val"
+
+    def test_hook_context_extra_absent_is_empty_dict(self):
+        """HookContext 无 extra 时 extra 字段默认为空字典。"""
+        ctx = HookContext(iteration=0, messages=[])
+        assert ctx.extra == {}
+
+    def test_hook_context_extra_with_mixed_fields(self):
+        """HookContext 混合已知字段和未知字段。"""
+        ctx = HookContext(iteration=0, messages=[], tool_call="call1", unknown_field=42)
+        assert ctx.tool_call == "call1"
+        assert ctx.extra["unknown_field"] == 42
+
     def test_no_hooks_at_point(self):
         runner = HookManager()
         results = runner.run(HookPoint.PRE_TOOL, HookContext(iteration=1, messages=[]))

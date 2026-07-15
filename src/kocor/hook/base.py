@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Protocol
+from typing import Any, Protocol
 
 
 class HookAction(str, Enum):
@@ -25,17 +25,35 @@ class HookPoint(Enum):
     ON_BUDGET_EXHAUSTED = "on_budget_exhausted"  # 预算耗尽时
 
 
-@dataclass
-class HookContext:
-    """传递给钩子的上下文，包含执行时的环境信息。"""
+# 已知的 HookContext 字段名，用于 __init__ 中拆分未知字段
+_KNOWN_HOOK_CONTEXT_FIELDS = frozenset({
+    "iteration", "messages", "tool_call", "tool_result",
+    "response", "error", "config", "extra",
+})
 
-    iteration: int
-    messages: list
-    tool_call: any = None
-    tool_result: any = None
-    response: any = None
-    error: Exception | None = None
-    config: dict = field(default_factory=dict)
+
+class HookContext:
+    """传递给钩子的上下文，包含执行时的环境信息。
+
+    未知关键字参数自动归入 extra 字典，不会抛 TypeError。
+    """
+
+    def __init__(self, **kwargs):
+        self.iteration: int = kwargs.get("iteration", 0)
+        self.messages: list = kwargs.get("messages", [])
+        self.tool_call: Any = kwargs.get("tool_call")
+        self.tool_result: Any = kwargs.get("tool_result")
+        self.response: Any = kwargs.get("response")
+        self.error: Exception | None = kwargs.get("error")
+        self.config: dict = kwargs.get("config", {})
+        # 未知字段自动归入 extra
+        self.extra: dict = {}
+        for k, v in kwargs.items():
+            if k not in _KNOWN_HOOK_CONTEXT_FIELDS:
+                self.extra[k] = v
+        # merge 显式传入的 extra
+        if "extra" in kwargs and isinstance(kwargs["extra"], dict):
+            self.extra.update(kwargs["extra"])
 
 
 @dataclass
