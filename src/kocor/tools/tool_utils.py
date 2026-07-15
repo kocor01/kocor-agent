@@ -8,8 +8,10 @@ import os
 def resolve_safe_path(path: str, allowed_dir: str) -> str:
     """解析并校验路径是否在允许目录内，防止路径遍历攻击。
 
-    如果 path 是绝对路径，直接使用（跳过 allowed_dir 锚定）；
-    如果是相对路径，基于 allowed_dir 解析并验证。
+    无论 path 是绝对路径还是相对路径，都基于 allowed_dir 解析，
+    并验证解析后的绝对路径未逃逸出 allowed_dir。
+    绝对路径若指向 allowed_dir 外（如 /etc/passwd、C:\\Windows）将被拒绝，
+    此前绝对路径直接放行的行为构成 P0.1 越权漏洞。
 
     Args:
         path: 用户传入的路径
@@ -21,12 +23,14 @@ def resolve_safe_path(path: str, allowed_dir: str) -> str:
     Raises:
         PermissionError: 路径尝试逃逸到允许目录外
     """
-    if os.path.isabs(path):
-        resolved = os.path.realpath(path)
-    else:
-        resolved = os.path.realpath(os.path.join(allowed_dir, path))
-        if resolved != allowed_dir and not resolved.startswith(allowed_dir + os.sep):
-            raise PermissionError(f"Path traversal denied: {path}")
+    # 统一规范化 allowed_dir，确保与 resolved 的比较口径一致
+    # （调用方传入的 allowed_dir 可能未经 realpath 规范化）
+    base = os.path.realpath(allowed_dir)
+    # 所有路径都基于 base 解析：绝对路径会覆盖 base（os.path.join 语义），
+    # 相对路径则拼接在 base 之下
+    resolved = os.path.realpath(os.path.join(base, path))
+    if resolved != base and not resolved.startswith(base + os.sep):
+        raise PermissionError(f"Path traversal denied: {path}")
     return resolved
 
 

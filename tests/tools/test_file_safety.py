@@ -48,6 +48,18 @@ class TestCheckSensitivePath:
         # 相对路径 resolve 后可能变成 /etc/passwd
         assert err is not None
 
+    def test_bin_path_blocked(self):
+        """/bin/sh 等系统可执行目录被阻断。"""
+        assert check_sensitive_path("/bin/sh") is not None
+
+    def test_lib_path_blocked(self):
+        """/lib/systemd 下的系统库目录被阻断。"""
+        assert check_sensitive_path("/lib/systemd/evil") is not None
+
+    def test_usr_path_blocked(self):
+        """/usr/bin 下的路径被阻断。"""
+        assert check_sensitive_path("/usr/bin/evil") is not None
+
 
 class TestIsWriteDenied:
     """测试写拒绝列表检查。"""

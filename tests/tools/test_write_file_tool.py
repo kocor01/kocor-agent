@@ -6,6 +6,7 @@ import tempfile
 
 from kocor.tools.toolsets.write_file_tool import WriteFile
 from kocor.tools.toolsets.file.file_state import FileStateTracker
+from tests.tools.conftest import chdir_cm
 
 
 class TestWriteFile:
@@ -16,7 +17,7 @@ class TestWriteFile:
 
     def test_write_new_file(self):
         """写入新文件。"""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory() as tmpdir, chdir_cm(tmpdir):
             path = os.path.join(tmpdir, "test.py")
             result = WriteFile.handler(file_state=self.tracker, path=path, content="print('hello')\n")
             data = json.loads(result)
@@ -27,7 +28,7 @@ class TestWriteFile:
 
     def test_write_creates_dirs(self):
         """写入时自动创建父目录。"""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory() as tmpdir, chdir_cm(tmpdir):
             path = os.path.join(tmpdir, "sub", "nested", "test.py")
             result = WriteFile.handler(file_state=self.tracker, path=path, content="nested\n")
             data = json.loads(result)
@@ -36,7 +37,7 @@ class TestWriteFile:
 
     def test_overwrite_existing_file(self):
         """覆盖已存在的文件。"""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory() as tmpdir, chdir_cm(tmpdir):
             path = os.path.join(tmpdir, "test.py")
             with open(path, "w", encoding="utf-8") as f:
                 f.write("old content\n")
@@ -46,7 +47,7 @@ class TestWriteFile:
 
     def test_write_empty_content(self):
         """写入空内容。"""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory() as tmpdir, chdir_cm(tmpdir):
             path = os.path.join(tmpdir, "empty.txt")
             result = WriteFile.handler(file_state=self.tracker, path=path, content="")
             data = json.loads(result)
@@ -57,14 +58,9 @@ class TestWriteFile:
 
     def test_path_traversal_rejected(self):
         """路径遍历被拒绝。"""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            old_cwd = os.getcwd()
-            os.chdir(tmpdir)
-            try:
-                result = WriteFile.handler(file_state=self.tracker, path="../outside.txt", content="hack")
-                assert "denied" in result.lower() or "Error" in result
-            finally:
-                os.chdir(old_cwd)
+        with tempfile.TemporaryDirectory() as tmpdir, chdir_cm(tmpdir):
+            result = WriteFile.handler(file_state=self.tracker, path="../outside.txt", content="hack")
+            assert "denied" in result.lower() or "Error" in result
 
     def test_sensitive_path_rejected(self):
         """敏感系统路径被拒绝。"""
@@ -74,7 +70,7 @@ class TestWriteFile:
 
     def test_env_file_rejected(self):
         """.env 文件被拒绝写入。"""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory() as tmpdir, chdir_cm(tmpdir):
             path = os.path.join(tmpdir, ".env")
             result = WriteFile.handler(file_state=self.tracker, path=path, content="SECRET=xxx")
             data = json.loads(result)
@@ -82,7 +78,7 @@ class TestWriteFile:
 
     def test_internal_tool_content_rejected(self):
         """内部工具显示文本被拒绝写入。"""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory() as tmpdir, chdir_cm(tmpdir):
             path = os.path.join(tmpdir, "test.py")
             # 模拟 read_file 的行号内容
             content = "1|import os\n2|import sys\n3|\n4|def main():\n5|    pass"
@@ -92,7 +88,7 @@ class TestWriteFile:
 
     def test_preserves_crlf(self):
         """保留 CRLF 行尾。"""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory() as tmpdir, chdir_cm(tmpdir):
             path = os.path.join(tmpdir, "crlf.txt")
             with open(path, "w", encoding="utf-8", newline="") as f:
                 f.write("line1\r\nline2\r\n")
@@ -105,7 +101,7 @@ class TestWriteFile:
 
     def test_write_utf8_with_bom(self):
         """保留 UTF-8 BOM。"""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory() as tmpdir, chdir_cm(tmpdir):
             path = os.path.join(tmpdir, "bom.txt")
             # 写入带 BOM 的文件
             raw = "﻿Hello\nWorld\n"

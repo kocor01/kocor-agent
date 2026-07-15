@@ -128,6 +128,27 @@ class TestResolveSafePath:
             resolved = resolve_safe_path(".", tmpdir)
             assert resolved == os.path.realpath(tmpdir)
 
+    def test_absolute_path_outside_allowed_dir(self):
+        """绝对路径指向 allowed_dir 外应被拒绝（P0.1 回归）"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # 构造一个位于 tmpdir 之外的绝对路径
+            outside = os.path.join(os.path.dirname(tmpdir.rstrip(os.sep)), "outside.txt")
+            try:
+                resolve_safe_path(outside, tmpdir)
+                assert False, "应抛出 PermissionError"
+            except PermissionError:
+                pass
+
+    def test_absolute_path_inside_allowed_dir(self):
+        """绝对路径位于 allowed_dir 内应正常返回"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            inside = os.path.join(tmpdir, "sub", "file.txt")
+            resolved = resolve_safe_path(inside, tmpdir)
+            assert resolved == os.path.realpath(inside)
+            # 必须仍落在 allowed_dir 内
+            base = os.path.realpath(tmpdir)
+            assert resolved == base or resolved.startswith(base + os.sep)
+
 
 class TestCreateDefaultTools:
     """测试内置工具创建"""

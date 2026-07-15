@@ -14,17 +14,24 @@ class TestReadFile:
     def setup_method(self):
         self.tracker = FileStateTracker()
 
-    def _make_file(self, content: str, suffix: str = ".py") -> str:
-        """创建临时文件并返回路径。"""
+    def _make_file(self, content: str, suffix: str = ".py", monkeypatch=None) -> str:
+        """创建临时文件并返回路径。
+
+        read_file 工具以 os.getcwd() 为允许目录，临时文件位于系统 temp
+        目录（工作目录之外）会被路径越界检查拒绝。传入 monkeypatch 时
+        chdir 到文件所在目录，使绝对路径落在允许目录内。
+        """
         f = tempfile.NamedTemporaryFile(suffix=suffix, delete=False, mode="w", encoding="utf-8")
         f.write(content)
         f.close()
+        if monkeypatch is not None:
+            monkeypatch.chdir(os.path.dirname(f.name))
         return f.name
 
-    def test_read_full_file(self):
+    def test_read_full_file(self, monkeypatch):
         """读取完整文件内容。"""
         content = "line1\nline2\nline3\n"
-        path = self._make_file(content)
+        path = self._make_file(content, monkeypatch=monkeypatch)
         try:
             result = ReadFile.handler(file_state=self.tracker, path=path)
             data = json.loads(result)
@@ -34,10 +41,10 @@ class TestReadFile:
         finally:
             os.unlink(path)
 
-    def test_read_with_row_numbers(self):
+    def test_read_with_row_numbers(self, monkeypatch):
         """读取的内容包含行号前缀。"""
         content = "hello\nworld\nfoo\n"
-        path = self._make_file(content)
+        path = self._make_file(content, monkeypatch=monkeypatch)
         try:
             result = ReadFile.handler(file_state=self.tracker, path=path, offset=1, limit=10)
             data = json.loads(result)
@@ -47,10 +54,10 @@ class TestReadFile:
         finally:
             os.unlink(path)
 
-    def test_read_with_offset(self):
+    def test_read_with_offset(self, monkeypatch):
         """指定 offset 读取。"""
         content = "a\nb\nc\nd\ne\n"
-        path = self._make_file(content)
+        path = self._make_file(content, monkeypatch=monkeypatch)
         try:
             result = ReadFile.handler(file_state=self.tracker, path=path, offset=3, limit=2)
             data = json.loads(result)
@@ -66,9 +73,9 @@ class TestReadFile:
         data = json.loads(result)
         assert "error" in data
 
-    def test_empty_file(self):
+    def test_empty_file(self, monkeypatch):
         """空文件返回空内容。"""
-        path = self._make_file("")
+        path = self._make_file("", monkeypatch=monkeypatch)
         try:
             result = ReadFile.handler(file_state=self.tracker, path=path)
             data = json.loads(result)
@@ -77,9 +84,9 @@ class TestReadFile:
         finally:
             os.unlink(path)
 
-    def test_binary_file_blocked_by_extension(self):
+    def test_binary_file_blocked_by_extension(self, monkeypatch):
         """二进制扩展名文件被阻断。"""
-        path = self._make_file("not really png", suffix=".png")
+        path = self._make_file("not really png", suffix=".png", monkeypatch=monkeypatch)
         try:
             result = ReadFile.handler(file_state=self.tracker, path=path)
             data = json.loads(result)
@@ -99,12 +106,12 @@ class TestReadFile:
             finally:
                 os.chdir(old_cwd)
 
-    def test_truncated_large_content(self):
+    def test_truncated_large_content(self, monkeypatch):
         """超长内容被截断。"""
         # 生成超过 char limit 的内容
         lines = [f"line{i}_" + "x" * 200 for i in range(1000)]
         content = "\n".join(lines) + "\n"
-        path = self._make_file(content)
+        path = self._make_file(content, monkeypatch=monkeypatch)
         try:
             result = ReadFile.handler(file_state=self.tracker, path=path, offset=1, limit=2000)
             data = json.loads(result)
@@ -113,10 +120,10 @@ class TestReadFile:
         finally:
             os.unlink(path)
 
-    def test_dedup_returns_unchanged(self):
+    def test_dedup_returns_unchanged(self, monkeypatch):
         """重复读取返回 unchanged。"""
         content = "dedup test\n"
-        path = self._make_file(content)
+        path = self._make_file(content, monkeypatch=monkeypatch)
         try:
             # 首次读取
             ReadFile.handler(file_state=self.tracker, path=path)
