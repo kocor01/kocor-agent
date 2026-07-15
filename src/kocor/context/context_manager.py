@@ -112,14 +112,18 @@ class ContextManager:
     def compress_if_needed(self) -> None:
         """检测上下文大小，必要时压缩。
 
-        使用 API 返回的真实 token 数（输入+输出），无时回退本地估算。
+        使用 self.token_budget 实例的配置（而非新建），
+        优先使用 API 返回的真实 token 数（输入+输出），无时回退本地估算。
         """
+        budget = self.token_budget
+
+        # 优先使用 API 精确计数，无时回退本地估算
         total_token = (self.usage.prompt_tokens + self.usage.completion_tokens) if self.usage \
             else (self.count_message_tokens() + self.count_tool_tokens())
-        budget = TokenBudget()
-        budget.used_prompt = total_token
 
-        if not budget.should_summarize():
+        # 判断是否达到摘要阈值
+        usage_ratio = total_token / budget.limit if budget.limit > 0 else 0
+        if usage_ratio < budget.threshold_summary:
             return
 
         system = [m for m in self.messages if m.role == "system"]

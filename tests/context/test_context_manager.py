@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from kocor.context.budget import TokenBudget
 from kocor.context.context_manager import ContextManager
 from kocor.context.strategies import ContextStrategyApplier
@@ -304,3 +306,133 @@ class TestSessionHistoryCompression:
 
             assert len(ctx.messages) < len(messages)
             _restore_config(_orig)
+class TestCompressBudgetConsistency:
+    """测试 compress_if_needed 预算口径一致性（P1.3）。
+
+    验证：
+    1. 复用 self.token_budget 而非新建 TokenBudget() 实例
+    2. 仅用 prompt 侧 token 做压缩判断（不含 completion_tokens）
+    3. 有 usage 时优先使用 usage.prompt_tokens，无 usage 时回退到 count_message_tokens()
+    """
+
+    def test_compress_if_needed_uses_same_budget(self):
+        """应使用 self.token_budget 而非新建实例。"""
+        ctx = ContextManager()
+        original_budget = ctx.token_budget
+        assert original_budget is not None
+
+        ctx.compress_if_needed()
+
+        assert ctx.token_budget is original_budget
+
+    def test_compress_if_needed_default_strategy_skips_noop(self):
+        """DEFAULT 策略下即使超阈值也不改变消息（非 SLIDING 策略）。"""
+        _orig = _override_config({
+            "context_max_tokens": 10000,
+            "context_summary_threshold": 0.5,
+        })
+        ctx = ContextManager()
+        ctx.messages = [Message(role="user", content="hi")]
+
+        ctx.usage = MagicMock()
+        ctx.usage.prompt_tokens = 100000      # 远超阈值
+        ctx.usage.completion_tokens = 0
+
+        ctx.compress_if_needed()
+
+        # DEFAULT 策略不截断，消息数不变
+        assert len(ctx.messages) == 1
+        _restore_config(_orig)
+
+    def test_compress_if_needed_uses_api_usage_when_available(self):
+        """有 usage 时使用 usage.prompt_tokens + usage.completion_tokens，不调用本地估算。"""
+        with _patch_llm():
+            _orig = _override_config({
+                "context_strategy": "sliding",
+                "context_max_tokens": 1000,
+                "context_summary_threshold": 0.3,
+            })
+            ctx = ContextManager()
+            ctx.messages = [Message(role="system", content="sys")]
+            for i in range(10):
+                ctx.messages.append(Message(role="user", content=f"q{i}"))
+                ctx.messages.append(Message(role="assistant", content=f"a{i}"))
+
+            ctx.usage = MagicMock()
+            ctx.usage.prompt_tokens = 200       # 20%
+            ctx.usage.completion_tokens = 200    # 20% → 合计 40% > 30% → 触发压缩
+            ctx.count_message_tokens = MagicMock(return_value=50)  # 5% — 不应被用到
+
+            ctx.compress_if_needed()
+
+            # 有 usage 时 total=400, ratio=0.4>0.3 → 触发压缩
+            assert len(ctx.messages) < 21
+            _restore_config(_orig)
+
+    def test_compress_if_needed_without_usage(self):
+        """无 usage 时回退到 count_message_tokens() + count_tool_tokens()。"""
+        _orig = _override_config({
+            "context_max_tokens": 1000,
+            "context_summary_threshold": 0.3,
+        })
+        ctx = ContextManager()
+        ctx.messages = [Message(role="user", content="hi")]
+        ctx.usage = None  # 无 API 返回的 usage
+
+        called = [False]
+
+        def _track_call(*args, **kwargs):
+            called[0] = True
+            return 50  # 极低 token，不会触发压缩
+
+        original = ctx.count_message_tokens
+        ctx.count_message_tokens = _track_call
+
+        try:
+            ctx.compress_if_needed()
+        finally:
+            ctx.count_message_tokens = original
+
+        assert called[0], "count_message_tokens should be called when usage is None"
+        _restore_config(_orig)
+
+    def test_compress_uses_api_usage_sum(self):
+        """有 usage 时 total = prompt_tokens + completion_tokens 做压缩判断。"""
+        with _patch_llm():
+            _orig = _override_config({
+                "context_strategy": "sliding",
+                "preserve_last_rounds": 2,
+                "preserve_first_rounds": 1,
+                "context_max_tokens": 100_000,
+                "context_summary_threshold": 0.5,
+                "context_truncate_threshold": 0.9,
+                "default_system_prompt": "你是一个助手",
+            })
+            ctx = ContextManager()
+
+            ctx.messages = [Message(role="system", content="sys")]
+            for i in range(10):
+                ctx.messages.append(Message(role="user", content=f"q{i}"))
+                ctx.messages.append(Message(role="assistant", content=f"a{i}"))
+
+            # 场景 A：usage 的 prompt+completion 低 → 不压缩
+            ctx.usage = MagicMock()
+            ctx.usage.prompt_tokens = 1000       # 1%
+            ctx.usage.completion_tokens = 1000   # 1% → total 2% < 50%
+
+            ctx.count_message_tokens = MagicMock(return_value=95_000)  # 不应被用到
+            ctx.count_tool_tokens = MagicMock(return_value=0)
+
+            ctx.compress_if_needed()
+            assert len(ctx.messages) == 21, "usage 合计低时不应压缩"
+
+            # 场景 B：usage 的 prompt+completion 高 → 压缩
+            ctx.usage = MagicMock()
+            ctx.usage.prompt_tokens = 50_000     # 50%
+            ctx.usage.completion_tokens = 50_000  # 50% → total 100% > 50%
+
+            ctx.compress_if_needed()
+            assert len(ctx.messages) < 21, "usage 合计超阈值时应压缩"
+
+            _restore_config(_orig)
+

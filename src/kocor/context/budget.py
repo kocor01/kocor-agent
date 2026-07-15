@@ -5,7 +5,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from kocor.config import Config
 
@@ -21,10 +21,10 @@ class TokenBudget:
         threshold_truncate: 触发截断的阈值比例（0.0 ~ 1.0）
     """
 
-    limit: int = Config.load().context_max_tokens
+    limit: int = field(default_factory=lambda: Config.load().context_max_tokens)
     used_prompt: int = 0
-    threshold_summary: float = Config.load().context_summary_threshold
-    threshold_truncate: float = Config.load().context_truncate_threshold
+    threshold_summary: float = field(default_factory=lambda: Config.load().context_summary_threshold)
+    threshold_truncate: float = field(default_factory=lambda: Config.load().context_truncate_threshold)
 
     @property
     def remaining(self) -> int:
