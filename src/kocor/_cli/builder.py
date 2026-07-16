@@ -127,6 +127,15 @@ class AgentBuilder:
         if self._metrics:
             agent._metrics_collector = self._metrics
 
+        # 注册配置热加载回调：重载时重建 LLM 客户端
+        if self.llm is not None:
+
+            def on_config_reload(new_config):
+                from kocor.llm_provider.llm_factory import LlmFactory
+                agent.llm = LlmFactory.create()
+
+            Config.register_reload_hook(on_config_reload)
+
         # 注册进程退出清理
         atexit.register(self.tool_manager.stop_cron_scheduler)
         return agent

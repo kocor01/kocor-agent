@@ -5,7 +5,9 @@
 
 from __future__ import annotations
 
+import logging
 import os
+import signal
 from dataclasses import dataclass, field, fields
 from typing import Any, ClassVar, Optional
 
@@ -291,6 +293,53 @@ class Config:
     def _load(cls) -> Config:
         """从环境变量加载配置（测试入口，委托给 ConfigLoader）。"""
         return ConfigLoader.load()
+
+    # -----------------------------------------------------------------------
+    # 热加载
+    # -----------------------------------------------------------------------
+
+    _reload_hooks: ClassVar[list[callable]] = []
+
+    @classmethod
+    def register_reload_hook(cls, fn: callable) -> None:
+        """注册配置重载后的回调函数。
+
+        回调在配置重载后执行，用于重建依赖于配置的组件
+        （如 LLM 客户端、日志器、SessionStore 等）。
+
+        Args:
+            fn: 无参可调用对象，配置重载后被调用
+        """
+        cls._reload_hooks.append(fn)
+
+    @classmethod
+    def _notify_reload(cls) -> None:
+        """执行所有已注册的重载回调。"""
+        new_config = cls.load_fresh()
+        _logger = logging.getLogger(__name__)
+        for fn in cls._reload_hooks:
+            try:
+                fn(new_config)
+            except Exception as e:
+                _logger.exception("Config reload hook failed: %s", e)
+
+    @classmethod
+    def enable_hot_reload(cls) -> bool:
+        """注册 SIGHUP 信号处理器，使配置支持热加载。
+
+        通过 kill -HUP <PID> 触发配置重载。
+
+        Returns:
+            True 表示注册成功，False 表示当前平台不支持 SIGHUP
+        """
+        if not hasattr(signal, "SIGHUP"):
+            return False
+
+        def _handler(signum, frame):
+            cls._notify_reload()
+
+        signal.signal(signal.SIGHUP, _handler)
+        return True
 
 
 # --- 类型映射表（from __future__ import annotations 下 f.type 是字符串） ----------
