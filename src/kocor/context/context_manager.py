@@ -1,7 +1,7 @@
 """Agent 运行时上下文管理器。
 
-统一封装消息积累、跨轮历史、迭代追踪、上下文压缩。
-既是数据承载，也负责分层组装系统提示和上下文构建。
+编排 RuntimeContext 数据容器 + ContextCompressor 压缩逻辑 + SystemPromptBuilder 提示构建。
+数据与逻辑分离：数据在 RuntimeContext 中，编排在 ContextManager 中，压缩在 ContextCompressor 中。
 """
 
 from __future__ import annotations
@@ -10,6 +10,8 @@ from typing import Any
 
 from kocor.config import Config
 from kocor.context.budget import TokenBudget
+from kocor.context.compressor import ContextCompressor
+from kocor.context.runtime_context import RuntimeContext
 from kocor.context.strategies import ContextStrategyApplier
 from kocor.context.system_prompt import SystemPromptBuilder
 from kocor.context.token_counter import TokenCounter
@@ -19,18 +21,15 @@ from kocor.tools.definitions import ToolDefinition
 
 
 class ContextManager:
-    """Agent 运行时上下文管理器。
+    """Agent 运行时上下文编排器。
+
+    持有 RuntimeContext 数据实例，提供构建/压缩/提取等编排方法。
+    调用方（Loop/Agent）通过属性委托访问数据，无需感知内部结构变化。
 
     核心依赖通过构造函数传入，其余依赖按需取用（Config 单例、延迟创建）。
 
     Attributes:
-        system_content: 系统提示文本
-        tool_definitions: 可用工具定义
-        messages: 当前完整消息列表（含 system）
-        token_budget: Token 预算与使用统计
-        session_history: 跨 run() 调用的会话历史
-        iteration: 当前轮次迭代次数
-        usage: 最近一次 LLM 返回的真实 token 用量
+        ctx: RuntimeContext 实例（数据容器，通过属性委托暴露字段）
     """
 
     def __init__(
@@ -42,9 +41,13 @@ class ContextManager:
         self.tools = tools
         self.memory = memory
         self.todo_store = todo_store
+
+        # 数据容器（纯数据，无逻辑）
+        self._runtime = RuntimeContext()
+
+        # 逻辑组件（编排器组合）
         self._token_counter = TokenCounter()
         self._prompt_builder = SystemPromptBuilder(memory)
-
         resolved = Config.load().context_strategy
         mapping = {
             "default": ContextStrategy.DEFAULT,
@@ -52,128 +55,154 @@ class ContextManager:
             "aggressive": ContextStrategy.AGGRESSIVE,
         }
         self._context_strategy = mapping.get(resolved.lower(), ContextStrategy.DEFAULT)
+        self._compressor = ContextCompressor(context_strategy=self._context_strategy)
         self._strategy_applier = ContextStrategyApplier()
 
-        self.system_content = ""
-        self.tool_definitions: list[ToolDefinition] = []
-        self.messages: list[Message] = []
-        self.token_budget = TokenBudget()
-        self.session_history: list[Message] = []
-        self.usage: Usage | None = None
-        self.iteration = 0
+    # ── 属性委托（向后兼容，不改动 Loop/Agent 调用方） ──
+
+    @property
+    def system_content(self) -> str:
+        return self._runtime.system_content
+
+    @system_content.setter
+    def system_content(self, value: str) -> None:
+        self._runtime.system_content = value
+
+    @property
+    def tool_definitions(self) -> list[ToolDefinition]:
+        return self._runtime.tool_definitions
+
+    @tool_definitions.setter
+    def tool_definitions(self, value: list[ToolDefinition]) -> None:
+        self._runtime.tool_definitions = value
+
+    @property
+    def messages(self) -> list[Message]:
+        return self._runtime.messages
+
+    @messages.setter
+    def messages(self, value: list[Message]) -> None:
+        self._runtime.messages = value
+
+    @property
+    def token_budget(self) -> TokenBudget:
+        return self._runtime.token_budget
+
+    @token_budget.setter
+    def token_budget(self, value: TokenBudget) -> None:
+        self._runtime.token_budget = value
+
+    @property
+    def session_history(self) -> list[Message]:
+        return self._runtime.session_history
+
+    @session_history.setter
+    def session_history(self, value: list[Message]) -> None:
+        self._runtime.session_history = value
+
+    @property
+    def usage(self) -> Usage | None:
+        return self._runtime.usage
+
+    @usage.setter
+    def usage(self, value: Usage | None) -> None:
+        self._runtime.usage = value
+
+    @property
+    def iteration(self) -> int:
+        return self._runtime.iteration
+
+    @iteration.setter
+    def iteration(self, value: int) -> None:
+        self._runtime.iteration = value
 
     # ── 公开方法 ──
 
     def build_initial_context(self, user_input: str) -> None:
         """构建本轮初始上下文：系统提示、消息列表、Token 预算。"""
-        self.system_content = self._prompt_builder.build()
+        self._runtime.system_content = self._prompt_builder.build()
 
-        self.tool_definitions = self.tools.get_definitions() if self.tools else []
-        tool_tokens = self._token_counter.count_tools(self.tool_definitions)
+        self._runtime.tool_definitions = self.tools.get_definitions() if self.tools else []
+        tool_tokens = self._token_counter.count_tools(self._runtime.tool_definitions)
 
         estimated_total = (
-            self._token_counter.count(self.system_content)
+            self._token_counter.count(self._runtime.system_content)
             + self._token_counter.count(user_input)
-            + self._token_counter.count_messages(self.session_history)
+            + self._token_counter.count_messages(self._runtime.session_history)
             + tool_tokens
         )
-        self.token_budget = TokenBudget(
+        self._runtime.token_budget = TokenBudget(
             limit=Config.load().context_max_tokens,
             threshold_summary=Config.load().context_summary_threshold,
             threshold_truncate=Config.load().context_truncate_threshold,
         )
-        self.token_budget.used_prompt = estimated_total
+        self._runtime.token_budget.used_prompt = estimated_total
 
-        processed_history = self.session_history
+        processed_history = self._runtime.session_history
         summary_node = None
         if self._strategy_applier:
             processed_history, summary_node = self._strategy_applier.apply(
-                messages=self.session_history,
+                messages=self._runtime.session_history,
                 strategy=self._context_strategy,
-                token_budget=self.token_budget,
+                token_budget=self._runtime.token_budget,
             )
 
-        self.messages = [
-            Message(role="system", content=self.system_content),
+        self._runtime.messages = [
+            Message(role="system", content=self._runtime.system_content),
         ]
-        self.messages.extend(processed_history)
+        self._runtime.messages.extend(processed_history)
         # 上下文压缩发生时，注入 active todos 快照，防止 LLM 重做已完成任务
         if summary_node is not None:
             self._inject_todo_snapshot()
-        self.messages.append(Message(role="user", content=user_input))
-        self.token_budget.used_prompt = self._token_counter.count_messages(self.messages) + tool_tokens
+        self._runtime.messages.append(Message(role="user", content=user_input))
+        self._runtime.token_budget.used_prompt = (
+            self._token_counter.count_messages(self._runtime.messages) + tool_tokens
+        )
 
     def count_message_tokens(self) -> int:
-        return self._token_counter.count_messages(self.messages)
+        return self._token_counter.count_messages(self._runtime.messages)
 
     def count_tool_tokens(self) -> int:
-        return self._token_counter.count_tools(self.tool_definitions)
+        return self._token_counter.count_tools(self._runtime.tool_definitions)
 
     def compress_if_needed(self) -> None:
         """检测上下文大小，必要时压缩。
 
-        使用 self.token_budget 实例的配置（而非新建），
-        优先使用 API 返回的真实 token 数（输入+输出），无时回退本地估算。
+        委托给 ContextCompressor，优先使用 API 返回的真实 token 数。
         """
-        budget = self.token_budget
-
-        # 优先使用 API 精确计数，无时回退本地估算
-        total_token = (self.usage.prompt_tokens + self.usage.completion_tokens) if self.usage \
+        total_token = (
+            (self.usage.prompt_tokens + self.usage.completion_tokens) if self.usage
             else (self.count_message_tokens() + self.count_tool_tokens())
-
-        # 判断是否达到摘要阈值
-        usage_ratio = total_token / budget.limit if budget.limit > 0 else 0
-        if usage_ratio < budget.threshold_summary:
-            return
-
-        system = [m for m in self.messages if m.role == "system"]
-        history = [m for m in self.messages if m.role != "system"]
-
-        processed, summary_node = self._strategy_applier.apply(
-            messages=history,
-            strategy=self._context_strategy,
-            token_budget=budget,
+        )
+        self._compressor.compress_if_needed(
+            ctx=self._runtime,
+            todo_store=self.todo_store,
+            total_token=total_token,
         )
 
-        self.messages = system + processed
-        # 压缩发生时，在末尾注入 active todos 快照
-        if summary_node is not None:
-            self._inject_todo_snapshot()
-
     def _inject_todo_snapshot(self) -> None:
-        """把 active todos 作为 user 消息追加以提示 LLM。
-
-        调用方负责在正确的时机追加：
-        - build_initial_context：在 user_input 前追加 → 快照出现在 user_input 之前
-        - compress_if_needed：在末尾追加 → 快照出现在所有消息之后
-
-        active 项为空（format_for_injection 返回 None）时不注入，避免冗余。
-        """
+        """把 active todos 作为 user 消息追加以提示 LLM。"""
         if not self.todo_store:
             return
         snapshot = self.todo_store.format_for_injection()
         if snapshot is None:
             return
-        self.messages.append(Message(role="user", content=snapshot))
+        self._runtime.messages.append(Message(role="user", content=snapshot))
 
     def extract_session_history(self) -> None:
         """从本轮 messages 提取非 system 消息作为跨轮历史。"""
-        self.session_history = [
-            m for m in self.messages if m.role != "system"
+        self._runtime.session_history = [
+            m for m in self._runtime.messages if m.role != "system"
         ]
 
     def advance_iteration(self) -> None:
-        self.iteration += 1
+        self._runtime.iteration += 1
 
     def append(self, message: Message) -> None:
-        self.messages.append(message)
+        self._runtime.messages.append(message)
 
     def reset(self) -> None:
-        self.iteration = 0
-        self.messages.clear()
-        self.token_budget.reset()
-        self.usage = None
+        self._runtime.reset()
 
     def reset_conversation(self) -> None:
-        self.reset()
-        self.session_history.clear()
+        self._runtime.reset_conversation()
