@@ -56,7 +56,7 @@ def _search_with_rg(
     cmd.append(pattern)
     cmd.append(path)
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=_SEARCH_TIMEOUT)
+        result = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=_SEARCH_TIMEOUT)
     except FileNotFoundError:
         return {"error": "ripgrep (rg) not found"}
     except subprocess.TimeoutExpired:
@@ -98,7 +98,7 @@ def _search_with_grep(
     cmd.append(pattern)
     cmd.append(path)
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=_SEARCH_TIMEOUT)
+        result = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=_SEARCH_TIMEOUT)
     except FileNotFoundError:
         return {"error": "grep not found"}
     except subprocess.TimeoutExpired:
@@ -202,7 +202,7 @@ def _search_files_with_rg(pattern: str, path: str, limit: int, offset: int) -> d
         cmd.extend(["--glob", f"*{pattern}*"])
     cmd.append(path)
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=_SEARCH_TIMEOUT)
+        result = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=_SEARCH_TIMEOUT)
     except FileNotFoundError:
         return {"error": "ripgrep not found"}
     except subprocess.TimeoutExpired:
@@ -216,7 +216,7 @@ def _search_files_with_find(pattern: str, path: str, limit: int, offset: int) ->
     if pattern:
         cmd.extend(["-name", f"*{pattern}*"])
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=_SEARCH_TIMEOUT)
+        result = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=_SEARCH_TIMEOUT)
     except FileNotFoundError:
         return {"error": "find not found"}
     except subprocess.TimeoutExpired:
