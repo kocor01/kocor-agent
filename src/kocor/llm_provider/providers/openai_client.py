@@ -7,9 +7,15 @@ from __future__ import annotations
 
 from openai import OpenAI
 
+from kocor._secret import SecretStr
 from kocor.llm_provider.llm_client import BaseLLMClient
 from kocor.llm_provider.message import FunctionCall, Message, StreamChunk, ToolCall, Usage
 from kocor.tools.definitions import ToolDefinition
+
+
+def _reveal(key: SecretStr | str) -> str:
+    """兼容 SecretStr 和普通 str 的 API Key 读取。"""
+    return key.reveal() if isinstance(key, SecretStr) else key
 
 
 class OpenAIClient(BaseLLMClient):
@@ -22,7 +28,7 @@ class OpenAIClient(BaseLLMClient):
         """获取或创建 SDK 客户端实例（懒加载，复用连接池）。"""
         if self._client is None:
             self._client = OpenAI(
-                api_key=self.config.openai_api_key,
+                api_key=_reveal(self.config.openai_api_key),
                 base_url=self.config.openai_base_url or None,
             )
         return self._client
@@ -48,7 +54,7 @@ class OpenAIClient(BaseLLMClient):
         # 流式场景需要短 read timeout（3s）以保证 Windows 上 Ctrl+C 的响应性。
         # 因为此超时与 generate() 不同，使用独立的 SDK 客户端。
         client = OpenAI(
-            api_key=self.config.openai_api_key,
+            api_key=_reveal(self.config.openai_api_key),
             base_url=self.config.openai_base_url or None,
             # 设置 read timeout 确保 blocking socket read 能定期返回 Python 字节码，
             # 从而让 Windows 上的 KeyboardInterrupt(Ctrl+C) 可以被传递。

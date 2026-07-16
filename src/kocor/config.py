@@ -11,6 +11,13 @@ from typing import Any, ClassVar, Optional
 
 from dotenv import load_dotenv
 
+from kocor._secret import SecretStr
+
+
+def _is_api_key_field(field_name: str) -> bool:
+    """判断字段名是否代表 API Key。"""
+    return "api_key" in field_name.lower()
+
 
 def _resolve_config_path(path: str) -> str:
     """解析配置文件路径：绝对路径直接使用，相对路径优先查找 CWD，其次包根目录。"""
@@ -84,12 +91,12 @@ class Config:
     skills_dir: str = ".kocor/skills"
 
     # --- OpenAI ---
-    openai_api_key: str = field(default="", metadata={"env": "OPENAI_API_KEY"})
+    openai_api_key: SecretStr | str = field(default="", metadata={"env": "OPENAI_API_KEY"})
     openai_model: str = field(default="gpt-5.5", metadata={"env": "OPENAI_MODEL"})
     openai_base_url: str = field(default="", metadata={"env": "OPENAI_BASE_URL"})
 
     # --- Anthropic ---
-    anthropic_api_key: str = field(default="", metadata={"env": "ANTHROPIC_API_KEY"})
+    anthropic_api_key: SecretStr | str = field(default="", metadata={"env": "ANTHROPIC_API_KEY"})
     anthropic_model: str = field(default="opus-4.7", metadata={"env": "ANTHROPIC_MODEL"})
     anthropic_base_url: str = field(default="", metadata={"env": "ANTHROPIC_BASE_URL"})
 
@@ -305,7 +312,13 @@ class ConfigLoader:
             default = getattr(Config, f.name)
 
             raw = os.environ.get(env_name) if env_name else None
-            value = cls._coerce(f.type, env_name, raw) if raw is not None else default
+            if raw is not None:
+                value = cls._coerce(f.type, env_name, raw)
+                # API Key 字段自动包装为 SecretStr
+                if _is_api_key_field(f.name):
+                    value = SecretStr(value)
+            else:
+                value = default
 
             value = cls._apply_transform(value, meta)
             value = cls._apply_split(value, meta)

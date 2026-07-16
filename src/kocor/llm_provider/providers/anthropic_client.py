@@ -9,9 +9,15 @@ import json
 
 from anthropic import Anthropic
 
+from kocor._secret import SecretStr
 from kocor.llm_provider.llm_client import BaseLLMClient
 from kocor.llm_provider.message import FunctionCall, Message, StreamChunk, ToolCall, Usage
 from kocor.tools.definitions import ToolDefinition
+
+
+def _reveal(key: SecretStr | str) -> str:
+    """兼容 SecretStr 和普通 str 的 API Key 读取。"""
+    return key.reveal() if isinstance(key, SecretStr) else key
 
 
 class AnthropicClient(BaseLLMClient):
@@ -19,8 +25,8 @@ class AnthropicClient(BaseLLMClient):
 
     def _create_client(self):
         return Anthropic(
-            api_key=self.config.anthropic_api_key,
-            auth_token=self.config.anthropic_api_key,  # anthropic 兼容不同厂商模型
+            api_key=_reveal(self.config.anthropic_api_key),
+            auth_token=_reveal(self.config.anthropic_api_key),  # anthropic 兼容不同厂商模型
             base_url=self.config.anthropic_base_url or None,
         )
 
@@ -64,8 +70,8 @@ class AnthropicClient(BaseLLMClient):
         # 因为此超时与 generate() 场景（需要更长 read timeout）不同，所以使用
         # 独立的 SDK 客户端创建，不共享 __init__ 中的 self._client。
         client = Anthropic(
-            api_key=self.config.anthropic_api_key,
-            auth_token=self.config.anthropic_api_key,  # anthropic 兼容不同厂商模型
+            api_key=_reveal(self.config.anthropic_api_key),
+            auth_token=_reveal(self.config.anthropic_api_key),  # anthropic 兼容不同厂商模型
             base_url=self.config.anthropic_base_url or None,
             # 设置 read timeout 确保 blocking socket read 能定期返回 Python 字节码，
             # 从而让 Windows 上的 KeyboardInterrupt(Ctrl+C) 可以被传递。
