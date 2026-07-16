@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 
 from kocor.mcp.client import MCPClient
 from kocor.mcp.config import load_mcp_servers, sanitize_server_name
 from kocor.mcp.event_loop import MCPError
 from kocor.tools.permission import PermissionManager
+
+logger = logging.getLogger(__name__)
 
 
 class McpManager:
@@ -19,18 +22,29 @@ class McpManager:
         self.config_path = config_path
         self._clients: list = []
 
-    def register_all(self) -> list:
+    def register_all(
+        self,
+        client_factory=None,
+    ) -> list:
         """连接所有 MCP 服务器并注册工具到 ToolManager。
+
+        Args:
+            client_factory: 客户端工厂类（测试时传入 FakeMCPClient）。
+                为 None 时使用默认的 MCPClient。
 
         Returns:
             connected_clients: 用于关闭的客户端列表
         """
         servers = load_mcp_servers(self.config_path)
+        if not servers:
+            return self._clients
+
         permissions_cfg = self._load_permissions()
+        factory = client_factory or MCPClient
 
         for name, cfg in servers.items():
             try:
-                client = MCPClient(name, cfg)
+                client = factory(name, cfg)
                 client.start()
                 tool_list = client.list_tools()
 
@@ -62,7 +76,10 @@ class McpManager:
                     )
 
                 self._clients.append(client)
-            except MCPError:
+
+            except (ConnectionError, MCPError, RuntimeError, Exception) as e:
+                # 单个服务器失败不影响其他服务器注册
+                logger.warning("MCP server '%s' registration failed: %s", name, e)
                 try:
                     client.shutdown()
                 except Exception:
