@@ -90,6 +90,9 @@ class Loop:
         循环结束后由本方法负责将本轮 messages 提取为 session_history，
         调用方无需手工调用 extract_session_history。
         """
+        # 工具定义在循环内不变，缓存引用以利用 LLM 客户端的 _normalize_tools 缓存
+        tools = self.tool_manager.get_definitions()
+
         try:
             while not self.ctx.iteration >= self.max_iterations:
                 if self._stop_requested:
@@ -100,14 +103,14 @@ class Loop:
                 hook_msg = self._run_hooks(HookPoint.PRE_GENERATE)
                 self._emit_event(EventType.PRE_GENERATE, iteration=self.ctx.iteration,
                            messages=self.ctx.messages,
-                           tools=self.tool_manager.get_definitions(),
+                           tools=tools,
                            hook_result=hook_msg)
                 if hook_msg is not None:
                     return hook_msg
 
                 response = self.llm.generate(
                     self.ctx.messages,
-                    tools=self.tool_manager.get_definitions(),
+                    tools=tools,
                 )
                 self.ctx.append(response)
 
@@ -149,6 +152,9 @@ class Loop:
 
         生成器结束（耗尽或被关闭）时由本方法负责提取 session_history。
         """
+        # 工具定义在循环内不变，缓存引用以利用 LLM 客户端的 _normalize_tools 缓存
+        tools = self.tool_manager.get_definitions()
+
         try:
             while not self.ctx.iteration >= self.max_iterations:
                 if self._stop_requested:
@@ -161,7 +167,7 @@ class Loop:
                 hook_msg = self._run_hooks(HookPoint.PRE_GENERATE)
                 self._emit_event(EventType.PRE_GENERATE, iteration=self.ctx.iteration,
                            messages=self.ctx.messages,
-                           tools=self.tool_manager.get_definitions(),
+                           tools=tools,
                            hook_result=hook_msg)
                 if hook_msg is not None:
                     yield StreamChunk(content=hook_msg, is_final=True)
@@ -174,7 +180,7 @@ class Loop:
 
                 for chunk in self.llm.stream(
                     self.ctx.messages,
-                    tools=self.tool_manager.get_definitions(),
+                    tools=tools,
                 ):
                     # 在 LLM 流式块之间检查停止信号。
                     # 即使 KeyboardInterrupt 被延迟传递（Windows  blocked I/O），

@@ -83,6 +83,10 @@ class BaseLLMClient(ABC):
     def __init__(self):
         self.config = Config.load()
         self._client = self._create_client()
+        # 工具定义缓存：(id(tools), 转换结果)
+        # 工具列表在会话期间不变（ToolManager 持有一份引用），
+        # 用 id(tools) 作缓存键精确且零开销。
+        self._tool_cache: tuple[int, list[dict] | None] | None = None
 
     @property
     @abstractmethod
@@ -148,6 +152,33 @@ class BaseLLMClient(ABC):
         """
         return None, messages
 
+    def _normalize_tools(
+        self,
+        tools: list[ToolDefinition] | None,
+    ) -> list[dict] | None:
+        """转换工具定义，带缓存。
+
+        工具列表在会话期间不变（ToolManager 持有一份引用），
+        用 id(tools) 作缓存键。tools 为 None 时清除缓存。
+
+        Args:
+            tools: 工具定义列表或 None
+
+        Returns:
+            转换后的工具数据列表或 None
+        """
+        if not tools:
+            self._tool_cache = None
+            return None
+
+        cache_key = id(tools)
+        if self._tool_cache is not None and self._tool_cache[0] == cache_key:
+            return self._tool_cache[1]
+
+        result = [self._normalize_tool(t) for t in tools]
+        self._tool_cache = (cache_key, result)
+        return result
+
     def generate(
         self,
         messages: list[Message],
@@ -157,12 +188,12 @@ class BaseLLMClient(ABC):
     ) -> Message:
         """生成响应。
 
-        模板方法：_prepare_messages → _normalize_in → _normalize_tool → _api_generate → _normalize_out
+        模板方法：_prepare_messages → _normalize_in → _normalize_tools → _api_generate → _normalize_out
         """
         actual_max_tokens = max_tokens if max_tokens is not None else self.config.max_tokens
         system_data, filtered = self._prepare_messages(messages)
         input_data = self._normalize_in(filtered)
-        tool_data = [self._normalize_tool(t) for t in tools] if tools else None
+        tool_data = self._normalize_tools(tools)
         try:
             response = self._api_generate(input_data, tool_data, actual_max_tokens, temperature, system=system_data)
             return self._normalize_out(response)
@@ -178,12 +209,12 @@ class BaseLLMClient(ABC):
     ) -> Iterator[StreamChunk]:
         """流式生成响应。
 
-        模板方法：_prepare_messages → _normalize_in → _normalize_tool → _api_stream
+        模板方法：_prepare_messages → _normalize_in → _normalize_tools → _api_stream
         """
         actual_max_tokens = max_tokens if max_tokens is not None else self.config.max_tokens
         system_data, filtered = self._prepare_messages(messages)
         input_data = self._normalize_in(filtered)
-        tool_data = [self._normalize_tool(t) for t in tools] if tools else None
+        tool_data = self._normalize_tools(tools)
         try:
             yield from self._api_stream(input_data, tool_data, actual_max_tokens, temperature, system=system_data)
         except (httpx.ReadTimeout, httpx.ConnectTimeout):
