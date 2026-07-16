@@ -19,25 +19,40 @@ def _is_api_key_field(field_name: str) -> bool:
     return "api_key" in field_name.lower()
 
 
-def _resolve_config_path(path: str) -> str:
-    """解析配置文件路径：绝对路径直接使用，相对路径优先查找 CWD，其次包根目录。"""
-    if os.path.isabs(path):
-        return path
-    if os.path.exists(path):
-        return path
-    package_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    resolved = os.path.join(package_root, path)
-    if os.path.exists(resolved):
-        return resolved
-    return path
+def _resolve_path(path: str, *, prefer_cwd: bool = False) -> str:
+    """解析相对路径为绝对路径。
 
+    绝对路径直接返回。
+    相对路径按 prefer_cwd 决定解析策略：
+    - prefer_cwd=True:  优先查找 CWD，不存在时回退包根目录（配置文件场景）
+    - prefer_cwd=False: 直接相对于包根目录（数据文件场景）
 
-def _resolve_data_path(path: str) -> str:
-    """解析数据目录路径：绝对路径直接使用，相对路径相对于包根目录。"""
+    Args:
+        path: 待解析的路径
+        prefer_cwd: True 表示配置文件（优先 CWD），False 表示数据文件（相对于包根目录）
+
+    Returns:
+        解析后的路径。文件不存在时返回原始路径（兼容未创建的配置文件）。
+    """
     if os.path.isabs(path):
-        return path
-    package_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    return os.path.join(package_root, path)
+        return os.path.abspath(path)
+
+    package_root = os.path.dirname(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    )
+
+    if prefer_cwd:
+        # 配置文件场景：优先 CWD，不存在时回退包根目录
+        # 都不存在时返回原始路径（兼容未创建的配置文件）
+        if os.path.exists(path):
+            return path
+        pkg_path = os.path.join(package_root, path)
+        if os.path.exists(pkg_path):
+            return pkg_path
+        return path  # 都不存在，返回原始路径
+    else:
+        # 数据文件场景：直接相对于包根目录
+        return os.path.abspath(os.path.join(package_root, path))
 
 
 # --- 声明式元数据：配置字段的加载规则 ----------------------------------------------
@@ -47,7 +62,7 @@ def _resolve_data_path(path: str) -> str:
 #   choices   — 合法值集合（在 transform 后校验）
 #   min/max   — 数值范围（含端点，float 类型）
 #   transform — "lower" / "upper"
-#   resolve   — "config"（_resolve_config_path + 存在性校验）/ "data"（_resolve_data_path）
+#   resolve   — "config"（优先 CWD 查找）/ "data"（相对于包根目录）
 #   split     — "str"（将 env 字符串按逗号分割为 tuple，仅 str/list/tuple 字段时有效）
 # 类型从字段注解（int/float/str/bool/tuple）自动推断，不在元数据中重复。
 
@@ -378,12 +393,12 @@ class ConfigLoader:
 
     @staticmethod
     def _apply_resolve(value: Any, meta: dict) -> Any:
-        """路径解析：config（_resolve_config_path）或 data（_resolve_data_path）。"""
+        """路径解析：config（prefer_cwd）或 data（相对于包根目录）。"""
         resolve = meta.get("resolve")
         if resolve == "config":
-            return _resolve_config_path(value)
+            return _resolve_path(value, prefer_cwd=True)
         if resolve == "data":
-            return _resolve_data_path(value)
+            return _resolve_path(value, prefer_cwd=False)
         return value
 
     @staticmethod
