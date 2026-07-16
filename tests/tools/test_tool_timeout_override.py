@@ -72,7 +72,7 @@ class TestPerToolTimeout:
         registry = ToolManager()
 
         def slow(**kwargs):
-            time.sleep(3)
+            time.sleep(2)
             return "done"
 
         registry.register(
@@ -89,7 +89,7 @@ class TestPerToolTimeout:
         registry = ToolManager()
 
         def slow(**kwargs):
-            time.sleep(3)
+            time.sleep(2)
             return "done"
 
         registry.register(

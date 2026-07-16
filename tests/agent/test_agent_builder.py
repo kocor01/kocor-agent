@@ -46,6 +46,21 @@ def mock_llm_factory(monkeypatch):
     return fake
 
 
+@pytest.fixture(autouse=True)
+def _skip_mcp_skill(monkeypatch):
+    """Builder 单元测试无需 MCP 服务器连接或技能加载（ToolManager.register_all 默认会启动 MCP）。
+
+    各 build_* 方法只验证装配逻辑，不验证 MCP/Skill 功能。
+    """
+    from kocor.tools import tool_manager as tm_mod
+
+    def _fast_register_all(self, include_subagent=False):
+        # 仅注册内置工具，跳过耗时的 MCP 服务器和技能加载
+        self.register_builtin_tools(include_subagent=include_subagent)
+
+    monkeypatch.setattr(tm_mod.ToolManager, "register_all", _fast_register_all)
+
+
 class TestAgentBuilderSubagent:
     """测试 Subagent 装配逻辑。"""
 

@@ -183,7 +183,7 @@ class TestRunnerTimeout:
         # 用慢 MockLLM：睡眠超过 1s 再返回
         class SlowLLM(MockLLM):
             def generate(self, messages, tools=None, **kwargs):
-                time.sleep(3)
+                time.sleep(1.5)
                 return Message(role="assistant", content="最终完成")
 
         runner = SubagentRunner(
@@ -213,7 +213,7 @@ class TestRunnerTimeout:
 
         class SlowLLM(MockLLM):
             def generate(self, messages, tools=None, **kwargs):
-                time.sleep(3)
+                time.sleep(1.5)
                 return Message(role="assistant", content="done")
 
         runner = SubagentRunner(

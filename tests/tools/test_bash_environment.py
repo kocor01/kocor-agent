@@ -169,7 +169,7 @@ class TestLocalEnvironmentExecute:
 
     def test_timeout_kills_process(self):
         env = LocalEnvironment(timeout=30)
-        result = env.execute("sleep 10", timeout=1)
+        result = env.execute("sleep 3", timeout=1)
         assert result["exit_code"] == 124
         assert "timed out" in result["stdout"]
 

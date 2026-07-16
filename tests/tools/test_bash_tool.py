@@ -66,7 +66,7 @@ class TestBashToolHandler:
 
     def test_handler_timeout_long_command(self):
         """短超时应触发超时，而不是无限等待。"""
-        result = BashTool.handler(command="sleep 10", timeout=1)
+        result = BashTool.handler(command="sleep 3", timeout=1)
         assert "timed out" in result.lower() or "exit_code" in result
 
     def test_handler_cwd_tracking(self):
