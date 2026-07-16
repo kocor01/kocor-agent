@@ -286,6 +286,9 @@ class SessionManager:
             # assistant 消息记录 completion_tokens（该消息生成的 token 数），input 只在会话级统计
             self.store.db.append_message(entry.session_id, msg, usage=msg.usage)
 
+        # 批量提交剩余未提交数据
+        self.store.db.flush()
+
         return len(messages)
 
     # -- 内部辅助 --

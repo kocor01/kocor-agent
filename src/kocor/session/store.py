@@ -24,12 +24,18 @@ class SessionDB:
     """SQLite 持久化层。
 
     WAL 模式，单线程访问。提供会话元数据和消息历史的原子化读写。
+
+    支持批量提交模式（batch_mode）以减少消息持久化的磁盘 I/O 次数。
+    默认每 20 条消息或显式调用 flush() 时统一提交。
     """
 
-    def __init__(self, db_path: str):
+    def __init__(self, db_path: str, batch_mode: bool = True, batch_threshold: int = 20):
         self._db_path = db_path
         self._lock = threading.Lock()
         self._conn: sqlite3.Connection | None = None
+        self._batch_mode = batch_mode
+        self._batch_threshold = batch_threshold
+        self._pending_count = 0
         self._connect()
 
     def _connect(self) -> None:
@@ -83,6 +89,7 @@ class SessionDB:
 
     def close(self) -> None:
         if self._conn:
+            self.flush()
             self._conn.close()
             self._conn = None
 
@@ -245,11 +252,29 @@ class SessionDB:
                     datetime.now().isoformat(),
                 ),
             )
-            self._conn.commit()
+
+            # 批量模式：延迟提交，减少 fsync 次数
+            if self._batch_mode:
+                self._pending_count += 1
+                if self._pending_count >= self._batch_threshold:
+                    self._conn.commit()
+                    self._pending_count = 0
+            else:
+                self._conn.commit()
 
         # 自动以首个用户消息设置会话标题
         if message.role == "user" and content.strip():
             self.update_session_title(session_id, content.strip())
+
+    def flush(self) -> None:
+        """显式提交所有未提交的变更。
+
+        在批量模式下，确保最后一批未达阈值的数据落盘。
+        """
+        if self._batch_mode and self._pending_count > 0:
+            with self._lock:
+                self._conn.commit()
+                self._pending_count = 0
 
     def _lookup_tool_call(self, session_id: str, tool_call_id: str) -> dict | None:
         """查找与 tool_call_id 匹配的完整 tool_call 信息（用于写入 tool 消息的 tool_calls 列供审查）。"""
