@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
+import tempfile
+
+from kocor.memory.store import MemoryStore
 from kocor.tools.tool_manager import ToolManager
+from kocor.tools.toolsets.todo_tool import TodoStore
 
 
 class TestBundledToolRegistration:
@@ -48,7 +52,7 @@ class TestBundledToolRegistration:
             if name in skipped:
                 continue
             if name == "search_files":
-                result = handler(pattern="test")
+                result = handler(pattern="__nonexistent_pattern_xyz__", path="tests")
             elif name == "read_file":
                 result = handler(path="/nonexistent")
             elif name == "write_file":
@@ -56,8 +60,15 @@ class TestBundledToolRegistration:
             elif name == "patch_file":
                 result = handler(path="/nonexistent", old_string="a", new_string="b")
             elif name == "todo":
+                tm.todo_store = TodoStore()
                 result = handler(todos=[])
             elif name == "memory":
+                tm.memory_store = MemoryStore(
+                    memory_dir=tempfile.mkdtemp(),
+                    memory_limit=10000,
+                    user_limit=5000,
+                    user_enabled=True,
+                )
                 result = handler(operations=[])
             else:
                 continue
