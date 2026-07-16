@@ -89,8 +89,33 @@ class TestDetectDangerousCommand:
         level, reason = detect_dangerous_command("mkfs /dev/sda1")
         assert level == "dangerous"
 
+    def test_dangerous_dd_zero(self):
+        """dd 覆写块设备应检测为 dangerous。"""
+        level, reason = detect_dangerous_command("dd if=/dev/zero of=/dev/sda")
+        assert level == "dangerous"
+
     def test_caution_rm_rf(self):
         level, reason = detect_dangerous_command("rm -rf /tmp/foo")
+        assert level == "caution"
+
+    def test_caution_kill(self):
+        """kill 应检测为 caution。"""
+        level, reason = detect_dangerous_command("kill 1234")
+        assert level == "caution"
+
+    def test_caution_killall(self):
+        """killall 应检测为 caution。"""
+        level, reason = detect_dangerous_command("killall nginx")
+        assert level == "caution"
+
+    def test_caution_chmod_R(self):
+        """chmod -R 应检测为 caution。"""
+        level, reason = detect_dangerous_command("chmod -R 777 /tmp/test")
+        assert level == "caution"
+
+    def test_caution_wget(self):
+        """wget 下载脚本应检测为 caution。"""
+        level, reason = detect_dangerous_command("wget http://example.com/malware.sh")
         assert level == "caution"
 
     def test_dangerous_curl_pipe_bash(self):
@@ -155,6 +180,26 @@ class TestDetectDangerousCommand:
         """echo 'rm -rf / is dangerous' 不应升级为 dangerous（引号剥离不改变级别）。"""
         level, reason = detect_dangerous_command("echo 'rm -rf / is dangerous'")
         assert level != "dangerous", f"Expected not dangerous, got {level!r}: {reason}"
+
+    def test_safe_sudo_check(self):
+        """sudo -S -p 密码提示是安全操作。"""
+        level, reason = detect_dangerous_command("sudo -S -p '' whoami")
+        assert level == "safe"
+
+    def test_python_script_is_safe(self):
+        """python -c 执行脚本安全。"""
+        level, reason = detect_dangerous_command("python3 -c \"print('hello')\"")
+        assert level == "safe"
+
+    def test_empty_command(self):
+        """空命令应安全。"""
+        level, reason = detect_dangerous_command("")
+        assert level == "safe"
+
+    def test_dangerous_encryption_miner(self):
+        """加密货币挖矿应检测为 dangerous。"""
+        level, reason = detect_dangerous_command("xmrig --config pool.cryptomining.com")
+        assert level == "dangerous"
 
     # --- 新增：变量混淆绕过检测 ---
 
@@ -252,6 +297,37 @@ class TestValidateWorkdir:
         assert validate_workdir("/tmp/foo") is None
         assert validate_workdir("C:\\Users\\test") is None
 
+    def test_windows_path(self):
+        """Windows 风格路径应合法。"""
+        assert validate_workdir("C:\\Users\\user\\project") is None
+
+    def test_path_with_spaces(self):
+        """带空格的路径应合法。"""
+        assert validate_workdir("/home/user/my project") is None
+
+    def test_tilde_path(self):
+        """~ 开头的路径应合法。"""
+        assert validate_workdir("~/projects") is None
+
+    def test_dot_path(self):
+        """. 和 .. 路径应合法。"""
+        assert validate_workdir(".") is None
+
     def test_unsafe_path_returns_error(self):
         err = validate_workdir("/tmp; rm -rf /")
+        assert err is not None
+
+    def test_pipe_blocked(self):
+        """管道符号应被拦截。"""
+        err = validate_workdir("/tmp|echo")
+        assert err is not None
+
+    def test_backtick_blocked(self):
+        """反引号应被拦截。"""
+        err = validate_workdir("`pwd`")
+        assert err is not None
+
+    def test_dollar_blocked(self):
+        """$() 命令替换应被拦截。"""
+        err = validate_workdir("$(pwd)")
         assert err is not None
