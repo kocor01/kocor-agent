@@ -66,6 +66,13 @@ def _normalize_line_endings(text: str, target: str) -> str:
 
 
 class WriteFile:
+    @classmethod
+    def handler_factory(cls, **deps):
+        """返回带 file_state 注入的 handler。"""
+        fs_val = deps.get("file_state")
+        return lambda **kw: WriteFile.handler(file_state=fs_val, **kw)
+
+
     """写入文件内容工具。
 
     特性：

@@ -54,6 +54,9 @@ class ToolManager:
     ) -> None:
         """向当前 ToolManager 注册内置工具（文件操作、沙盒执行、bash、cron、subagent）。
 
+        每个工具类通过 handler_factory 类方法提供 handler 工厂，
+        注入共享依赖（file_state、env、memory_store 等）。
+
         Args:
             include_cron: 是否注册 cronjob 工具并创建 cron worker。
                 主进程默认 True。cron worker 子进程内设 False —— 既不注册
@@ -62,85 +65,60 @@ class ToolManager:
                 cli.py 在注册时通过 ToolManager._subagent_runner 注入运行器。
         """
         from kocor.tools.toolsets.bash_tool import BashTool, ProcessTool
+        from kocor.tools.toolsets.cron_tool import CronTool
+        from kocor.tools.toolsets.memory_tool import MemoryTool
         from kocor.tools.toolsets.patch_file_tool import PatchFile
         from kocor.tools.toolsets.read_file_tool import ReadFile
         from kocor.tools.toolsets.search_file_tool import SearchFiles
+        from kocor.tools.toolsets.subagent.tool import SubagentTool
+        from kocor.tools.toolsets.todo_tool import TodoTool
         from kocor.tools.toolsets.write_file_tool import WriteFile
 
         self.memory_store = None
         self.todo_store = None
 
-        # 文件工具：通过闭包注入 file_state
-        self.register(
-            ReadFile.NAME, ReadFile.DESCRIPTION, ReadFile.PARAMETERS,
-            lambda **kw: ReadFile.handler(file_state=self.file_state, **kw),
-            ReadFile.SAFETY_LEVEL,
-        )
-        self.register(
-            WriteFile.NAME, WriteFile.DESCRIPTION, WriteFile.PARAMETERS,
-            lambda **kw: WriteFile.handler(file_state=self.file_state, **kw),
-            WriteFile.SAFETY_LEVEL,
-        )
-        self.register(
-            PatchFile.NAME, PatchFile.DESCRIPTION, PatchFile.PARAMETERS,
-            lambda **kw: PatchFile.handler(file_state=self.file_state, **kw),
-            PatchFile.SAFETY_LEVEL,
-        )
+        # 构建共享依赖字典。
+        # memory_store/todo_store 在 Agent.__init__ 中设定（晚于注册），
+        # 因此传 ToolManager 自身引用，由 handler 在调用时解析。
+        deps = {
+            "file_state": self.file_state,
+            "env": self.get_or_create_env(),
+            "tool_manager": self,
+            "subagent_runner": self._subagent_runner,
+        }
 
-        # BashTool 通过闭包注入 env，ProcessTool 保持直接注册
-        self.register(
-            BashTool.NAME, BashTool.DESCRIPTION, BashTool.PARAMETERS,
-            lambda **kw: BashTool.handler(env=self.get_or_create_env(), **kw),
-            BashTool.SAFETY_LEVEL,
-        )
-        self.register(
-            SearchFiles.NAME, SearchFiles.DESCRIPTION,
-            SearchFiles.PARAMETERS, SearchFiles.handler, SearchFiles.SAFETY_LEVEL,
-        )
-        self.register(
-            ProcessTool.NAME, ProcessTool.DESCRIPTION,
-            ProcessTool.PARAMETERS, ProcessTool.handler, ProcessTool.SAFETY_LEVEL,
-        )
-
-        # memory 工具依赖 self.memory_store，handler 在调用时读取
-        from kocor.tools.toolsets.memory_tool import MemoryTool
-        self.register(
-            MemoryTool.NAME, MemoryTool.DESCRIPTION, MemoryTool.PARAMETERS,
-            lambda **kw: MemoryTool.handler(store=self.memory_store, **kw),
-            MemoryTool.SAFETY_LEVEL,
-        )
-
-        # todo 工具依赖 self.todo_store，handler 在调用时读取
-        from kocor.tools.toolsets.todo_tool import TodoTool
-        self.register(
-            TodoTool.NAME, TodoTool.DESCRIPTION, TodoTool.PARAMETERS,
-            lambda **kw: TodoTool.handler(store=self.todo_store, **kw),
-            TodoTool.SAFETY_LEVEL,
-        )
+        # 始终注册的核心工具
+        core_tools = [
+            ReadFile, WriteFile, PatchFile, BashTool,
+            SearchFiles, ProcessTool, MemoryTool, TodoTool,
+        ]
+        for tool_cls in core_tools:
+            handler = tool_cls.handler_factory(**deps)
+            self.register(
+                tool_cls.NAME, tool_cls.DESCRIPTION, tool_cls.PARAMETERS,
+                handler, tool_cls.SAFETY_LEVEL,
+            )
 
         # cron 工具：主进程注册 cronjob 工具 + 创建 cron worker 子进程管理器。
-        # cron worker 子进程自身跳过此块（include_cron=False）。
         if include_cron:
             from kocor.tools.toolsets.cron.worker_process import CronWorkerProcess
-            from kocor.tools.toolsets.cron_tool import CronTool
             if self._cron_worker is None:
                 self._cron_worker = CronWorkerProcess()
+            handler = CronTool.handler_factory(**deps)
             self.register(
                 CronTool.NAME, CronTool.DESCRIPTION, CronTool.PARAMETERS,
-                lambda **kw: CronTool.handler(**kw),
-                CronTool.SAFETY_LEVEL,
+                handler, CronTool.SAFETY_LEVEL,
             )
 
         # subagent 工具：注册委派子代理工具。
         # 非 orchestrator 角色（子代理自身）由 _build_child_tool_manager 管理。
+        # handler 在调用时解析 self._subagent_runner（延迟绑定），
+        # 避免 LLM 未就绪时 runner 不存在的问题。
         if include_subagent:
-            from kocor.tools.toolsets.subagent.tool import SubagentTool
-            # 在调用时解析 self._subagent_runner（cli.py 在 LLM 创建后注入），
-            # 不在此处闭包绑定（避免 LLM 未就绪时 runner 不存在的问题）
+            handler = SubagentTool.handler_factory(**deps)
             self.register(
                 SubagentTool.NAME, SubagentTool.DESCRIPTION, SubagentTool.PARAMETERS,
-                lambda **kw: SubagentTool.handler(runner=self._subagent_runner, **kw),
-                SubagentTool.SAFETY_LEVEL,
+                handler, SubagentTool.SAFETY_LEVEL,
                 timeout=0,  # 豁免全局超时（子代理通常需要数分钟）
             )
 

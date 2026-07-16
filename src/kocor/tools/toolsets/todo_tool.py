@@ -201,6 +201,13 @@ class TodoStore:
 
 
 class TodoTool:
+    @classmethod
+    def handler_factory(cls, **deps):
+        """返回带 store 注入的 handler（延迟解析，因为 store 注册后才设定）。"""
+        tm = deps.get("tool_manager")
+        return lambda **kw: TodoTool.handler(store=tm.todo_store if tm else None, **kw)
+
+
     """任务规划工具（仿 MemoryTool 类式风格）。"""
 
     NAME = "todo"

@@ -54,6 +54,13 @@ def _reset_env() -> None:
 
 
 class BashTool:
+    @classmethod
+    def handler_factory(cls, **deps):
+        """返回带 env 注入的 handler。"""
+        env_val = deps.get("env")
+        return lambda **kw: BashTool.handler(env=env_val, **kw)
+
+
     """在本地 shell 中执行命令。
 
     CWD 和导出的环境变量在调用之间持久化。
@@ -194,6 +201,12 @@ class BashTool:
 
 
 class ProcessTool:
+    @classmethod
+    def handler_factory(cls, **deps):
+        """返回无依赖注入的 handler。"""
+        return lambda **kw: ProcessTool.handler(**kw)
+
+
     """管理 bash 后台进程。
 
     提供以下操作：

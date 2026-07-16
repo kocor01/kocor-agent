@@ -129,6 +129,12 @@ class ReadFile:
     }
 
     @staticmethod
+    def handler_factory(**deps):
+        """返回带 file_state 注入的 handler。"""
+        fs = deps.get("file_state")
+        return lambda **kw: ReadFile.handler(file_state=fs, **kw)
+
+    @staticmethod
     def handler(
         path: str,
         offset: int | None = None,

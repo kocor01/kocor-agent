@@ -15,6 +15,13 @@ from kocor.tools.permission import PermissionManager
 
 
 class MemoryTool:
+    @classmethod
+    def handler_factory(cls, **deps):
+        """返回带 store 注入的 handler（延迟解析，因为 store 注册后才设定）。"""
+        tm = deps.get("tool_manager")
+        return lambda **kw: MemoryTool.handler(store=tm.memory_store if tm else None, **kw)
+
+
     """管理长期记忆。"""
 
     NAME = "memory"

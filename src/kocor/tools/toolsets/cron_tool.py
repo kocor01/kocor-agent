@@ -442,6 +442,12 @@ action='update'、'pause'、'resume'、'remove' 或 'run' 管理已有任务。
 
 
 class CronTool:
+    @classmethod
+    def handler_factory(cls, **deps):
+        """返回无依赖注入的 handler。"""
+        return lambda **kw: CronTool.handler(**kw)
+
+
     """定时任务管理工具。"""
 
     NAME = "cronjob"
