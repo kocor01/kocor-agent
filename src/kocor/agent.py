@@ -185,9 +185,14 @@ class Agent:
         self._check_nudge()
 
     def reset_conversation(self) -> None:
-        """清空会话历史，开始新对话。"""
+        """清空会话历史，开始新对话。
+
+        重置时刷新记忆快照，确保新对话看到最新记忆。
+        """
         self.ctx.reset_conversation()
         self._persisted_msg_idx = 0
+        if self._memory:
+            self._memory.refresh_snapshot()
         if self.session_manager:
             self.session_manager.reset_session(self.session_manager.session_key)
 
@@ -419,11 +424,17 @@ class Agent:
             self._todo_store.hydrate_from_history(history)
 
     def _check_nudge(self) -> None:
-        """检查是否需要触发后台记忆审查。"""
+        """检查是否需要触发后台记忆审查。
+
+        审查后刷新记忆快照，使新写入的记忆对下一轮 LLM 调用可见。
+        """
         if not self._background_reviewer:
             return
         self._turns_since_memory += 1
         nudge_interval = Config.load().nudge_interval
         if self._turns_since_memory >= nudge_interval:
             self._background_reviewer.review(self.ctx.session_history)
+            # 审查后刷新快照，使新记忆立即对 LLM 可见
+            if self._memory:
+                self._memory.refresh_snapshot()
             self._turns_since_memory = 0

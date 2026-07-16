@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import os
 import sys
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal
@@ -74,6 +75,8 @@ class MemoryStore:
             memory_usage=(0, memory_limit),
             user_usage=(0, user_limit),
         )
+        self._snapshot_version: int = 0
+        self._last_snapshot_at: float = 0.0
 
     # ── 生命周期 ────────────────────────────────────────
 
@@ -104,7 +107,23 @@ class MemoryStore:
             user_usage=(user_used, self.user_limit),
             formatted_text=formatted,
         )
+        self._snapshot_version += 1
+        self._last_snapshot_at = time.time()
         return self._snapshot
+
+    def refresh_snapshot(self) -> MemorySnapshot:
+        """从磁盘重新加载，生成新快照。
+
+        在 add/replace/remove 操作后调用，使新记忆对下一轮 LLM 可见。
+        不改变快照结构（标题/格式），仅更新条目文本，
+        因此 system prompt 的前缀缓存仍有效。
+        """
+        return self.load_from_disk()
+
+    @property
+    def snapshot_version(self) -> int:
+        """快照版本号，每次 refresh 递增。"""
+        return self._snapshot_version
 
     def format_for_system_prompt(self) -> str:
         """返回冻结快照的 formatted_text（会话内不变）。"""
