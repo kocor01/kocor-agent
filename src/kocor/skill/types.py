@@ -10,7 +10,6 @@ from enum import Enum
 from typing import Callable
 
 from kocor.tools.permission import PermissionManager
-
 from kocor.tools.tool_manager import ToolManager
 
 

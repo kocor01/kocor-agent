@@ -8,16 +8,15 @@ from __future__ import annotations
 import json
 import os
 import tempfile
-from pathlib import Path
 
 from kocor.tools.permission import PermissionManager
+from kocor.tools.tool_utils import resolve_safe_path
 from kocor.tools.toolsets.file.file_safety import (
     check_sensitive_path,
     is_internal_file_tool_content,
     is_write_denied,
 )
 from kocor.tools.toolsets.file.file_state import FileStateTracker
-from kocor.tools.tool_utils import resolve_safe_path
 
 # ── 行尾/BOM 检测 ────────────────────────────────────────────────
 _UTF8_BOM = "﻿"

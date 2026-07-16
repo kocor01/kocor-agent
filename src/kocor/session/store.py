@@ -16,7 +16,6 @@ from pathlib import Path
 from kocor.llm_provider.message import FunctionCall, Message, ToolCall, Usage
 from kocor.session.types import SessionEntry
 
-
 # ---------------------------------------------------------------------------
 # SessionDB — SQLite 持久化层
 # ---------------------------------------------------------------------------

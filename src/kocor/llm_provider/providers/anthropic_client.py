@@ -6,14 +6,12 @@
 from __future__ import annotations
 
 import json
-from typing import Iterator
 
 from anthropic import Anthropic
 
-from kocor.config import Config
 from kocor.llm_provider.llm_client import BaseLLMClient
-from kocor.tools.definitions import ToolDefinition
 from kocor.llm_provider.message import FunctionCall, Message, StreamChunk, ToolCall, Usage
+from kocor.tools.definitions import ToolDefinition
 
 
 class AnthropicClient(BaseLLMClient):

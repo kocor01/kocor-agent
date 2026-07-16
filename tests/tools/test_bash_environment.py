@@ -1,13 +1,11 @@
 """bash/environment.py 单元测试：BaseEnvironment 和 LocalEnvironment。"""
 
 import os
-import tempfile
-from unittest.mock import patch, MagicMock, PropertyMock
+from unittest.mock import MagicMock
 
 import pytest
 
 from kocor.tools.toolsets.bash.environment import BaseEnvironment, LocalEnvironment
-
 
 # =============================================================================
 # BaseEnvironment 抽象基类测试
@@ -256,11 +254,9 @@ class TestLocalEnvironmentWrapCommand:
 
 def _make_test_env(command_output: str = "", exit_code: int = 0, timeout: int = 30):
     """创建 BaseEnvironment 的测试子类，模拟 _run_bash 行为。"""
-    import time as _time
 
     class TestEnv(BaseEnvironment):
         def _run_bash(self, cmd_string, *, login=False, timeout=120, stdin_data=None):
-            import subprocess
             proc = MagicMock()
             # 模拟 subprocess.Popen 接口
             proc.poll.return_value = None

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-from unittest.mock import MagicMock
 
 from kocor.agent import Agent
 from kocor.llm_provider.message import FunctionCall, Message, ToolCall

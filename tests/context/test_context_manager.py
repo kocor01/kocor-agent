@@ -4,14 +4,9 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-import pytest
-
-from kocor.context.budget import TokenBudget
-from kocor.context.context_manager import ContextManager
-from kocor.context.strategies import ContextStrategyApplier
-from kocor.context.types import ContextStrategy
-from kocor.llm_provider.message import Message
 from kocor.config import Config
+from kocor.context.context_manager import ContextManager
+from kocor.llm_provider.message import Message
 
 
 def _override_config(values: dict) -> dict:

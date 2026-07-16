@@ -2,8 +2,8 @@
 
 import pytest
 
-from kocor.skill.types import InvokeStrategy, SkillDefinition, SkillType
 from kocor.skill.skill_manager import SkillManager
+from kocor.skill.types import SkillDefinition, SkillType
 
 
 class TestSkillRegistryRegister:

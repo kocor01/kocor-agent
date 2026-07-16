@@ -6,7 +6,6 @@ import re
 import shlex
 import shutil
 import tempfile
-from pathlib import Path
 
 _IS_WINDOWS = platform.system() == "Windows"
 

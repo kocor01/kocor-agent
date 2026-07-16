@@ -5,17 +5,12 @@
 
 from __future__ import annotations
 
-import json
-from dataclasses import dataclass, field
 from unittest.mock import MagicMock
 
-import pytest
-
 from kocor.event.event_manager import EventEmitter, EventType
-from kocor.hook.base import HookPoint, HookContext, HookResult, HookAction
+from kocor.hook.base import HookAction, HookPoint, HookResult
 from kocor.hook.hook_manager import HookManager
-from kocor.llm_provider.message import FunctionCall, Message, ToolCall, StreamChunk
-
+from kocor.llm_provider.message import FunctionCall, Message, StreamChunk, ToolCall
 
 # ── Helper: 构建 Loop 所需的最小 mock ──
 

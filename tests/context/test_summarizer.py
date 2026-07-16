@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
-from kocor.context.types import SummaryNode
 from kocor.context.summarizer import HistorySummarizer
-from kocor.hook.base import HookPoint, HookContext, HookResult, HookAction
+from kocor.context.types import SummaryNode
+from kocor.hook.base import HookAction, HookContext, HookPoint, HookResult
 from kocor.llm_provider.message import FunctionCall, Message, ToolCall
 
 

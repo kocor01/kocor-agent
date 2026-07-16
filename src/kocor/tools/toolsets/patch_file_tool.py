@@ -11,6 +11,7 @@ import logging
 import os
 
 from kocor.tools.permission import PermissionManager
+from kocor.tools.tool_utils import resolve_safe_path
 from kocor.tools.toolsets.file.file_safety import (
     check_sensitive_path,
     is_internal_file_tool_content,
@@ -18,7 +19,6 @@ from kocor.tools.toolsets.file.file_safety import (
 )
 from kocor.tools.toolsets.file.file_state import FileStateTracker
 from kocor.tools.toolsets.file.fuzzy_match import fuzzy_find_and_replace
-from kocor.tools.tool_utils import resolve_safe_path
 
 logger = logging.getLogger(__name__)
 

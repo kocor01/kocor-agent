@@ -162,6 +162,7 @@ class TestExtractNotebook:
         f.close()
         try:
             import pytest
+
             from kocor.tools.toolsets.file.read_extract import ExtractionError
             with pytest.raises(ExtractionError):
                 extract_document_text(f.name)

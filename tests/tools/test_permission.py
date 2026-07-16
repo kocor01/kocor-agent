@@ -1,10 +1,9 @@
 """统一 PermissionManager 测试。"""
 
-import pytest
+from kocor.llm_provider.message import FunctionCall, ToolCall
 from kocor.tools.permission import PermissionManager
 from kocor.tools.toolsets.read_file_tool import ReadFile
 from kocor.tools.toolsets.write_file_tool import WriteFile
-from kocor.llm_provider.message import ToolCall, FunctionCall
 
 
 def _tc(name: str, args: str = "{}") -> ToolCall:

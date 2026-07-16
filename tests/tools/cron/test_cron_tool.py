@@ -4,12 +4,10 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from unittest.mock import MagicMock, patch
 
 import pytest
 
-from kocor.tools.toolsets.cron.jobs import HAS_CRONITER, create_job, load_jobs, get_job
-
+from kocor.tools.toolsets.cron.jobs import create_job
 
 # ---------------------------------------------------------------------------
 # Fixtures

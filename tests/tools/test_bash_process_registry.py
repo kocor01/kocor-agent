@@ -3,14 +3,11 @@
 import time
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from kocor.tools.toolsets.bash.process_registry import (
+    MAX_OUTPUT_CHARS,
     ProcessRegistry,
     ProcessSession,
-    MAX_OUTPUT_CHARS,
 )
-
 
 # env.execute() 返回 {"stdout": ..., "exit_code": ...}
 _MOCK_ENV_RESULT = {"stdout": "12345\n", "exit_code": 0}

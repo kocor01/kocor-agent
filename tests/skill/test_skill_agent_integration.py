@@ -1,11 +1,11 @@
 """测试 Agent 与 Skill 集成（slash 命令处理）。"""
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 from kocor.agent import Agent
 from kocor.llm_provider.message import Message, StreamChunk
-from kocor.skill.types import InvokeStrategy, SkillDefinition, SkillType
 from kocor.skill.skill_manager import SkillManager
+from kocor.skill.types import InvokeStrategy, SkillDefinition, SkillType
 from kocor.tools.tool_manager import ToolManager
 
 

@@ -2,8 +2,8 @@
 
 
 from kocor.llm_provider.llm_client import LLMClient
-from kocor.tools.definitions import ToolDefinition
 from kocor.llm_provider.message import Message, StreamChunk
+from kocor.tools.definitions import ToolDefinition
 
 
 class TestLLMClientInterface:

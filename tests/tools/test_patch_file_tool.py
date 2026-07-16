@@ -4,8 +4,8 @@ import json
 import os
 import tempfile
 
-from kocor.tools.toolsets.patch_file_tool import PatchFile
 from kocor.tools.toolsets.file.file_state import FileStateTracker
+from kocor.tools.toolsets.patch_file_tool import PatchFile
 from tests.tools.conftest import chdir_cm
 
 

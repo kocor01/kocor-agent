@@ -5,18 +5,14 @@ from __future__ import annotations
 import os
 import tempfile
 from datetime import datetime
-from unittest.mock import MagicMock
 
 import pytest
 
 from kocor.agent import Agent
-from kocor.config import Config
-from kocor.llm_provider.llm_client import LLMClient
-from kocor.llm_provider.message import Message, ToolResult
+from kocor.llm_provider.message import Message
 from kocor.session import SessionManager, SessionResetPolicy, SessionStore
 from kocor.skill.skill_manager import SkillManager
 from kocor.skill.types import InvokeStrategy, SkillDefinition, SkillType
-from kocor.tools.definitions import ToolDefinition
 from kocor.tools.tool_manager import ToolManager
 from tests.agent.test_agent import FakeLLMClient
 

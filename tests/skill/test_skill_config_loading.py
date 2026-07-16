@@ -6,8 +6,8 @@ import tempfile
 
 import pytest
 
-from kocor.skill.types import InvokeStrategy, SkillType
 from kocor.skill.skill_manager import SkillManager
+from kocor.skill.types import InvokeStrategy, SkillType
 
 
 class TestLoadFromConfig:

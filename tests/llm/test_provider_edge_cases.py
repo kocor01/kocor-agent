@@ -6,17 +6,12 @@
 
 from __future__ import annotations
 
-import json
-from dataclasses import dataclass
 from unittest.mock import MagicMock, patch
-
-import pytest
 
 from kocor.config import Config
 from kocor.llm_provider.message import FunctionCall, Message, ToolCall, Usage
 from kocor.llm_provider.providers import AnthropicClient, OpenAIClient
 from kocor.tools.definitions import ToolDefinition
-
 
 # ═══════════════════════════════════════════════
 # Anthropic _normalize_in 边界

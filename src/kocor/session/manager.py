@@ -10,10 +10,10 @@ from datetime import datetime
 from typing import Any
 
 from kocor.config import Config
+from kocor.llm_provider.message import Message
 from kocor.session.reset_policy import should_reset
 from kocor.session.store import SessionStore
 from kocor.session.types import SessionEntry, SessionResetPolicy
-from kocor.llm_provider.message import Message
 
 
 class SessionManager:

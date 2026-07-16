@@ -2,12 +2,9 @@
 
 from __future__ import annotations
 
-import os
-import tempfile
-
 import pytest
 
-from kocor.memory.store import MemoryOp, MemoryOpResult, MemoryStore
+from kocor.memory.store import MemoryOp, MemoryStore
 from kocor.memory.types import MemoryTarget
 
 

@@ -1,7 +1,7 @@
 """测试 skill() 装饰器。"""
 
-from kocor.skill.types import InvokeStrategy, SkillType
 from kocor.skill.skill_manager import _params_from_signature, skill
+from kocor.skill.types import InvokeStrategy, SkillType
 
 
 class TestSkillDecorator:

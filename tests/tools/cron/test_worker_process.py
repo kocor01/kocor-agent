@@ -10,8 +10,6 @@ import subprocess
 import sys
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from kocor.tools.toolsets.cron.worker_process import CronWorkerProcess
 
 

@@ -1,6 +1,5 @@
 """command_safety.py 单元测试：绕过检测与命令规范化。"""
 
-import pytest
 
 from kocor.tools.toolsets.bash.command_safety import (
     _normalize_command,

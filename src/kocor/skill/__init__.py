@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from kocor.skill.skill_manager import SkillManager, skill
 from kocor.skill.types import (
     InvokeStrategy,
     SkillContext,
@@ -9,7 +10,6 @@ from kocor.skill.types import (
     SkillResult,
     SkillType,
 )
-from kocor.skill.skill_manager import SkillManager, skill
 
 __all__ = [
     "InvokeStrategy",

@@ -4,9 +4,9 @@ from dataclasses import dataclass
 from unittest.mock import MagicMock, patch
 
 from kocor.config import Config
+from kocor.llm_provider.message import FunctionCall, Message, ToolCall
 from kocor.llm_provider.providers import AnthropicClient
 from kocor.tools.definitions import ToolDefinition
-from kocor.llm_provider.message import FunctionCall, Message, ToolCall
 
 
 @dataclass

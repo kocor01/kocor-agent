@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import os
 from pathlib import Path
 
 import pytest
@@ -18,7 +17,6 @@ from kocor.tools.toolsets.cron.jobs import (
     remove_job,
     resolve_job_ref,
     resume_job,
-    save_jobs,
     update_job,
 )
 

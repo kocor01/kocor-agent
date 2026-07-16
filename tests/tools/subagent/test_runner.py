@@ -10,8 +10,7 @@ from unittest.mock import Mock
 
 from kocor.config import Config
 from kocor.event.event_manager import EventType
-from kocor.llm_provider.message import Message
-from kocor.llm_provider.message import FunctionCall, ToolCall
+from kocor.llm_provider.message import FunctionCall, Message, ToolCall
 from kocor.tools.tool_manager import ToolManager
 from kocor.tools.toolsets.subagent.runner import SubagentRunner
 
@@ -99,7 +98,6 @@ class TestRunnerSingleGoal:
                            tool_calls=[MagicMock()])
 
         from unittest.mock import MagicMock
-        from kocor.llm_provider.message import ToolCall, FunctionCall
 
         llm = MockLLM.__new__(MockLLM)
         llm.call_count = 0

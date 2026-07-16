@@ -1,12 +1,11 @@
 """bash/output.py 单元测试：ANSI 剥离、敏感信息脱敏、输出截断。"""
 
-import pytest
 
 from kocor.tools.toolsets.bash.output import (
+    OutputProcessor,
+    redact_sensitive,
     strip_ansi,
     truncate_output,
-    redact_sensitive,
-    OutputProcessor,
 )
 
 

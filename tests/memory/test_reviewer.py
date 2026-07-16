@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
+from kocor.llm_provider.message import Message, ToolCall
 from kocor.memory.reviewer import MEMORY_REVIEW_PROMPT, BackgroundReviewer
 from kocor.memory.store import MemoryStore
-from kocor.llm_provider.message import Message, ToolCall
 
 
 class _FakeReviewLLM:
@@ -49,7 +49,6 @@ class TestBackgroundReviewer:
 
     def test_review_nothing_to_save(self, tmp_path):
         """无值得记忆的对话不应写入。"""
-        from kocor.memory.types import MemoryTarget
         store = MemoryStore(memory_dir=str(tmp_path), memory_limit=2200, user_limit=1375, user_enabled=True)
         store.load_from_disk()
         llm = _FakeReviewLLM(should_memorize=False)
@@ -65,7 +64,6 @@ class TestBackgroundReviewer:
 
     def test_review_saves_when_llm_decides(self, tmp_path):
         """审查发现值得记忆的内容应写入存储。"""
-        from kocor.memory.types import MemoryTarget
         store = MemoryStore(memory_dir=str(tmp_path), memory_limit=2200, user_limit=1375, user_enabled=True)
         store.load_from_disk()
         llm = _FakeReviewLLM(should_memorize=True)

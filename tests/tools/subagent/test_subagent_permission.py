@@ -6,8 +6,6 @@ dangerous 按 subagent_auto_approve 决定、永不调用 input()。
 
 from __future__ import annotations
 
-import os
-
 from kocor.config import Config
 from kocor.llm_provider.message import FunctionCall, ToolCall
 from kocor.tools.permission import PermissionManager

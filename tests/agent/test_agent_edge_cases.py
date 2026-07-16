@@ -14,11 +14,11 @@ import pytest
 from kocor.agent import Agent
 from kocor.config import Config
 from kocor.llm_provider.llm_client import LLMClient
-from kocor.llm_provider.message import FunctionCall, Message, StreamChunk, ToolCall, ToolResult
+from kocor.llm_provider.message import Message, StreamChunk, ToolResult
 from kocor.skill.skill_manager import SkillManager
 from kocor.skill.types import InvokeStrategy, SkillDefinition, SkillType
-from kocor.tools.definitions import ToolDefinition
 from kocor.tools.tool_manager import ToolManager
+
 # ── Fake LLM ──
 
 
@@ -372,7 +372,8 @@ class TestSessionManagementEdgeCases:
     def test_session_before_run_auto_reset_injects_notification(self, session_manager):
         """自动重置时注入通知消息。"""
         from datetime import datetime, timedelta
-        from kocor.session import SessionManager, SessionResetPolicy, SessionStore
+
+        from kocor.session import SessionManager, SessionResetPolicy
 
         policy = SessionResetPolicy(mode="idle", idle_minutes=60)
         sm = SessionManager(store=session_manager.store, policy=policy)

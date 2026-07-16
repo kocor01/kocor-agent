@@ -7,8 +7,8 @@ from __future__ import annotations
 
 import pytest
 
+from kocor.tools.toolsets.subagent.summary import extract_summary, truncate_summary
 from kocor.tools.toolsets.subagent.system_prompt import build_subagent_system_prompt
-from kocor.tools.toolsets.subagent.summary import truncate_summary, extract_summary
 
 
 class TestBuildSubagentSystemPrompt:

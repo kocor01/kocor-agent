@@ -13,8 +13,8 @@ import argparse
 import os
 import sys
 
-from kocor.agent import Agent
 from kocor._cli.output import _print_stream_formatted, _print_welcome
+from kocor.agent import Agent
 from kocor.config import Config
 from kocor.logger import Logger
 from kocor.tools.permission import PermissionManager

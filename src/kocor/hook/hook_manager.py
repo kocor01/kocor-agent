@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
+from kocor.hook.base import Hook, HookAction, HookContext, HookPoint, HookResult
 from kocor.logger import Logger
-from kocor.hook.base import HookPoint, HookContext, HookResult, HookAction, Hook
 
 
 class HookManager:

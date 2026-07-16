@@ -1,13 +1,10 @@
 """bash_tool.py 集成测试：BashTool 和 ProcessTool 的完整功能。"""
 
-from unittest.mock import MagicMock, patch
 
-import pytest
 
-from kocor.tools.toolsets.bash_tool import BashTool, ProcessTool
-from kocor.tools.toolsets.bash.environment import LocalEnvironment
-from kocor.tools.toolsets.bash.process_registry import ProcessRegistry
 from kocor.tools.permission import PermissionManager
+from kocor.tools.toolsets.bash.environment import LocalEnvironment
+from kocor.tools.toolsets.bash_tool import BashTool, ProcessTool
 
 
 class TestBashToolDefinition:

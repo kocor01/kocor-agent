@@ -1,9 +1,9 @@
 """测试 SlidingWindowStrategy。"""
 
 from __future__ import annotations
+
 from unittest.mock import patch
 
-from kocor.context.types import SummaryNode
 from kocor.context.sliding_window import SlidingWindowStrategy
 from kocor.llm_provider.message import FunctionCall, Message, ToolCall
 

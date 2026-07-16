@@ -12,8 +12,8 @@ from typing import Iterator, Protocol
 import httpx
 
 from kocor.config import Config
-from kocor.tools.definitions import ToolDefinition
 from kocor.llm_provider.message import Message, StreamChunk, Usage
+from kocor.tools.definitions import ToolDefinition
 
 
 class LLMClient(Protocol):

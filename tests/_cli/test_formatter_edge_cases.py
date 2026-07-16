@@ -9,8 +9,6 @@ import io
 import re
 from unittest.mock import patch
 
-import pytest
-
 from kocor._cli.output import _StreamFormatter
 from kocor.llm_provider.message import FunctionCall, StreamChunk, ToolCall, Usage
 

@@ -20,7 +20,6 @@ from typing import Any
 from kocor.llm_provider.message import Message
 from kocor.tools.permission import PermissionManager
 
-
 # 合法状态值
 VALID_STATUSES = {"pending", "in_progress", "completed", "cancelled"}
 

@@ -2,8 +2,6 @@
 
 import logging
 
-import pytest
-
 from kocor.event.event_manager import EventType
 from kocor.logger import Logger
 

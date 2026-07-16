@@ -1,17 +1,13 @@
 """Agent 循环控制器测试。"""
 
-import json
-from dataclasses import dataclass, field
 
-import pytest
 
 from kocor.agent import Agent
 from kocor.event.event_manager import EventEmitter, EventType
-from kocor.tools.permission import PermissionManager
-from kocor.hook.base import HookPoint, HookContext, HookResult, HookAction
+from kocor.hook.base import HookAction, HookPoint, HookResult
 from kocor.hook.hook_manager import HookManager
-from kocor.llm_provider.message import Message, ToolCall, FunctionCall, StreamChunk
-
+from kocor.llm_provider.message import FunctionCall, Message, StreamChunk, ToolCall
+from kocor.tools.permission import PermissionManager
 
 # ── 辅助方法 ──
 

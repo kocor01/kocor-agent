@@ -1,7 +1,7 @@
 """测试技能执行。"""
 
-from kocor.skill.types import InvokeStrategy, SkillContext, SkillDefinition, SkillResult, SkillType
 from kocor.skill.skill_manager import SkillManager
+from kocor.skill.types import SkillContext, SkillDefinition, SkillType
 from kocor.tools.tool_manager import ToolManager
 
 

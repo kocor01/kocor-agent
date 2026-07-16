@@ -9,18 +9,17 @@ from __future__ import annotations
 import codecs
 import logging
 import os
-import platform
 import re
 import select
-import signal
 import shlex
+import signal
 import subprocess
 import tempfile
 import threading
 import time
 import uuid
 from abc import ABC, abstractmethod
-from typing import Callable, IO
+from typing import IO
 
 from kocor.tools.toolsets.bash.constants import (
     IS_WINDOWS,

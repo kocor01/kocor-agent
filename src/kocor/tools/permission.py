@@ -114,7 +114,7 @@ class PermissionManager:
             return False
 
         try:
-            print(f"⚠️  工具调用需要确认: ")
+            print("⚠️  工具调用需要确认: ")
             print(f"   名称: {tool_name}")
             if args:
                 print(f"   参数: {args if isinstance(args, str) else json.dumps(args, ensure_ascii=False)[:200]}")

@@ -6,15 +6,12 @@
 from __future__ import annotations
 
 import logging
-from unittest.mock import MagicMock, call, patch
+from unittest.mock import patch
 
-import pytest
-
-from kocor.event.event_manager import EventEmitter, EventType, Event
+from kocor.event.event_manager import Event, EventEmitter, EventType
 from kocor.event.event_subscribe import EventSubscribe
-from kocor.logger import Logger
 from kocor.event.subscribes.logs import Logs
-
+from kocor.logger import Logger
 
 # ═══════════════════════════════════════════════
 # EventSubscribe.subscribe_all

@@ -2,7 +2,7 @@
 
 import logging
 
-from kocor.event.event_manager import EventType, Event
+from kocor.event.event_manager import Event, EventType
 from kocor.logger import Logger
 
 

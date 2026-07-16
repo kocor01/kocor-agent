@@ -1,6 +1,6 @@
 """钩子系统核心类型 — HookPoint、HookContext、HookResult、Hook 协议。"""
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Protocol
 

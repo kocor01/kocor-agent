@@ -14,27 +14,22 @@ import re
 import shutil
 import tempfile
 import threading
-import time
 import uuid
-
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 from kocor.config import Config
 from kocor.tools.toolsets.cron.types import (
     CRON_DIR_NAME,
-    CRON_OUTPUT_DEFAULT_KEEP,
     JOBS_FILE_NAME,
     JOBS_LOCK_NAME,
     ONESHOT_GRACE_SECONDS,
-    ONESHOT_RUN_CLAIM_TTL_SECONDS,
     OUTPUT_DIR_NAME,
     STATE_COMPLETED,
     STATE_ERROR,
     STATE_PAUSED,
     STATE_SCHEDULED,
-    VALID_STATES,
 )
 
 logger = logging.getLogger(__name__)

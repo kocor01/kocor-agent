@@ -6,8 +6,8 @@
 
 from __future__ import annotations
 
-from kocor.context.types import SummaryNode
 from kocor.context.summarizer import HistorySummarizer
+from kocor.context.types import SummaryNode
 from kocor.event.event_manager import EventEmitter
 from kocor.hook.hook_manager import HookManager
 from kocor.llm_provider.message import Message

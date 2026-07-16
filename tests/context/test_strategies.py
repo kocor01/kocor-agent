@@ -1,6 +1,7 @@
 """测试上下文策略应用器。"""
 
 from __future__ import annotations
+
 import os
 from unittest.mock import patch
 

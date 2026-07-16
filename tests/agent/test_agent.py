@@ -2,11 +2,11 @@
 
 from unittest.mock import MagicMock
 
-from kocor.config import Config
 from kocor.agent import Agent
+from kocor.config import Config
 from kocor.llm_provider.llm_client import LLMClient
-from kocor.tools.definitions import ToolDefinition
 from kocor.llm_provider.message import FunctionCall, Message, StreamChunk, ToolCall, ToolResult
+from kocor.tools.definitions import ToolDefinition
 
 
 class FakeLLMClient(LLMClient):

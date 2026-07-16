@@ -16,8 +16,8 @@ from kocor.skill.types import (
     SkillResult,
     SkillType,
 )
-from kocor.tools.tool_manager import ToolManager
 from kocor.tools.permission import PermissionManager
+from kocor.tools.tool_manager import ToolManager
 
 
 class SkillManager:

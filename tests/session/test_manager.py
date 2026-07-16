@@ -9,8 +9,8 @@ from datetime import datetime
 import pytest
 
 from kocor.session.manager import SessionManager
-from kocor.session.store import SessionDB, SessionStore
-from kocor.session.types import SessionEntry, SessionResetPolicy
+from kocor.session.store import SessionStore
+from kocor.session.types import SessionResetPolicy
 
 
 @pytest.fixture

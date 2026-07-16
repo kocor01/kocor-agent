@@ -12,7 +12,6 @@ import os
 import re
 from pathlib import Path
 
-
 # ── 敏感系统路径（跨平台，检查 path.parts） ───────────────────────
 # 使用 Path.parts 元组进行检查以兼容 Windows/Linux。
 # 仅靠 resolve_safe_path 的 allowed_dir 越界检查不足以覆盖所有场景

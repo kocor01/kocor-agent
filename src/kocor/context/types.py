@@ -5,8 +5,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import Enum
 
-from kocor.context.budget import TokenBudget
-
 
 class ContextStrategy(Enum):
     """上下文管理策略。

@@ -6,15 +6,12 @@
 from __future__ import annotations
 
 import json
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
-import pytest
-
-from kocor.logger import Logger
-from kocor.hook.base import HookPoint, HookContext, HookResult, HookAction
+from kocor.hook.base import HookAction, HookContext, HookPoint, HookResult
 from kocor.hook.hook_manager import HookManager
 from kocor.hook.hooks.audit_log import AuditLogHook
-
+from kocor.logger import Logger
 
 # ═══════════════════════════════════════════════
 # HookManager.register_all

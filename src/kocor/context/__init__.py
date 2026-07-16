@@ -5,11 +5,11 @@
 """
 
 from kocor.context.budget import TokenBudget
+from kocor.context.context_manager import ContextManager
 from kocor.context.sliding_window import SlidingWindowStrategy
 from kocor.context.strategies import ContextStrategyApplier
 from kocor.context.summarizer import HistorySummarizer
 from kocor.context.token_counter import TokenCounter
-from kocor.context.context_manager import ContextManager
 from kocor.context.types import (
     ContextStrategy,
     SummaryNode,

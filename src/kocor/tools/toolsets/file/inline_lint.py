@@ -17,7 +17,6 @@ import os
 import traceback
 from typing import Any
 
-
 LINTERS: dict[str, str] = {
     ".py": "python",
     ".json": "json",

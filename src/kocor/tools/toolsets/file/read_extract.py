@@ -80,7 +80,7 @@ def _extract_notebook(path: str) -> str:
             outputs = cell.get("outputs", [])
             output_text = _extract_outputs(outputs)
             if output_text:
-                parts.append(f"[output]")
+                parts.append("[output]")
                 parts.append(output_text)
 
         parts.append("")  # 空行分隔

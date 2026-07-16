@@ -4,8 +4,6 @@ from __future__ import annotations
 
 import json
 
-import pytest
-
 from kocor.llm_provider.message import FunctionCall, Message, ToolCall
 from kocor.tools.permission import PermissionManager
 from kocor.tools.toolsets.todo_tool import (
@@ -14,7 +12,6 @@ from kocor.tools.toolsets.todo_tool import (
     TodoStore,
     TodoTool,
 )
-
 
 # ──────────────────────────── TodoStore: 读写 ────────────────────────────
 

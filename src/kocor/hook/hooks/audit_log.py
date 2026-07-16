@@ -3,8 +3,8 @@
 import json
 from datetime import datetime
 
+from kocor.hook.base import HookAction, HookContext, HookPoint, HookResult
 from kocor.logger import Logger
-from kocor.hook.base import HookPoint, HookContext, HookResult, HookAction
 
 
 class AuditLogHook:

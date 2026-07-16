@@ -10,8 +10,8 @@ from kocor.tools.toolsets.bash.constants import (
     IS_WINDOWS,
     _find_bash,
     _make_run_env,
-    _resolve_safe_cwd,
     _quote_cwd_for_cd,
+    _resolve_safe_cwd,
 )
 
 

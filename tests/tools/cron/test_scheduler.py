@@ -2,23 +2,18 @@
 
 from __future__ import annotations
 
-import time
 from pathlib import Path
-from unittest.mock import MagicMock, patch
 
 import pytest
 
 from kocor.tools.toolsets.cron.jobs import (
-    HAS_CRONITER,
     claim_job_for_fire,
     create_job,
     get_due_jobs,
     get_job,
     load_jobs,
     mark_job_run,
-    save_jobs,
 )
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -90,11 +85,11 @@ class TestCronScheduler:
         job = create_job(prompt="test job", schedule="*/10 * * * *")
         job_id = job["id"]
 
-        from kocor.tools.toolsets.cron.scheduler import CronScheduler
+        from datetime import datetime, timedelta
 
         # 将 next_run_at 设为已过期
         import kocor.tools.toolsets.cron.jobs as jobs_module
-        from datetime import datetime, timedelta
+        from kocor.tools.toolsets.cron.scheduler import CronScheduler
 
         jobs = jobs_module.load_jobs()
         for j in jobs:
@@ -126,11 +121,11 @@ class TestCronScheduler:
         """get_due_jobs 返回到期作业。"""
         job = create_job(prompt="due test", schedule="*/10 * * * *")
 
-        from kocor.tools.toolsets.cron.jobs import get_due_jobs, load_jobs
 
         # 将 next_run_at 设为过去
-        import kocor.tools.toolsets.cron.jobs as jobs_module
         from datetime import datetime, timedelta
+
+        import kocor.tools.toolsets.cron.jobs as jobs_module
 
         jobs = load_jobs()
         for j in jobs:
@@ -144,7 +139,6 @@ class TestCronScheduler:
 
     def test_get_due_jobs_empty_when_no_due(self):
         """无到期作业时返回空列表。"""
-        from kocor.tools.toolsets.cron.jobs import get_due_jobs
 
         create_job(prompt="future job", schedule="*/10 * * * *")
         due = get_due_jobs()
@@ -155,7 +149,7 @@ class TestCronScheduler:
         job = create_job(prompt="track test", schedule="*/10 * * * *")
         job_id = job["id"]
 
-        from kocor.tools.toolsets.cron.jobs import mark_job_run, get_job
+        from kocor.tools.toolsets.cron.jobs import get_job
 
         mark_job_run(job_id, success=True)
         refreshed = get_job(job_id)

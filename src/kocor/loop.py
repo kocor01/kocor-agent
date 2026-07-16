@@ -16,7 +16,7 @@ from typing import Iterator
 
 from kocor.context.context_manager import ContextManager
 from kocor.event.event_manager import Event, EventEmitter, EventType
-from kocor.hook.base import HookPoint, HookContext, HookAction
+from kocor.hook.base import HookAction, HookContext, HookPoint
 from kocor.hook.hook_manager import HookManager
 from kocor.llm_provider.llm_client import LLMClient
 from kocor.llm_provider.message import Message, StreamChunk

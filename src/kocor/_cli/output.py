@@ -263,11 +263,11 @@ def _print_welcome(
             print(f" ⏳  会话已重置（{reason}）")
         elif entry.message_count > 0:
             title = f"「{entry.title}」" if entry.title else ""
-            print(f"")
+            print("")
             print(f" 📋  继续上次会话 {title} · ID: {entry.session_id} · {entry.message_count} 条消息")
         else:
-            print(f"")
-            print(f" 📋  新会话")
+            print("")
+            print(" 📋  新会话")
         print()
 
     # ── Slash 命令列表 ──

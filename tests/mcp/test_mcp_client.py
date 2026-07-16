@@ -9,7 +9,6 @@ from mcp.types import CallToolResult, InitializeResult, ListToolsResult, TextCon
 from kocor.llm_provider.message import FunctionCall, ToolCall
 from kocor.tools.tool_manager import ToolManager
 
-
 # ── 测试辅助函数 ──────────────────────────────────────────────────────────
 
 def _mock_tool(name: str, description: str = "", inputSchema: dict | None = None) -> Tool:

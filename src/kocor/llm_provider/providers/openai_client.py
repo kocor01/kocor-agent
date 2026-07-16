@@ -5,14 +5,11 @@
 
 from __future__ import annotations
 
-from typing import Iterator
-
 from openai import OpenAI
 
-from kocor.config import Config
 from kocor.llm_provider.llm_client import BaseLLMClient
-from kocor.tools.definitions import ToolDefinition
 from kocor.llm_provider.message import FunctionCall, Message, StreamChunk, ToolCall, Usage
+from kocor.tools.definitions import ToolDefinition
 
 
 class OpenAIClient(BaseLLMClient):

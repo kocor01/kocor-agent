@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from kocor.config import Config
 from kocor.context.context_manager import ContextManager
-from kocor.context.types import ContextStrategy
 from kocor.tools.definitions import ToolDefinition
 
 
@@ -144,6 +143,7 @@ class TestContextManagerBuilder:
     def test_memories_in_system_prompt(self):
         """记忆应注入到 system prompt 中。"""
         import tempfile
+
         from kocor.memory.store import MemoryStore
 
         mem_dir = tempfile.mkdtemp()

@@ -8,12 +8,12 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import Callable
 
 from kocor.config import Config
-from kocor.tools.definitions import ToolDefinition
-from kocor.tools.truncate import ToolOutputTruncator
-from kocor.tools.toolsets.file.file_state import FileStateTracker
-from kocor.tools.toolsets.bash.environment import LocalEnvironment
 from kocor.llm_provider.message import ToolCall, ToolResult
+from kocor.tools.definitions import ToolDefinition
 from kocor.tools.permission import PermissionManager
+from kocor.tools.toolsets.bash.environment import LocalEnvironment
+from kocor.tools.toolsets.file.file_state import FileStateTracker
+from kocor.tools.truncate import ToolOutputTruncator
 
 
 class ToolManager:
@@ -61,11 +61,11 @@ class ToolManager:
             include_subagent: 是否注册 subagent 工具（子代理委派）。
                 cli.py 在注册时通过 ToolManager._subagent_runner 注入运行器。
         """
-        from kocor.tools.toolsets.read_file_tool import ReadFile
-        from kocor.tools.toolsets.write_file_tool import WriteFile
-        from kocor.tools.toolsets.patch_file_tool import PatchFile
-        from kocor.tools.toolsets.search_file_tool import SearchFiles
         from kocor.tools.toolsets.bash_tool import BashTool, ProcessTool
+        from kocor.tools.toolsets.patch_file_tool import PatchFile
+        from kocor.tools.toolsets.read_file_tool import ReadFile
+        from kocor.tools.toolsets.search_file_tool import SearchFiles
+        from kocor.tools.toolsets.write_file_tool import WriteFile
 
         self.memory_store = None
         self.todo_store = None
@@ -119,8 +119,8 @@ class ToolManager:
         # cron 工具：主进程注册 cronjob 工具 + 创建 cron worker 子进程管理器。
         # cron worker 子进程自身跳过此块（include_cron=False）。
         if include_cron:
-            from kocor.tools.toolsets.cron_tool import CronTool
             from kocor.tools.toolsets.cron.worker_process import CronWorkerProcess
+            from kocor.tools.toolsets.cron_tool import CronTool
             if self._cron_worker is None:
                 self._cron_worker = CronWorkerProcess()
             self.register(

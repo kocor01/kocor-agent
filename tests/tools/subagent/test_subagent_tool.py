@@ -6,7 +6,7 @@ TDD：验证 handler 通过 runner 执行并返回 JSON 结构。
 from __future__ import annotations
 
 import json
-from unittest.mock import MagicMock, Mock
+from unittest.mock import Mock
 
 from kocor.tools.toolsets.subagent.tool import SubagentTool
 

@@ -3,8 +3,6 @@
 import os
 import tempfile
 
-import pytest
-
 from kocor.tools.toolsets.file.file_safety import (
     _looks_like_read_file_line_numbered_content,
     check_sensitive_path,

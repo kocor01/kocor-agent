@@ -7,8 +7,8 @@ from __future__ import annotations
 
 from kocor.config import Config
 from kocor.context.budget import TokenBudget
-from kocor.context.types import ContextStrategy, SummaryNode
 from kocor.context.sliding_window import SlidingWindowStrategy
+from kocor.context.types import ContextStrategy, SummaryNode
 from kocor.llm_provider.message import Message
 
 
