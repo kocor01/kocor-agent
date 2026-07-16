@@ -21,6 +21,7 @@ from kocor.context.context_manager import ContextManager
 from kocor.event.event_manager import Event, EventEmitter, EventType
 from kocor.hook.base import HookAction, HookContext, HookPoint
 from kocor.hook.hook_manager import HookManager
+from kocor._stream_session import StreamSession
 from kocor.llm_provider.exceptions import LLMConnectionError, LLMTimeoutError
 from kocor.llm_provider.llm_client import LLMClient
 from kocor.llm_provider.message import Message, StreamChunk
@@ -201,48 +202,23 @@ class Loop:
                     yield StreamChunk(content=hook_msg, is_final=True)
                     return
 
-                accumulated_tool_calls = []
-                final_content = ""
-                final_reasoning = ""
-                streaming_usage = None
-
-                for chunk in self.llm.stream(
+                sess = StreamSession(self.llm.stream(
                     self.ctx.messages,
                     tools=tools,
-                ):
+                ))
+
+                for chunk in sess.iter_chunks():
                     # 在 LLM 流式块之间检查停止信号。
                     # 即使 KeyboardInterrupt 被延迟传递（Windows  blocked I/O），
                     # 一旦 read timeout 突破阻塞后也能在此处迅速响应。
                     if self._stop_requested:
+                        sess.request_stop()
                         msg = self._stopped_message()
                         yield StreamChunk(content="\n⏹️ " + msg, is_final=True)
                         return
-
-                    if chunk.tool_calls:
-                        for tc in chunk.tool_calls:
-                            if not any(t.id == tc.id for t in accumulated_tool_calls):
-                                accumulated_tool_calls.append(tc)
-                    if chunk.content:
-                        final_content += chunk.content
-                    if chunk.reasoning:
-                        final_reasoning += chunk.reasoning
-                    if chunk.usage:
-                        streaming_usage = chunk.usage
-                    # 吸收 LLM 流的纯结束标记（is_final 且无实质内容，可能携带 usage）：
-                    # 不透传给渲染层，由循环层在轮末统一发出 is_final 关闭轮次。
-                    # 否则该标记会在 POST_GENERATE 钩子前提前关闭当前轮，使随后的
-                    # abort/stop 消息被渲染层误判为新的一轮"第 N 次请求"。
-                    if chunk.is_final and not chunk.content and not chunk.reasoning and not chunk.tool_calls:
-                        continue
                     yield chunk
 
-                response = Message(
-                    role="assistant",
-                    content=final_content,
-                    reasoning=final_reasoning,
-                    tool_calls=accumulated_tool_calls or None,
-                    usage=streaming_usage,
-                )
+                response = sess.message()
 
                 hook_msg = self._run_hooks(HookPoint.POST_GENERATE, response=response)
                 self._emit_event(EventType.POST_GENERATE, iteration=self.ctx.iteration,
@@ -253,7 +229,7 @@ class Loop:
 
                 self.ctx.append(response)
 
-                if not accumulated_tool_calls:
+                if not sess.has_tool_calls:
                     # 纯文本回复：LLM 流的结束标记已被吸收，由循环层补发关闭当前轮
                     yield StreamChunk(is_final=True)
                     return
@@ -262,7 +238,7 @@ class Loop:
                     yield StreamChunk(content=self._stuck_in_loop_message(), is_final=True)
                     return
 
-                for tool_call in accumulated_tool_calls:
+                for tool_call in (response.tool_calls or []):
                     if self._stop_requested:
                         msg = self._stopped_message()
                         yield StreamChunk(content="\n⏹️ " + msg, is_final=True)
@@ -282,7 +258,7 @@ class Loop:
                 yield StreamChunk(is_final=True)
 
                 # 工具结果已追加，压缩上下文供下一轮迭代使用
-                self.ctx.usage = streaming_usage
+                self.ctx.usage = response.usage
                 self.ctx.compress_if_needed()
 
             hook_msg = self._run_hooks(HookPoint.ON_BUDGET_EXHAUSTED)
