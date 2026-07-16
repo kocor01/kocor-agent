@@ -20,9 +20,13 @@ class ToolManager:
     """工具注册与执行中心。"""
 
     def __init__(self):
+        # 工具定义字典：name → ToolDefinition
         self._tools: dict[str, ToolDefinition] = {}
+        # 工具处理器字典：name → Callable（执行时按名查找）
         self._handlers: dict[str, Callable] = {}
+        # 文件状态追踪器：去重缓存、连续读检测、补丁失败计数
         self.file_state = FileStateTracker()
+        # 本地执行环境（延迟初始化，首次 bash 调用时创建）
         self._env: LocalEnvironment | None = None
         self.mcp_manager = None
         self.skill_manager = None
@@ -212,6 +216,8 @@ class ToolManager:
             )
 
         try:
+            # 使用 ThreadPoolExecutor 实现工具级超时，
+            # 因为 handler 可能是同步阻塞的（如 bash 命令长时间运行）
             with ThreadPoolExecutor(max_workers=1) as pool:
                 defn = self._tools.get(name)
                 timeout = defn.timeout if (

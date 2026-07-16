@@ -48,6 +48,7 @@ class AnthropicClient(BaseLLMClient):
                     system_parts.append(msg.content)
             else:
                 filtered_messages.append(msg)
+        # Anthropic API 的 system 参数是单独传递的顶层字段，不在 messages 数组中
         system_content = "\n\n---\n\n".join(system_parts)
         return (system_content or None), filtered_messages
 
@@ -101,14 +102,18 @@ class AnthropicClient(BaseLLMClient):
         ):
             stream_chunk = StreamChunk()
 
+            # Anthropic 流式事件的类型包括：
+            # message_start → content_block_start → content_block_delta* → content_block_stop → message_delta
             match event.type:
                 case "message_start":
+                    # 第一个事件，携带 prompt 侧的 token 用量
                     usage_attr = getattr(event, "message", None)
                     if usage_attr and hasattr(usage_attr, "usage"):
                         prompt_tokens = getattr(usage_attr.usage, "input_tokens", 0)
                         cached_tokens = getattr(usage_attr.usage, "cache_read_input_tokens", 0)
 
                 case "content_block_delta":
+                    # 增量更新：文本增量、JSON 增量（工具参数）、思维链增量
                     if event.delta.type == "text_delta":
                         text = event.delta.text
                         accumulated_text += text
@@ -117,7 +122,7 @@ class AnthropicClient(BaseLLMClient):
                         idx = event.index
                         json_fragment = event.delta.partial_json
                         if idx not in accumulated_tool_calls:
-                            # 从 content_block_start 获取骨架
+                            # 第一个 JSON 增量——从 content_block_start 获取骨架（工具名和 ID）
                             block_meta = tool_block_starts.get(idx, {})
                             accumulated_tool_calls[idx] = ToolCall(
                                 id=block_meta.get("id", ""),
@@ -128,6 +133,7 @@ class AnthropicClient(BaseLLMClient):
                                 ),
                             )
                         else:
+                            # 后续 JSON 增量——追加到 arguments
                             accumulated_tool_calls[idx].function.arguments += json_fragment
                         stream_chunk.tool_calls = list(accumulated_tool_calls.values())
                     elif event.delta.type == "thinking_delta":
@@ -139,7 +145,7 @@ class AnthropicClient(BaseLLMClient):
                         stream_chunk.tool_calls = list(accumulated_tool_calls.values())
 
                 case "content_block_start":
-                    # 记录工具块开始信息
+                    # 记录工具块开始信息（名称和 ID），供后续 JSON delta 使用
                     block = getattr(event, "content_block", None)
                     if block and getattr(block, "type", None) == "tool_use":
                         tool_block_starts[event.index] = {
@@ -148,6 +154,7 @@ class AnthropicClient(BaseLLMClient):
                         }
 
                 case "message_delta":
+                    # 最后事件，携带 completion 侧的 token 用量和 stop_reason
                     if event.delta.stop_reason:
                         stream_chunk.is_final = True
                     usage_attr = getattr(event, "usage", None)
@@ -160,18 +167,23 @@ class AnthropicClient(BaseLLMClient):
                             cached_tokens=cached_tokens,
                         )
 
-            # 有内容时才 yield
+            # 有内容时才 yield——避免向渲染层发无意义的空 chunk
             if stream_chunk.content or stream_chunk.reasoning or stream_chunk.tool_calls or stream_chunk.is_final:
                 yield stream_chunk
 
     # ── 格式转换 ──
 
     def _normalize_in(self, messages: list[Message]) -> list[dict]:
-        """内部消息格式 → Anthropic 消息格式"""
+        """内部消息格式 → Anthropic 消息格式
+
+        Anthropic 要求 tool_result 类型消息必须以 content 块数组形式作为 user 消息发送。
+        如果连续出现多条 tool 消息（对应多次工具调用），它们会合并为同一条 user 消息的 content 数组。
+        """
         result: list[dict] = []
         pending_tool_results: list[dict] = []
 
         def _flush_tool_results():
+            """将累积的 tool_results 作为一条 user 消息写入 result。"""
             nonlocal pending_tool_results
             if pending_tool_results:
                 result.append({"role": "user", "content": pending_tool_results})
@@ -194,6 +206,7 @@ class AnthropicClient(BaseLLMClient):
                     result.append({"role": "user", "content": msg.content})
                 case "assistant":
                     if msg.tool_calls:
+                        # assistant 消息带工具调用时，content 必须为块数组格式
                         content_blocks = []
                         if msg.content:
                             content_blocks.append({"type": "text", "text": msg.content})
@@ -267,7 +280,10 @@ class AnthropicClient(BaseLLMClient):
         return Message(role="assistant", content=content, reasoning=reasoning, usage=usage)
 
     def _normalize_tool(self, tool: ToolDefinition) -> dict:
-        """内部工具定义 → Anthropic 工具格式"""
+        """内部工具定义 → Anthropic 工具格式
+
+        Anthropic 的工具 Schema 字段名为 input_schema（而非 OpenAI 的 parameters）。
+        """
         return {
             "name": tool.name,
             "description": tool.description,

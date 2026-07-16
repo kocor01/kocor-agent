@@ -12,17 +12,16 @@ if TYPE_CHECKING:
 
 
 class SubagentTool:
+    """子代理工具定义。
+
+    工具注册时 handler 通过闭包注入 SubagentRunner 实例。
+    """
+
     @classmethod
     def handler_factory(cls, **deps):
         """返回带 runner 注入的 handler。"""
         runner_val = deps.get("runner")
         return lambda **kw: SubagentTool.handler(runner=runner_val, **kw)
-
-
-    """子代理工具定义。
-
-    工具注册时 handler 通过闭包注入 SubagentRunner 实例。
-    """
 
     NAME = "subagent"
     DESCRIPTION = (

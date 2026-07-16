@@ -51,7 +51,8 @@ class Agent:
         self.llm = llm
         self.tool_manager = tool_manager or ToolManager()
         self.system_prompt = Config.load().default_system_prompt
-        # Harness 组件
+        # Harness 组件：未传时各自创建默认实例（非 None 安全），
+        # 使 Agent 在最小依赖场景下也能构造，降低测试和子代理装配门槛
         self.permission_mgr = permission_mgr or PermissionManager(policy=PermissionManager.POLICY_PERMISSIVE)
         self.hook_manager = hook_manager or HookManager()
         self.event_emitter = event_emitter or EventEmitter()
@@ -59,12 +60,17 @@ class Agent:
 
         # 会话管理
         self.session_manager = session_manager
+        # 已持久化的消息索引——标记 session_history 中被写入 SQLite 的最后位置。
+        # 用于自上次 persist 后增量写入，避免每次全量转储。
         self._persisted_msg_idx = 0
 
         # Cron 调度器标志（首次使用时启动）
         self._cron_started = False
 
-        # 上下文管理
+        # 运行时指标收集器（由 AgentBuilder 在 build() 时通过 setattr 注入，初始为 None）
+        self._metrics_collector = None
+
+        # 上下文管理：记忆系统、后台审查、轮次计数器
         self._memory: MemoryStore | None = None
         self._background_reviewer = None
         self._turns_since_memory = 0
@@ -77,17 +83,17 @@ class Agent:
                     user_limit=Config.load().user_char_limit,
                     user_enabled=Config.load().user_profile_enabled,
                 )
-                self._memory.load_from_disk()
-                self.tool_manager.memory_store = self._memory
+                self._memory.load_from_disk()  # 加载持久化到磁盘的记忆文件
+                self.tool_manager.memory_store = self._memory  # 共享给 memory 工具
                 from kocor.memory.reviewer import BackgroundReviewer
                 self._background_reviewer = BackgroundReviewer(llm=self.llm, store=self._memory)
 
         # 任务规划（todo）：零依赖、零风险，始终启用
         from kocor.tools.toolsets.todo_tool import TodoStore
-        self._todo_store = TodoStore()
-        self.tool_manager.todo_store = self._todo_store
+        self._todo_store = TodoStore()  # 内存态任务列表，随 Agent 生灭
+        self.tool_manager.todo_store = self._todo_store  # 共享给 todo 工具
 
-        # 运行时上下文管理器
+        # 运行时上下文管理器：统一管理系统提示、消息列表、token 预算
         self.ctx = ContextManager(
             tools=self.tool_manager,
             memory=self._memory,
@@ -220,6 +226,7 @@ class Agent:
         # 自动重置时注入通知，重置已持久化消息索引
         if entry.was_auto_reset:
             reason = entry.auto_reset_reason or "unknown"
+            # 向 LLM 注入一条系统通知，说明会话已重置，让其感知上下文变化
             self.ctx.append(Message(
                 role="user",
                 content=f"[会话因 {reason} 已自动重置，开始新对话]",
@@ -248,16 +255,16 @@ class Agent:
         if entry is None:
             return
 
-        # 使用 _persisted_msg_idx 作为已持久化消息的基准，
-        # 而非 entry.message_count，因为会话可能在 ReAct 循环
-        # 中被重置（如 /reset 或自动重置），此时 entry 指向
-        # 新会话且 message_count 为 0，但 session_history 中
-        # 可能已有本轮新增消息
+        # 计算本轮新增消息数：用 _persisted_msg_idx 而非 entry.message_count，
+        # 因为会话可能在 ReAct 循环中被重置（如 /reset），此时 entry 指向新会话
+        # 且 message_count=0，但 session_history 中可能有本轮新增消息。
+        # 使用本地索引避免了 entry 状态与真实数据不同步的问题。
         prev_count = self._persisted_msg_idx
         current_total = len(self.ctx.session_history)
         msg_delta = max(0, current_total - prev_count)
 
-        # token 用量从新增消息的 usage 累计（ReAct 循环可能有多次 API 调用）
+        # token 用量从新增消息的 usage 累计（ReAct 循环可能有多次 API 调用，
+        # 每次 API 调用返回的 usage 附着在对应 assistant 消息上）
         prompt_delta = 0
         completion_delta = 0
         total_delta = 0
@@ -279,7 +286,7 @@ class Agent:
             cached_tokens_delta=cached_delta,
         )
 
-        # 持久化新增消息
+        # 持久化新增消息（增量写入，避免每次全量转储）
         self._persisted_msg_idx = self.session_manager.persist_messages(
             session_key=session_key,
             messages=self.ctx.session_history,
@@ -378,6 +385,7 @@ class Agent:
     # ── slash 命令 ──
 
     def _handle_slash_command(self, user_input: str) -> str:
+        # 解析 /<skill_name> [args] 格式
         parts = user_input[1:].strip().split(maxsplit=1)
         skill_name = parts[0]
         skill_args = parts[1] if len(parts) > 1 else ""
@@ -400,12 +408,15 @@ class Agent:
             return result.content
 
         if skill_def.skill_type == SkillType.PROMPT:
+            # PROMPT 技能：渲染后的 prompt 走 ReAct 循环，让 LLM 处理后返回
             messages = [
                 Message(role="system", content=self.system_prompt),
             ]
             if skill_def.prompt_role == "system":
+                # 技能注入为 system 消息（如设定角色行为）
                 messages.append(Message(role="system", content=result.content))
             else:
+                # 技能注入为 user 消息（默认）
                 messages.append(Message(role="user", content=result.content))
             self.ctx.reset()
             self.ctx.messages = messages
@@ -413,6 +424,7 @@ class Agent:
             # 随后 _session_after_run 据此持久化 PROMPT 技能触发的 LLM 回复
             return self.loop.run_messages()
         else:
+            # CODE 技能：直接返回执行结果，不走 LLM 循环
             return result.content
 
     def _list_slash_skills(self) -> str:

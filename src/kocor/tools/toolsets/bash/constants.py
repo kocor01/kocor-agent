@@ -111,7 +111,8 @@ def _resolve_safe_cwd(cwd: str) -> str:
     if not cwd:
         return tempfile.gettempdir()
 
-    # Windows：尝试将 MSYS 路径转换为 Windows 原生路径
+    # Windows：尝试将 MSYS 路径（/c/Users/...）转换为 Windows 原生格式（C:\Users\...）
+    # MSYS 路径在 Git Bash 内部使用，但 subprocess.Popen 的 cwd 需要 Windows 原生路径。
     resolved = cwd
     if IS_WINDOWS:
         m = re.match(r'^/([a-zA-Z])/(.*)', cwd)

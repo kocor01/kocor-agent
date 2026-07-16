@@ -24,13 +24,6 @@ logger = logging.getLogger(__name__)
 
 
 class PatchFile:
-    @classmethod
-    def handler_factory(cls, **deps):
-        """返回带 file_state 注入的 handler。"""
-        fs_val = deps.get("file_state")
-        return lambda **kw: PatchFile.handler(file_state=fs_val, **kw)
-
-
     """替换文件中的文本块（补丁）工具。
 
     使用 6 策略模糊匹配链定位要替换的代码块，
@@ -44,6 +37,12 @@ class PatchFile:
     - 补丁失败跟踪（连续 3 次失败提示升级到 write_file）
     - 安全守卫（敏感路径、写拒绝、内容守卫）
     """
+
+    @classmethod
+    def handler_factory(cls, **deps):
+        """返回带 file_state 注入的 handler。"""
+        fs_val = deps.get("file_state")
+        return lambda **kw: PatchFile.handler(file_state=fs_val, **kw)
 
     NAME = "patch_file"
     DESCRIPTION = (

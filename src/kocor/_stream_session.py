@@ -27,13 +27,13 @@ class StreamSession:
     def __init__(self, llm_stream: Iterator[StreamChunk]):
         self._stream = llm_stream
 
-        # 累积状态
+        # 累积状态：将流式增量合并为完整响应
         self._accumulated_tool_calls: list[ToolCall] = []
         self._final_content = ""
         self._final_reasoning = ""
         self._usage: Usage | None = None
 
-        # 中断标志
+        # 中断标志（由外部事件如 Ctrl+C 设置）
         self._is_stopped = False
 
     def request_stop(self) -> None:
@@ -58,7 +58,7 @@ class StreamSession:
             if self._is_stopped:
                 break
 
-            # 累积工具调用（按 id 去重）
+            # 累积工具调用（按 id 去重——同一工具的 JSON 增量可能跨多个 chunk）
             if chunk.tool_calls:
                 for tc in chunk.tool_calls:
                     if not any(t.id == tc.id for t in self._accumulated_tool_calls):
@@ -68,11 +68,11 @@ class StreamSession:
             if chunk.content:
                 self._final_content += chunk.content
 
-            # 累积 reasoning
+            # 累积 reasoning（思维链增量）
             if chunk.reasoning:
                 self._final_reasoning += chunk.reasoning
 
-            # 累积 usage
+            # 累积 usage（通常是最后一个 chunk 携带）
             if chunk.usage:
                 self._usage = chunk.usage
 

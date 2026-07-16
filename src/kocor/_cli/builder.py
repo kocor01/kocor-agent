@@ -38,9 +38,13 @@ class AgentBuilder:
     """
 
     def __init__(self, config: Config | None = None):
+        # 共享配置实例，所有 build_* 方法通过 self.config 读取配置值
         self.config = config or Config.load()
+        # 先创建 ToolManager 和 EventEmitter——它们在各 build_* 阶段逐步注入依赖，
+        # 避免了"先构造后注入"的临时状态管理问题
         self.tool_manager = ToolManager()
         self.event_emitter = EventEmitter()
+        # 各组件初始化为 None，由对应 build_* 方法按顺序填充
         self.llm = None
         self.hook_manager = HookManager()
         self.permission_mgr = None
@@ -123,7 +127,8 @@ class AgentBuilder:
             session_manager=self.session_manager,
         )
 
-        # 挂载指标收集器
+        # 挂载指标收集器（通过 setattr 而非构造函数参数注入，
+        # 避免 Agent 构造函数参数膨胀，保持核心接口简洁）
         if self._metrics:
             agent._metrics_collector = self._metrics
 

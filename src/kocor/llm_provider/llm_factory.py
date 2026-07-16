@@ -54,7 +54,11 @@ class LlmFactory:
 
     @classmethod
     def _register_builtins(cls) -> None:
-        """注册内置的 openai 和 anthropic 客户端实现。"""
+        """注册内置的 openai 和 anthropic 客户端实现。
+
+        延迟导入避免在模块加载时就拉入 SDK 依赖——
+        用户只配置了一个 provider 时，另一个 SDK 的文件不会被导入。
+        """
         from kocor.llm_provider.providers import AnthropicClient, OpenAIClient
 
         cls.register("openai", OpenAIClient)

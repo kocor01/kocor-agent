@@ -297,13 +297,12 @@ def _densify_matches(matches: list[dict]) -> str:
 
 
 class SearchFiles:
+    """搜索文件和文件内容工具。"""
+
     @classmethod
     def handler_factory(cls, **deps):
         """返回无依赖注入的 handler。"""
         return lambda **kw: SearchFiles.handler(**kw)
-
-
-    """搜索文件和文件内容工具。"""
 
     NAME = "search_files"
     DESCRIPTION = (

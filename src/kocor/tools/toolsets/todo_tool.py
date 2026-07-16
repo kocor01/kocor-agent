@@ -201,14 +201,13 @@ class TodoStore:
 
 
 class TodoTool:
+    """任务规划工具（仿 MemoryTool 类式风格）。"""
+
     @classmethod
     def handler_factory(cls, **deps):
         """返回带 store 注入的 handler（延迟解析，因为 store 注册后才设定）。"""
         tm = deps.get("tool_manager")
         return lambda **kw: TodoTool.handler(store=tm.todo_store if tm else None, **kw)
-
-
-    """任务规划工具（仿 MemoryTool 类式风格）。"""
 
     NAME = "todo"
     DESCRIPTION = """管理当前会话的任务列表。WHEN: 复杂任务（3+ 步）或用户提供多个任务时主动规划。

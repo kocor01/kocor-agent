@@ -104,12 +104,15 @@ class Loop:
         tools = self.tool_manager.get_definitions()
 
         try:
+            # ── ReAct 主循环：LLM 生成 → 工具执行 → 下一轮 ──
             while not self.ctx.iteration >= self.max_iterations:
+                # 外部停止信号（如用户 Ctrl+C 或钩子请求）
                 if self._stop_requested:
                     return self._stopped_message()
 
                 self.ctx.advance_iteration()
 
+                # 阶段 1：LLM 生成前——执行钩子（如审计注入），可中止循环
                 hook_msg = self._run_hooks(HookPoint.PRE_GENERATE)
                 self._emit_event(EventType.PRE_GENERATE, iteration=self.ctx.iteration,
                            messages=self.ctx.messages,
@@ -118,12 +121,14 @@ class Loop:
                 if hook_msg is not None:
                     return hook_msg
 
+                # 阶段 2：调用 LLM 生成响应
                 try:
                     response = self.llm.generate(
                         self.ctx.messages,
                         tools=tools,
                     )
                 except LLMTimeoutError as e:
+                    # 超时重试：注入提示让 LLM 简化或继续，最多重试 2 次
                     self._consecutive_timeouts += 1
                     logger.warning("LLM timeout (iteration %d): %s", self.ctx.iteration, e)
                     if self._consecutive_timeouts > self._max_timeout_retries:
@@ -136,25 +141,30 @@ class Loop:
                     ))
                     continue
                 except LLMConnectionError as e:
+                    # 连接失败（如网络不可用、API Key 无效）——不可恢复，终止循环
                     logger.error("LLM connection failed (iteration %d): %s", self.ctx.iteration, e)
                     result = f"LLM API 连接失败: {e}"
                     self.ctx.append(Message(role="assistant", content=result))
                     return result
-                self._consecutive_timeouts = 0
+                self._consecutive_timeouts = 0  # 成功一次即重置超时计数
                 self.ctx.append(response)
 
+                # 阶段 3：LLM 生成后——执行钩子，可中止循环
                 hook_msg = self._run_hooks(HookPoint.POST_GENERATE, response=response)
                 self._emit_event(EventType.POST_GENERATE, iteration=self.ctx.iteration, response=response,
                            hook_result=hook_msg)
                 if hook_msg is not None:
                     return hook_msg or response.content or ""
 
+                # 阶段 4：无工具调用 → 纯文本回复，循环结束
                 if not response.tool_calls:
                     return response.content or ""
 
+                # 阶段 5：重复工具调用检测——连续 3 次相同签名则终止
                 if self._check_repetition(response):
                     return self._stuck_in_loop_message()
 
+                # 阶段 6：逐个执行工具调用
                 for tool_call in response.tool_calls:
                     result_msg = self._execute_one_tool(tool_call)
                     if result_msg is not None:
@@ -164,6 +174,7 @@ class Loop:
                 self.ctx.usage = response.usage
                 self.ctx.compress_if_needed()
 
+            # 迭代预算耗尽
             hook_msg = self._run_hooks(HookPoint.ON_BUDGET_EXHAUSTED)
             self._emit_event(EventType.ON_BUDGET_EXHAUSTED, iteration=self.ctx.iteration,
                        max_iterations=self.max_iterations,
@@ -280,6 +291,7 @@ class Loop:
         """执行单个工具调用：权限检查、钩子、事件、执行、审计。"""
         tool_name = tool_call.function.name
 
+        # 阶段 1：权限检查——拒绝的回调反馈给 LLM，让其不再尝试
         if not self.permission_mgr.check(tool_call):
             return Message(
                 role="tool",
@@ -287,7 +299,7 @@ class Loop:
                 tool_call_id=tool_call.id,
             )
 
-        # 先执行钩子，再触发事件（事件携带钩子结果供观察者使用）
+        # 阶段 2：工具执行前钩子——先执行钩子，再触发事件（事件携带钩子结果供观察者使用）
         hook_msg = self._run_hooks(HookPoint.PRE_TOOL, tool_call=tool_call)
         self._emit_event(EventType.PRE_TOOL, iteration=self.ctx.iteration, tool_call=tool_call,
                    hook_result=hook_msg)
@@ -296,6 +308,7 @@ class Loop:
             # 跳过事实由 PRE_TOOL 的 hook_result 表达
             return Message(role="tool", content=hook_msg or "[Tool Skipped by Hook]", tool_call_id=tool_call.id)
 
+        # 阶段 3：实际执行——记录耗时，用于后续指标
         duration = 0
         start = time.monotonic()
         try:
@@ -303,11 +316,14 @@ class Loop:
             duration = (time.monotonic() - start) * 1000
             content = result.content or ""
 
+            # 阶段 4：工具执行后钩子——可请求终止循环
             hook_msg = self._run_hooks(HookPoint.POST_TOOL, tool_call=tool_call, tool_result=result)
             self._emit_event(EventType.POST_TOOL, iteration=self.ctx.iteration,
                        tool_name=tool_name, duration=duration, success=True, result=result,
                        hook_result=hook_msg)
             if hook_msg is not None:
+                # 钩子返回非空消息说明它要求终止循环（如审计阻断、预算超限），
+                # 设置停止标志使循环在下一个迭代边界结束。
                 self._stop_requested = True
 
             return Message(
@@ -317,6 +333,7 @@ class Loop:
             )
 
         except Exception as e:
+            # 阶段 5：异常处理——记录错误事件，钩子可请求终止
             hook_msg = self._run_hooks(HookPoint.ON_ERROR, error=e)
             self._emit_event(EventType.POST_TOOL, iteration=self.ctx.iteration,
                        tool_name=tool_name, duration=duration, success=False, error=str(e))
@@ -325,6 +342,7 @@ class Loop:
             if hook_msg is not None:
                 self._stop_requested = True
 
+            # 将错误信息包装为 tool 消息返回给 LLM，让模型决定下一步
             return Message(
                 role="tool",
                 content=f"Error: {type(e).__name__}: {e}",
@@ -404,6 +422,9 @@ class Loop:
         已知字段传给 HookContext 命名参数，未知字段放入 extra 字典，
         避免因未知字段导致 TypeError（P0.2 回归）。
         """
+        # 已知字段列表——HookContext 构造函数显式接受这些字段。
+        # 不属于此列表的额外数据（如 iteration、max_iterations）自动归入 extra 字典，
+        # 防止 HookContext 构造函数因未知 kwargs 抛 TypeError。
         known_fields = {"tool_call", "tool_result", "response", "error", "config"}
         context_kwargs = {}
         extra_data = {}

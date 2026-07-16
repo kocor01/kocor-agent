@@ -118,26 +118,27 @@ def main() -> None:
     if args.debug:
         Config.load().log_level = "DEBUG"
 
-    # 检测 REPL 模式：无参数且 stdin 是终端时默认进入
+    # 检测 REPL 模式：无参数且 stdin 是终端时默认进入交互式循环
     is_repl = not user_args and sys.stdin.isatty()
 
-    # 一次性模式默认关闭会话持久化
+    # 一次性模式（非 REPL）关闭会话持久化，避免单次查询创建无用会话记录
     if not is_repl:
         Config.load().session_enabled = False
 
     logger = Logger(Config.load().log_level, log_dir=Config.load().log_dir)
 
-    # 使用 AgentBuilder 装配 Agent 及其所有依赖组件
+    # 使用 AgentBuilder 链式装配 Agent 及其所有依赖组件，
+    # 按依赖顺序：LLM → Subagent → 工具 → 权限 → 钩子 → 会话 → 组装
     from kocor._cli.builder import AgentBuilder
     agent = (
         AgentBuilder()
-        .build_llm()
-        .build_subagent()
-        .build_tools()
-        .build_permission()
-        .build_hooks(logger)
-        .build_session()
-        .build()
+        .build_llm()          # 先创建 LLM 客户端
+        .build_subagent()     # 再创建子代理运行器（需 LLM）
+        .build_tools()        # 注册所有工具（需 SubagentRunner）
+        .build_permission()   # 权限管理（需工具列表）
+        .build_hooks(logger)  # 钩子和事件订阅
+        .build_session()      # 可选的会话持久化
+        .build()              # 最终组装 Agent
     )
 
     if is_repl:
@@ -169,8 +170,9 @@ def main() -> None:
             if result:
                 print(result)
     finally:
-        agent.tool_manager.mcp_manager.shutdown_all()
-        agent.tool_manager.stop_cron_scheduler()
+        # 确保退出时释放所有资源，防止僵尸进程和泄露连接
+        agent.tool_manager.mcp_manager.shutdown_all()  # 关闭所有 MCP 服务器连接
+        agent.tool_manager.stop_cron_scheduler()        # 停止 cron worker 子进程
 
         # Debug 模式输出会话指标摘要
         if args.debug:

@@ -31,13 +31,14 @@ class Logger:
     """
 
     def __init__(self, level: str = "INFO", log_dir: str = "./log"):
+        # 按日期分类日志目录，每天一个子目录
         today = date.today().isoformat()
         daily_dir = os.path.join(log_dir, today)
         os.makedirs(daily_dir, exist_ok=True)
 
         formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(message)s")
 
-        # 默认日志 → kocor.log
+        # 默认日志 → kocor.log（运行时日志，含事件、错误等）
         self._default_logger = logging.getLogger("kocor")
         self._default_logger.setLevel(getattr(logging, level.upper(), logging.INFO))
         if not self._default_logger.handlers:

@@ -120,6 +120,8 @@ class _StreamFormatter:
         self._ensure_content_section()
 
         self._content_buffer += content
+        # 按行拆分处理：累积到换行符时取出完整行交给 _process_line，
+        # 剩余的碎片（不满一行的内容）留在 _content_buffer 中等待后续 chunk。
         while "\n" in self._content_buffer:
             line, self._content_buffer = self._content_buffer.split("\n", 1)
             self._process_line(line.rstrip())

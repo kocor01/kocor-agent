@@ -48,8 +48,11 @@ class PermissionManager:
         tool_manager=None,
     ):
         self.policy = policy
+        # 始终允许列表（跳过所有检查）
         self._always_allow = always_allow or set()
+        # 始终询问列表（即使 safe 等级也要确认）
         self._always_ask = always_ask or set()
+        # 会话缓存：已批准的工具名（FIFO 淘汰）
         self._cache: OrderedDict[str, None] = OrderedDict()
         self.cache_enabled = cache_enabled
         self.cache_max_size = cache_max_size
@@ -68,7 +71,7 @@ class PermissionManager:
         if tool_name in self._always_allow:
             return True
 
-        # 2. 会话缓存（之前已批准）
+        # 2. 会话缓存（之前已批准），避免同一工具的重复提示
         if self.cache_enabled and tool_name in self._cache:
             return True
 

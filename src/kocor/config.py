@@ -39,6 +39,7 @@ def _resolve_path(path: str, *, prefer_cwd: bool = False) -> str:
     if os.path.isabs(path):
         return os.path.abspath(path)
 
+    # 获取包根目录：向上查 src/kocor/config.py 所在路径
     package_root = os.path.dirname(
         os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     )
@@ -343,6 +344,8 @@ class Config:
 
 
 # --- 类型映射表（from __future__ import annotations 下 f.type 是字符串） ----------
+# ConfigLoader 在反射 fields 时，由于 Config 类开头有 `from __future__ import annotations`，
+# f.type 返回的是字符串（如 "int"、"str"）而非类型对象，因此需要此映射表做类型名称到类型的转换。
 _TYPES: dict[str, type] = {
     "int": int,
     "float": float,
@@ -378,7 +381,7 @@ class ConfigLoader:
             raw = os.environ.get(env_name) if env_name else None
             if raw is not None:
                 value = cls._coerce(f.type, env_name, raw)
-                # API Key 字段自动包装为 SecretStr
+                # API Key 字段自动包装为 SecretStr，防止 repr/str 意外泄露
                 if _is_api_key_field(f.name):
                     value = SecretStr(value)
             else:

@@ -191,6 +191,7 @@ class BaseLLMClient(ABC):
 
         模板方法：_prepare_messages → _normalize_in → _normalize_tools → _api_generate → _normalize_out
         """
+        # 未指定 max_tokens 时使用配置值，允许调用方传 None 表示"使用默认"
         actual_max_tokens = max_tokens if max_tokens is not None else self.config.max_tokens
         system_data, filtered = self._prepare_messages(messages)
         input_data = self._normalize_in(filtered)
