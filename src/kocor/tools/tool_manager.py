@@ -94,10 +94,12 @@ class ToolManager:
             BashTool.SAFETY_LEVEL,
         )
         self.register(
-            SearchFiles.NAME, SearchFiles.DESCRIPTION, SearchFiles.PARAMETERS, SearchFiles.handler, SearchFiles.SAFETY_LEVEL,
+            SearchFiles.NAME, SearchFiles.DESCRIPTION,
+            SearchFiles.PARAMETERS, SearchFiles.handler, SearchFiles.SAFETY_LEVEL,
         )
         self.register(
-            ProcessTool.NAME, ProcessTool.DESCRIPTION, ProcessTool.PARAMETERS, ProcessTool.handler, ProcessTool.SAFETY_LEVEL,
+            ProcessTool.NAME, ProcessTool.DESCRIPTION,
+            ProcessTool.PARAMETERS, ProcessTool.handler, ProcessTool.SAFETY_LEVEL,
         )
 
         # memory 工具依赖 self.memory_store，handler 在调用时读取
@@ -234,7 +236,9 @@ class ToolManager:
         try:
             with ThreadPoolExecutor(max_workers=1) as pool:
                 defn = self._tools.get(name)
-                timeout = defn.timeout if (defn is not None and defn.timeout is not None) else Config.load().tool_timeout
+                timeout = defn.timeout if (
+                    defn is not None and defn.timeout is not None
+                ) else Config.load().tool_timeout
                 future = pool.submit(self._handlers[name], **args)
                 result_timeout = None if timeout == 0 else timeout
                 try:

@@ -76,7 +76,9 @@ _WRITE_DENIED_PREFIXES: list[str] = _build_write_denied_prefixes()
 # 项目级 .env 文件模式
 _ENV_FILE_PATTERN = re.compile(r"\.env(\..+)?$")
 # Shell 启动文件模式
-_SHELL_RC_PATTERN = re.compile(r"\.(?:bashrc|bash_profile|bash_login|profile|zshrc|zprofile|zlogin|cshrc|tcshrc|kshrc|shrc)$")
+_SHELL_RC_PATTERN = re.compile(
+    r"\.(?:bashrc|bash_profile|bash_login|profile|zshrc|zprofile|zlogin|cshrc|tcshrc|kshrc|shrc)$"
+)
 
 
 def is_write_denied(path: str) -> bool:

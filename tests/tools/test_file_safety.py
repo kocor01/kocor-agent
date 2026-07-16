@@ -128,7 +128,10 @@ class TestIsInternalFileToolContent:
 
     def test_dedup_status_message_detected(self):
         """去重状态消息被检测为内部内容。"""
-        content = "File unchanged since last read. The content from the earlier read_file result in this conversation is still current"
+        content = (
+            "File unchanged since last read."
+            " The content from the earlier read_file result in this conversation is still current"
+        )
         assert is_internal_file_tool_content(content) is True
 
     def test_regular_code_not_detected(self):
@@ -144,6 +147,7 @@ class TestIsInternalFileToolContent:
     def test_short_text_with_status_message(self):
         """短文本包含状态消息被检测。"""
         from kocor.tools.toolsets.file.file_safety import _READ_DEDUP_STATUS_MESSAGE
+
         content = f"Note: {_READ_DEDUP_STATUS_MESSAGE}"
         assert is_internal_file_tool_content(content) is True
 

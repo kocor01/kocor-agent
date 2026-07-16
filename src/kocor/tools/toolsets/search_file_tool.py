@@ -171,7 +171,10 @@ def _search_with_python(
     if len(page) >= _DENSIFY_MIN_MATCHES:
         dense = _densify_matches(page)
         return {
-            "matches_format": "path-grouped: each file path on its own line, followed by indented '<line>: <content>' rows",
+            "matches_format": (
+                    "path-grouped: each file path on its own line,"
+                    " followed by indented '<line>: <content>' rows"
+                ),
             "matches_text": dense,
             "total_count": total,
         }
@@ -269,7 +272,10 @@ def _parse_content_matches(output: str, limit: int, offset: int) -> dict[str, An
     if len(page) >= _DENSIFY_MIN_MATCHES:
         dense = _densify_matches(page)
         return {
-            "matches_format": "path-grouped: each file path on its own line, followed by indented '<line>: <content>' rows",
+            "matches_format": (
+                    "path-grouped: each file path on its own line,"
+                    " followed by indented '<line>: <content>' rows"
+                ),
             "matches_text": dense,
             "total_count": total,
         }

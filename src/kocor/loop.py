@@ -377,7 +377,10 @@ class Loop:
         return f"Agent 在 {self.ctx.iteration} 次迭代后未完成。"
 
     def _stuck_in_loop_message(self) -> str:
-        return f"Agent 在第 {self.ctx.iteration} 次迭代检测到重复工具调用（连续 {self._consecutive_duplicate_count} 次），已提前终止。"
+        return (
+            f"Agent 在第 {self.ctx.iteration} 次迭代检测到重复工具调用"
+            f"（连续 {self._consecutive_duplicate_count} 次），已提前终止。"
+        )
 
     def _stopped_message(self) -> str:
         self._stop_requested = False

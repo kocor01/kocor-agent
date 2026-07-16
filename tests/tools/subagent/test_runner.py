@@ -17,6 +17,7 @@ from kocor.tools.toolsets.subagent.runner import SubagentRunner
 
 class MockEmitter:
     """简易 Mock EventEmitter，记录收到的事件。"""
+
     def __init__(self):
         self.events = []
 
@@ -33,6 +34,7 @@ class MockEmitter:
 
 class MockLLM:
     """Mock LLM 客户端，预设返回内容。"""
+
     def __init__(self, responses: list[str] | None = None):
         self.responses = responses or ["done"]
         self.call_count = 0
@@ -93,9 +95,9 @@ class TestRunnerSingleGoal:
 
     def test_run_budget_exhausted_status(self):
         """MockLLM 持续返回 tool_calls（不停循环）→ 预算耗尽。"""
+
         def tool_always(**kwargs):
-            return Message(role="assistant", content="",
-                           tool_calls=[MagicMock()])
+            return Message(role="assistant", content="", tool_calls=[MagicMock()])
 
         from unittest.mock import MagicMock
 
@@ -105,11 +107,11 @@ class TestRunnerSingleGoal:
         def gen(messages, tools=None, **kwargs):
             llm.call_count += 1
             return Message(
-                role="assistant", content="",
-                tool_calls=[
-                    ToolCall(id="c1", function=FunctionCall(name="bash", arguments='{"command":"echo hi"}'))
-                ],
+                role="assistant",
+                content="",
+                tool_calls=[ToolCall(id="c1", function=FunctionCall(name="bash", arguments='{"command":"echo hi"}'))],
             )
+
         llm.generate = gen
         llm.stream = lambda m, **kw: iter([])
 
@@ -120,6 +122,7 @@ class TestRunnerSingleGoal:
             depth=0,
         )
         from kocor.config import Config
+
         old = Config.load().subagent_max_iterations
         Config.load().subagent_max_iterations = 2
         try:
@@ -144,7 +147,7 @@ class TestRunnerSingleGoal:
         """stop() 设置 running_loops 中每个 Loop 的 _stop_requested。"""
         mock_loop = Mock()
         mock_loop._stop_requested = False
-        mock_loop.stop = lambda: setattr(mock_loop, '_stop_requested', True)
+        mock_loop.stop = lambda: setattr(mock_loop, "_stop_requested", True)
 
         runner = SubagentRunner(
             parent_llm=self.llm,
@@ -265,9 +268,7 @@ class TestRunnerOrchestrator:
             child_loop = runner._running_loops[-1]
             handler = child_loop.tool_manager._handlers.get("subagent")
             if handler is not None:
-                import json
                 resp = handler()
-                data = json.loads(resp)
                 # 真实 handler 返回 runner 的结果（error 因为无 goal/tasks）
                 # 占位 handler 返回固定 error 字符串
                 assert "SubagentRunner 未装配" not in resp

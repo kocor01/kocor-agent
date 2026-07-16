@@ -22,7 +22,7 @@ class TestContextManagerBuilder:
     def test_default_construction(self):
         """默认构造应成功。"""
         tools = ToolRegistryStub()
-        ctx = ContextManager(
+        _ = ContextManager(
             tools=tools,
         )
 

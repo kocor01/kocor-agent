@@ -261,7 +261,7 @@ class ProcessRegistry:
                 result = env.execute(f"cat {quoted_log} 2>/dev/null", timeout=10)
                 new_output = result.get("stdout", "")
                 if new_output:
-                    delta = new_output[prev_output_len:] if len(new_output) > prev_output_len else ""
+                    _ = new_output[prev_output_len:]  # 计算增量，用于后续处理
                     prev_output_len = len(new_output)
                     with session._lock:
                         session.output_buffer = new_output
@@ -296,7 +296,7 @@ class ProcessRegistry:
     def _move_to_finished(self, session: ProcessSession):
         """将会话从 running 移到 finished。幂等操作。"""
         with self._lock:
-            was_running = self._running.pop(session.id, None) is not None
+            _was_running = self._running.pop(session.id, None) is not None
             self._finished[session.id] = session
         session._completion_event.set()
 

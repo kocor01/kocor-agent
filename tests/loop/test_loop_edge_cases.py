@@ -56,7 +56,11 @@ class MockLLM:
         self.call_count = 0
 
     def generate(self, messages, tools=None):
-        resp = self.responses[self.call_count] if self.call_count < len(self.responses) else Message(role="assistant", content="done")
+        resp = (
+            self.responses[self.call_count]
+            if self.call_count < len(self.responses)
+            else Message(role="assistant", content="done")
+        )
         self.call_count += 1
         return resp
 
@@ -86,6 +90,7 @@ class MockToolRegistry:
     def execute(self, tool_call):
         self.executed.append(tool_call)
         from kocor.llm_provider.message import ToolResult
+
         return ToolResult(
             tool_call_id=tool_call.id,
             content=f"Result of {tool_call.function.name}",
@@ -186,6 +191,7 @@ class TestCheckRepetitionDirect:
 
         class TrackHook:
             hook_point = HookPoint.ON_BUDGET_EXHAUSTED
+
             def run(self, ctx):
                 hook_calls.append(ctx.iteration)
                 return HookResult(action=HookAction.CONTINUE)
@@ -266,7 +272,7 @@ class TestCheckRepetitionDirect:
         assert result is False
         assert loop._consecutive_duplicate_count == 1
         # 两个工具调用用 | 连接
-        assert 'read({' in loop._last_tool_call_signature
+        assert "read({" in loop._last_tool_call_signature
         assert "|" in loop._last_tool_call_signature
 
 
@@ -301,7 +307,7 @@ class TestGetToolCallSignatureEdgeCases:
 
         tc = ToolCall(id="1", function=FunctionCall(name="test", arguments="{}"))
         sig = Loop._get_tool_call_signature(tc)
-        assert sig == 'test({})'
+        assert sig == "test({})"
 
     def test_different_arg_orders_same_signature(self):
         """参数顺序不同应生成相同签名（通过 sort_keys）。"""
@@ -373,7 +379,6 @@ class TestLoopMessageFormatting:
 
 
 class TestExecuteOneToolEdgeCases:
-
     def test_permission_denied_returns_error_message(self):
         """权限拒绝时返回 Permission Denied 消息给 LLM。"""
         loop = _make_loop()
@@ -393,6 +398,7 @@ class TestExecuteOneToolEdgeCases:
 
         class SkipHook:
             hook_point = HookPoint.PRE_TOOL
+
             def run(self, ctx):
                 return HookResult(action=HookAction.ABORT, message="skip this tool")
 
@@ -410,12 +416,16 @@ class TestExecuteOneToolEdgeCases:
 
         class ErrorToolRegistry:
             skill_manager = None
+
             def get_definitions(self, filter_category=None):
                 return []
+
             def execute(self, tool_call):
                 raise RuntimeError("connection timeout")
+
             def start_cron_scheduler(self):
                 pass
+
             def stop_cron_scheduler(self):
                 pass
 
@@ -447,7 +457,6 @@ class TestExecuteOneToolEdgeCases:
 
 
 class TestResetState:
-
     def test_reset_state_clears_all(self):
         """_reset_state 重置所有运行状态。"""
         loop = _make_loop()
@@ -481,7 +490,6 @@ class TestResetState:
 
 
 class TestRunMessagesEdgeCases:
-
     def test_run_messages_with_empty_messages(self):
         """messages 为空时循环应仍运行（LLM 会收到空列表）。"""
         loop = _make_loop(llm_responses=[Message(role="assistant", content="response")])
@@ -539,7 +547,6 @@ class TestRunMessagesEdgeCases:
 
 
 class TestStopAndBudgetExhaustion:
-
     def test_stop_immediately_in_run(self):
         """stop() 后 run_messages 立即返回停止消息。"""
         loop = _make_loop(llm_responses=[Message(role="assistant", content="should not see")])
@@ -557,7 +564,9 @@ class TestStopAndBudgetExhaustion:
             llm_responses=[
                 Message(
                     role="assistant",
-                    tool_calls=[ToolCall(id="c1", function=FunctionCall(name="read_file", arguments='{"path": "x.txt"}'))],
+                    tool_calls=[
+                        ToolCall(id="c1", function=FunctionCall(name="read_file", arguments='{"path": "x.txt"}'))
+                    ],
                 ),
             ],
             max_iterations=1,
@@ -566,11 +575,14 @@ class TestStopAndBudgetExhaustion:
 
         # 注册钩子
         hook_calls = []
+
         class BudgetHook:
             hook_point = HookPoint.ON_BUDGET_EXHAUSTED
+
             def run(self, ctx):
                 hook_calls.append(ctx.iteration)
                 return HookResult(action=HookAction.CONTINUE)
+
         loop.hook_manager.register(BudgetHook())
 
         events = []
@@ -597,6 +609,7 @@ class TestStopAndBudgetExhaustion:
 
     def test_keyboard_interrupt_in_run(self):
         """KeyboardInterrupt 在 run_messages 中被捕获。"""
+
         class InterruptingLLM(MockLLM):
             def generate(self, messages, tools=None):
                 raise KeyboardInterrupt()
@@ -631,11 +644,14 @@ class TestLoopEventHooks:
         loop.ctx.messages = [Message(role="user", content="hi")]
 
         hook_calls = []
+
         class GenHook:
             hook_point = HookPoint.PRE_GENERATE
+
             def run(self, ctx):
                 hook_calls.append(("pre_generate", ctx.iteration))
                 return HookResult(action=HookAction.CONTINUE)
+
         loop.hook_manager.register(GenHook())
 
         loop.run_messages()
@@ -648,11 +664,14 @@ class TestLoopEventHooks:
         loop.ctx.messages = [Message(role="user", content="hi")]
 
         hook_calls = []
+
         class PostGenHook:
             hook_point = HookPoint.POST_GENERATE
+
             def run(self, ctx):
                 hook_calls.append(("post_generate", ctx.iteration))
                 return HookResult(action=HookAction.CONTINUE)
+
         loop.hook_manager.register(PostGenHook())
 
         loop.run_messages()
@@ -666,7 +685,9 @@ class TestLoopEventHooks:
             llm_responses=[
                 Message(
                     role="assistant",
-                    tool_calls=[ToolCall(id="c1", function=FunctionCall(name="read_file", arguments='{"path":"x.txt"}'))],
+                    tool_calls=[
+                        ToolCall(id="c1", function=FunctionCall(name="read_file", arguments='{"path":"x.txt"}'))
+                    ],
                 ),
                 Message(role="assistant", content="done"),
             ],
@@ -674,13 +695,17 @@ class TestLoopEventHooks:
         loop.ctx.messages = [Message(role="user", content="read x.txt")]
 
         hook_calls = []
+
         class PreToolHook:
             hook_point = HookPoint.PRE_TOOL
+
             def run(self, ctx):
                 hook_calls.append(("pre_tool", ctx.iteration))
                 return HookResult(action=HookAction.CONTINUE)
+
         class PostToolHook:
             hook_point = HookPoint.POST_TOOL
+
             def run(self, ctx):
                 hook_calls.append(("post_tool", ctx.iteration, ctx.tool_call.function.name))
                 return HookResult(action=HookAction.CONTINUE)

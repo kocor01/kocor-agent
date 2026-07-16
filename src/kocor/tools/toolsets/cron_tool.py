@@ -364,7 +364,10 @@ action='update'、'pause'、'resume'、'remove' 或 'run' 管理已有任务。
             "action": {
                 "type": "string",
                 "enum": ["create", "list", "update", "pause", "resume", "remove", "run"],
-                "description": "create: 创建 | list: 列表 | update: 更新 | pause: 暂停 | resume: 恢复 | remove: 删除 | run: 立即执行",
+                "description": (
+                    "create: 创建 | list: 列表 | update: 更新"
+                    " | pause: 暂停 | resume: 恢复 | remove: 删除 | run: 立即执行"
+                ),
             },
             "job_id": {
                 "type": "string",
@@ -372,11 +375,17 @@ action='update'、'pause'、'resume'、'remove' 或 'run' 管理已有任务。
             },
             "prompt": {
                 "type": "string",
-                "description": "create/update 时使用，需自包含的提示词。如果同时指定了 skills，则作为任务指令与 skills 配合使用",
+                "description": (
+                    "create/update 时使用，需自包含的提示词。"
+                    "如果同时指定了 skills，则作为任务指令与 skills 配合使用"
+                ),
             },
             "schedule": {
                 "type": "string",
-                "description": "create 必填。'2 22 * * *'（cron 表达式，覆盖所有重复场景）或 '2026-07-08T14:00:00'（ISO 时间戳，单次定时）。只支持这两种格式。",
+                "description": (
+                    "create 必填。'2 22 * * *'（cron 表达式，覆盖所有重复场景）"
+                    "或 '2026-07-08T14:00:00'（ISO 时间戳，单次定时）。只支持这两种格式。"
+                ),
             },
             "name": {
                 "type": "string",

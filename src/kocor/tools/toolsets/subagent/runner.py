@@ -138,7 +138,11 @@ class SubagentRunner:
         except concurrent.futures.TimeoutError:
             final_text = None
             status = "timeout"
-            context_data = {"subagent_id": f"sa-{id(child_loop):x}", "status": status, "error": f"timeout after {subagent_timeout}s"}
+            context_data = {
+                "subagent_id": f"sa-{id(child_loop):x}",
+                "status": status,
+                "error": f"timeout after {subagent_timeout}s",
+            }
         except Exception as e:
             final_text = None
             status = "error"
@@ -149,8 +153,14 @@ class SubagentRunner:
                 "status": status,
                 "duration": time.monotonic() - start,
                 "usage": {
-                    "prompt_tokens": getattr(child_loop.ctx.usage, "prompt_tokens", 0) if child_loop.ctx.usage else 0,
-                    "completion_tokens": getattr(child_loop.ctx.usage, "completion_tokens", 0) if child_loop.ctx.usage else 0,
+                    "prompt_tokens": (
+                    getattr(child_loop.ctx.usage, "prompt_tokens", 0)
+                    if child_loop.ctx.usage else 0
+                ),
+                "completion_tokens": (
+                    getattr(child_loop.ctx.usage, "completion_tokens", 0)
+                    if child_loop.ctx.usage else 0
+                ),
                 },
             }
 

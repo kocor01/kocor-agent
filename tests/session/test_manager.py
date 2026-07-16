@@ -96,7 +96,7 @@ class TestSessionManager:
         assert entry2.is_fresh_reset is True
         # 旧会话应在 DB 中标记结束
         if manager.store._db:
-            session = manager.store._db.get_session(entry1.session_id)
+            _session = manager.store._db.get_session(entry1.session_id)
             # entry1 在 reset 时被标记 ended_at
 
     def test_end_session(self, manager):
@@ -252,8 +252,10 @@ class TestSessionManagerPersistence:
         from kocor.llm_provider.message import Message, Usage
 
         msgs = [
-            Message(role="user", content="Hello"),                               # 无 usage
-            Message(role="assistant", content="Hi!", usage=Usage(prompt_tokens=10, completion_tokens=5, total_tokens=15)),  # 有 usage
+            Message(role="user", content="Hello"),  # 无 usage
+            Message(
+                role="assistant", content="Hi!", usage=Usage(prompt_tokens=10, completion_tokens=5, total_tokens=15)
+            ),  # 有 usage
         ]
         mgr.persist_messages(e.session_key, msgs, start_index=0)
 
@@ -263,9 +265,9 @@ class TestSessionManagerPersistence:
         ).fetchall()
         assert len(rows) == 2
         assert rows[0]["role"] == "user"
-        assert rows[0]["total_tokens"] == 0     # user 消息无 usage
+        assert rows[0]["total_tokens"] == 0  # user 消息无 usage
         assert rows[1]["role"] == "assistant"
-        assert rows[1]["total_tokens"] == 15     # prompt(10) + completion(5)
+        assert rows[1]["total_tokens"] == 15  # prompt(10) + completion(5)
 
     def test_persist_no_db(self, policy):
         """无 SQLite 后端时 persist 不应出错。"""
@@ -289,9 +291,13 @@ class TestSessionManagerPersistence:
 
         # 创建会话 1
         e1 = mgr.get_or_create_session(now=self.NOW)
-        mgr.persist_messages(e1.session_key, [
-            Message(role="user", content="会话 1 的消息"),
-        ], start_index=0)
+        mgr.persist_messages(
+            e1.session_key,
+            [
+                Message(role="user", content="会话 1 的消息"),
+            ],
+            start_index=0,
+        )
 
         # 创建会话 2（强制新会话）
         e2 = mgr.get_or_create_session(force_new=True, now=self.NOW)

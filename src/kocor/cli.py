@@ -141,7 +141,7 @@ def main() -> None:
     if is_repl:
         print()
         try:
-            import readline  # 提供行编辑和上下键历史
+            import readline  # noqa: F401  # 提供行编辑和上下键历史
         except ImportError:
             pass
         _print_welcome(agent.session_manager, agent.tool_manager.skill_manager)

@@ -825,7 +825,6 @@ def _get_due_jobs_locked() -> list[dict[str, Any]]:
     raw_jobs = load_jobs()
     jobs = [copy.deepcopy(j) for j in raw_jobs]
     due: list[dict[str, Any]] = []
-    needs_save = False
 
     for job in jobs:
         if not job.get("enabled", True):

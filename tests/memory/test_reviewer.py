@@ -31,10 +31,17 @@ class _FakeReviewLLM:
                 tool_calls=[
                     ToolCall(
                         id="call_1",
-                        function=type("Func", (), {
-                            "name": "memory",
-                            "arguments": '{"operations":[{"action":"add","target":"user","content":"User named Alice"}]}',
-                        })(),
+                        function=type(
+                            "Func",
+                            (),
+                            {
+                                "name": "memory",
+                                "arguments": (
+                                '{"operations":[{"action":"add",'
+                                '"target":"user","content":"User named Alice"}]}'
+                            ),
+                            },
+                        )(),
                     ),
                 ],
             )
@@ -54,10 +61,12 @@ class TestBackgroundReviewer:
         llm = _FakeReviewLLM(should_memorize=False)
         reviewer = BackgroundReviewer(llm=llm, store=store)
 
-        reviewer.review([
-            Message(role="user", content="你好"),
-            Message(role="assistant", content="你好，有什么可以帮助你的？"),
-        ])
+        reviewer.review(
+            [
+                Message(role="user", content="你好"),
+                Message(role="assistant", content="你好，有什么可以帮助你的？"),
+            ]
+        )
 
         assert llm.call_count == 1
         assert store.list_entries("memory") == []  # 无写入
@@ -69,10 +78,12 @@ class TestBackgroundReviewer:
         llm = _FakeReviewLLM(should_memorize=True)
         reviewer = BackgroundReviewer(llm=llm, store=store)
 
-        reviewer.review([
-            Message(role="user", content="我叫张三"),
-            Message(role="assistant", content="你好张三！"),
-        ])
+        reviewer.review(
+            [
+                Message(role="user", content="我叫张三"),
+                Message(role="assistant", content="你好张三！"),
+            ]
+        )
 
         assert llm.call_count == 1
         entries = store.list_entries("user")

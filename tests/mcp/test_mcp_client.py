@@ -11,6 +11,7 @@ from kocor.tools.tool_manager import ToolManager
 
 # ── 测试辅助函数 ──────────────────────────────────────────────────────────
 
+
 def _mock_tool(name: str, description: str = "", inputSchema: dict | None = None) -> Tool:
     return Tool(
         name=name,
@@ -32,16 +33,19 @@ def _make_async_cm(return_value):
 class TestSanitizeServerName:
     def test_lowercase(self):
         from kocor.mcp import sanitize_server_name
+
         assert sanitize_server_name("GitHub") == "github"
         assert sanitize_server_name("MyServer") == "myserver"
 
     def test_special_chars_to_underscore(self):
         from kocor.mcp import sanitize_server_name
+
         assert sanitize_server_name("my-server") == "my_server"
         assert sanitize_server_name("foo.bar") == "foo_bar"
 
     def test_alphanumeric_unchanged(self):
         from kocor.mcp import sanitize_server_name
+
         assert sanitize_server_name("filesystem") == "filesystem"
 
 
@@ -51,6 +55,7 @@ class TestSanitizeServerName:
 class TestMCPConfig:
     def test_default_values(self):
         from kocor.mcp import MCPConfig
+
         cfg = MCPConfig(command="node")
         assert cfg.command == "node"
         assert cfg.args == []
@@ -58,6 +63,7 @@ class TestMCPConfig:
 
     def test_remote_config(self):
         from kocor.mcp import MCPConfig
+
         cfg = MCPConfig(url="https://example.com/mcp", transport="sse")
         assert cfg.url == "https://example.com/mcp"
         assert cfg.transport == "sse"
@@ -70,14 +76,18 @@ class TestLoadMCPServers:
     def test_load_valid_config(self):
         from kocor.mcp import load_mcp_servers
 
-        data = json.dumps({
-            "mcpServers": {
-                "fs": {"command": "npx", "args": ["-y", "fs"]},
-                "api": {"url": "https://example.com/mcp"},
+        data = json.dumps(
+            {
+                "mcpServers": {
+                    "fs": {"command": "npx", "args": ["-y", "fs"]},
+                    "api": {"url": "https://example.com/mcp"},
+                }
             }
-        })
-        with patch("kocor.mcp.config.os.path.exists", return_value=True), \
-             patch("builtins.open", mock_open(read_data=data)):
+        )
+        with (
+            patch("kocor.mcp.config.os.path.exists", return_value=True),
+            patch("builtins.open", mock_open(read_data=data)),
+        ):
             servers = load_mcp_servers("cfg.json")
 
         assert len(servers) == 2
@@ -86,12 +96,16 @@ class TestLoadMCPServers:
 
     def test_file_not_found(self):
         from kocor.mcp import load_mcp_servers
+
         assert load_mcp_servers("/nonexistent") == {}
 
     def test_invalid_json(self):
         from kocor.mcp import load_mcp_servers
-        with patch("kocor.mcp.config.os.path.exists", return_value=True), \
-             patch("builtins.open", mock_open(read_data="bad")):
+
+        with (
+            patch("kocor.mcp.config.os.path.exists", return_value=True),
+            patch("builtins.open", mock_open(read_data="bad")),
+        ):
             assert load_mcp_servers("bad.json") == {}
 
 
@@ -101,8 +115,7 @@ class TestLoadMCPServers:
 class TestMCPClient:
     """测试基于 SDK 的 MCPClient。"""
 
-    def _setup_sdk_mocks(self, mock_stdio, mock_session_cls,
-                         init_result=None, tools=(), call_result=None):
+    def _setup_sdk_mocks(self, mock_stdio, mock_session_cls, init_result=None, tools=(), call_result=None):
         """统一设置 SDK mock 环境。"""
         mock_read = AsyncMock()
         mock_write = AsyncMock()
@@ -110,18 +123,26 @@ class TestMCPClient:
 
         mock_session = AsyncMock()
         mock_session.__aenter__.return_value = mock_session
-        mock_session.initialize = AsyncMock(return_value=init_result or InitializeResult(
-            protocolVersion="2025-03-26",
-            capabilities={"tools": {}},
-            serverInfo={"name": "test", "version": "1.0"},
-        ))
-        mock_session.list_tools = AsyncMock(return_value=ListToolsResult(
-            tools=tools if tools is not None else [_mock_tool("echo")],
-        ))
-        mock_session.call_tool = AsyncMock(return_value=call_result or CallToolResult(
-            content=[TextContent(type="text", text="ok")],
-            isError=False,
-        ))
+        mock_session.initialize = AsyncMock(
+            return_value=init_result
+            or InitializeResult(
+                protocolVersion="2025-03-26",
+                capabilities={"tools": {}},
+                serverInfo={"name": "test", "version": "1.0"},
+            )
+        )
+        mock_session.list_tools = AsyncMock(
+            return_value=ListToolsResult(
+                tools=tools if tools is not None else [_mock_tool("echo")],
+            )
+        )
+        mock_session.call_tool = AsyncMock(
+            return_value=call_result
+            or CallToolResult(
+                content=[TextContent(type="text", text="ok")],
+                isError=False,
+            )
+        )
         mock_session_cls.return_value = mock_session
         return mock_session
 
@@ -145,7 +166,8 @@ class TestMCPClient:
         from kocor.mcp import MCPClient, MCPConfig, MCPError
 
         self._setup_sdk_mocks(
-            mock_stdio, mock_session_cls,
+            mock_stdio,
+            mock_session_cls,
             init_result=InitializeResult(
                 protocolVersion="2024-10-01",
                 capabilities={},
@@ -162,15 +184,26 @@ class TestMCPClient:
     def test_list_tools(self, mock_stdio, mock_session_cls):
         from kocor.mcp import MCPClient, MCPConfig
 
-        mock_sess = self._setup_sdk_mocks(
-            mock_stdio, mock_session_cls,
+        _ = self._setup_sdk_mocks(
+            mock_stdio,
+            mock_session_cls,
             tools=[
-                _mock_tool("read", "Read file", {
-                    "type": "object", "properties": {"path": {"type": "string"}},
-                }),
-                _mock_tool("write", "Write file", {
-                    "type": "object", "properties": {"path": {"type": "string"}, "content": {"type": "string"}},
-                }),
+                _mock_tool(
+                    "read",
+                    "Read file",
+                    {
+                        "type": "object",
+                        "properties": {"path": {"type": "string"}},
+                    },
+                ),
+                _mock_tool(
+                    "write",
+                    "Write file",
+                    {
+                        "type": "object",
+                        "properties": {"path": {"type": "string"}, "content": {"type": "string"}},
+                    },
+                ),
             ],
         )
 
@@ -200,7 +233,8 @@ class TestMCPClient:
         from kocor.mcp import MCPClient, MCPConfig
 
         self._setup_sdk_mocks(
-            mock_stdio, mock_session_cls,
+            mock_stdio,
+            mock_session_cls,
             call_result=CallToolResult(
                 content=[TextContent(type="text", text="hello world")],
                 isError=False,
@@ -219,7 +253,8 @@ class TestMCPClient:
         from kocor.mcp import MCPClient, MCPConfig
 
         self._setup_sdk_mocks(
-            mock_stdio, mock_session_cls,
+            mock_stdio,
+            mock_session_cls,
             call_result=CallToolResult(
                 content=[TextContent(type="text", text="fail message")],
                 isError=True,
@@ -239,7 +274,8 @@ class TestMCPClient:
         from kocor.mcp import MCPClient, MCPConfig
 
         self._setup_sdk_mocks(
-            mock_stdio, mock_session_cls,
+            mock_stdio,
+            mock_session_cls,
             call_result=CallToolResult(
                 content=[
                     TextContent(type="text", text="part1"),
@@ -298,16 +334,24 @@ class TestMCPClient:
 
         mock_session = AsyncMock()
         mock_session.__aenter__.return_value = mock_session
-        mock_session.initialize = AsyncMock(return_value=InitializeResult(
-            protocolVersion="2025-03-26", capabilities={},
-            serverInfo={"name": "remote", "version": "1.0"},
-        ))
-        mock_session.list_tools = AsyncMock(return_value=ListToolsResult(
-            tools=[_mock_tool("hello")],
-        ))
-        mock_session.call_tool = AsyncMock(return_value=CallToolResult(
-            content=[TextContent(type="text", text="pong")], isError=False,
-        ))
+        mock_session.initialize = AsyncMock(
+            return_value=InitializeResult(
+                protocolVersion="2025-03-26",
+                capabilities={},
+                serverInfo={"name": "remote", "version": "1.0"},
+            )
+        )
+        mock_session.list_tools = AsyncMock(
+            return_value=ListToolsResult(
+                tools=[_mock_tool("hello")],
+            )
+        )
+        mock_session.call_tool = AsyncMock(
+            return_value=CallToolResult(
+                content=[TextContent(type="text", text="pong")],
+                isError=False,
+            )
+        )
         mock_session_cls.return_value = mock_session
 
         client = MCPClient("remote", MCPConfig(url="https://example.com/mcp"))
@@ -330,10 +374,13 @@ class TestMCPClient:
 
         mock_session = AsyncMock()
         mock_session.__aenter__.return_value = mock_session
-        mock_session.initialize = AsyncMock(return_value=InitializeResult(
-            protocolVersion="2025-03-26", capabilities={},
-            serverInfo={"name": "remote", "version": "1.0"},
-        ))
+        mock_session.initialize = AsyncMock(
+            return_value=InitializeResult(
+                protocolVersion="2025-03-26",
+                capabilities={},
+                serverInfo={"name": "remote", "version": "1.0"},
+            )
+        )
         # Simulate connection failure on call_tool
         mock_session.call_tool = AsyncMock(side_effect=Exception("Connection lost"))
         mock_session_cls.return_value = mock_session
@@ -352,32 +399,47 @@ class TestRegisterMCPTools:
     def test_stdio_tools_registered_with_mcp_prefix(self):
         from kocor.mcp import McpManager
 
-        config_data = json.dumps({
-            "mcpServers": {
-                "fs": {"command": "npx", "args": ["-y", "fs"]},
+        config_data = json.dumps(
+            {
+                "mcpServers": {
+                    "fs": {"command": "npx", "args": ["-y", "fs"]},
+                }
             }
-        })
+        )
 
-        with patch("mcp.client.stdio.stdio_client") as mock_stdio, \
-             patch("kocor.mcp.client.ClientSession") as mock_session_cls, \
-             patch("kocor.mcp.config.os.path.exists", return_value=True), \
-             patch("builtins.open", mock_open(read_data=config_data)):
-
+        with (
+            patch("mcp.client.stdio.stdio_client") as mock_stdio,
+            patch("kocor.mcp.client.ClientSession") as mock_session_cls,
+            patch("kocor.mcp.config.os.path.exists", return_value=True),
+            patch("builtins.open", mock_open(read_data=config_data)),
+        ):
             mock_read = AsyncMock()
             mock_write = AsyncMock()
             mock_stdio.return_value = _make_async_cm((mock_read, mock_write))
 
             mock_session = AsyncMock()
             mock_session.__aenter__.return_value = mock_session
-            mock_session.initialize = AsyncMock(return_value=InitializeResult(
-                protocolVersion="2025-03-26", capabilities={},
-                serverInfo={"name": "fs", "version": "1.0"},
-            ))
-            mock_session.list_tools = AsyncMock(return_value=ListToolsResult(
-                tools=[_mock_tool("read", "Read file", {
-                    "type": "object", "properties": {"path": {"type": "string"}},
-                })],
-            ))
+            mock_session.initialize = AsyncMock(
+                return_value=InitializeResult(
+                    protocolVersion="2025-03-26",
+                    capabilities={},
+                    serverInfo={"name": "fs", "version": "1.0"},
+                )
+            )
+            mock_session.list_tools = AsyncMock(
+                return_value=ListToolsResult(
+                    tools=[
+                        _mock_tool(
+                            "read",
+                            "Read file",
+                            {
+                                "type": "object",
+                                "properties": {"path": {"type": "string"}},
+                            },
+                        )
+                    ],
+                )
+            )
             mock_session_cls.return_value = mock_session
 
             registry = ToolManager()
@@ -393,12 +455,14 @@ class TestRegisterMCPTools:
     def test_one_server_fails_others_still_register(self):
         from kocor.mcp import McpManager
 
-        config_data = json.dumps({
-            "mcpServers": {
-                "good": {"command": "good-server"},
-                "bad": {"command": "bad-server"},
+        config_data = json.dumps(
+            {
+                "mcpServers": {
+                    "good": {"command": "good-server"},
+                    "bad": {"command": "bad-server"},
+                }
             }
-        })
+        )
 
         call_count = [0]
 
@@ -409,20 +473,22 @@ class TestRegisterMCPTools:
             if call_count[0] == 2:
                 mock_s.initialize = AsyncMock(side_effect=Exception("Connection refused"))
             else:
-                mock_s.initialize = AsyncMock(return_value=InitializeResult(
-                    protocolVersion="2025-03-26", capabilities={},
-                    serverInfo={"name": "g", "version": "1.0"},
-                ))
-                mock_s.list_tools = AsyncMock(return_value=ListToolsResult(
-                    tools=[_mock_tool("tool1")]
-                ))
+                mock_s.initialize = AsyncMock(
+                    return_value=InitializeResult(
+                        protocolVersion="2025-03-26",
+                        capabilities={},
+                        serverInfo={"name": "g", "version": "1.0"},
+                    )
+                )
+                mock_s.list_tools = AsyncMock(return_value=ListToolsResult(tools=[_mock_tool("tool1")]))
             return mock_s
 
-        with patch("mcp.client.stdio.stdio_client") as mock_stdio, \
-             patch("kocor.mcp.client.ClientSession", side_effect=mock_session_side), \
-             patch("kocor.mcp.config.os.path.exists", return_value=True), \
-             patch("builtins.open", mock_open(read_data=config_data)):
-
+        with (
+            patch("mcp.client.stdio.stdio_client") as mock_stdio,
+            patch("kocor.mcp.client.ClientSession", side_effect=mock_session_side),
+            patch("kocor.mcp.config.os.path.exists", return_value=True),
+            patch("builtins.open", mock_open(read_data=config_data)),
+        ):
             mock_read = AsyncMock()
             mock_write = AsyncMock()
             mock_read.__aenter__.return_value = mock_read
@@ -441,41 +507,57 @@ class TestRegisterMCPTools:
     def test_execute_mcp_tool_via_registry(self):
         from kocor.mcp import McpManager
 
-        config_data = json.dumps({
-            "mcpServers": {
-                "demo": {"command": "demo-server"},
+        config_data = json.dumps(
+            {
+                "mcpServers": {
+                    "demo": {"command": "demo-server"},
+                }
             }
-        })
+        )
 
-        with patch("mcp.client.stdio.stdio_client") as mock_stdio, \
-             patch("kocor.mcp.client.ClientSession") as mock_session_cls, \
-             patch("kocor.mcp.config.os.path.exists", return_value=True), \
-             patch("builtins.open", mock_open(read_data=config_data)):
-
+        with (
+            patch("mcp.client.stdio.stdio_client") as mock_stdio,
+            patch("kocor.mcp.client.ClientSession") as mock_session_cls,
+            patch("kocor.mcp.config.os.path.exists", return_value=True),
+            patch("builtins.open", mock_open(read_data=config_data)),
+        ):
             mock_read = AsyncMock()
             mock_write = AsyncMock()
             mock_stdio.return_value = _make_async_cm((mock_read, mock_write))
 
             mock_session = AsyncMock()
             mock_session.__aenter__.return_value = mock_session
-            mock_session.initialize = AsyncMock(return_value=InitializeResult(
-                protocolVersion="2025-03-26", capabilities={},
-                serverInfo={"name": "demo", "version": "1.0"},
-            ))
-            mock_session.list_tools = AsyncMock(return_value=ListToolsResult(
-                tools=[_mock_tool("echo", inputSchema={
-                    "type": "object", "properties": {"msg": {"type": "string"}},
-                })],
-            ))
-            mock_session.call_tool = AsyncMock(return_value=CallToolResult(
-                content=[TextContent(type="text", text="Hello from MCP")],
-                isError=False,
-            ))
+            mock_session.initialize = AsyncMock(
+                return_value=InitializeResult(
+                    protocolVersion="2025-03-26",
+                    capabilities={},
+                    serverInfo={"name": "demo", "version": "1.0"},
+                )
+            )
+            mock_session.list_tools = AsyncMock(
+                return_value=ListToolsResult(
+                    tools=[
+                        _mock_tool(
+                            "echo",
+                            inputSchema={
+                                "type": "object",
+                                "properties": {"msg": {"type": "string"}},
+                            },
+                        )
+                    ],
+                )
+            )
+            mock_session.call_tool = AsyncMock(
+                return_value=CallToolResult(
+                    content=[TextContent(type="text", text="Hello from MCP")],
+                    isError=False,
+                )
+            )
             mock_session_cls.return_value = mock_session
 
             registry = ToolManager()
             manager = McpManager(registry, "mcp.json")
-            clients = manager.register_all()
+            _ = manager.register_all()
 
         tool_call = ToolCall(
             id="call_1",

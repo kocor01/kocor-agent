@@ -80,7 +80,10 @@ class PermissionManager:
             return self._ask_user(tool_name, args)
 
         # 4. 基于策略的决策
-        safety = getattr(self._tool_manager._tools.get(tool_name), 'safety_level', PermissionManager.SAFETY_CAUTION) if self._tool_manager else PermissionManager.SAFETY_CAUTION
+        safety = (
+            getattr(self._tool_manager._tools.get(tool_name), 'safety_level', PermissionManager.SAFETY_CAUTION)
+            if self._tool_manager else PermissionManager.SAFETY_CAUTION
+        )
 
         if self.policy == PermissionManager.POLICY_PERMISSIVE:
             return True

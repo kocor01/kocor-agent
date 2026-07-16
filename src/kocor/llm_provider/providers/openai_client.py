@@ -176,7 +176,11 @@ class OpenAIClient(BaseLLMClient):
             completion_tokens = getattr(response.usage, "completion_tokens", 0) if response.usage else 0
             total_tokens = getattr(response.usage, "total_tokens", 0) if response.usage else 0
             cached_tokens = 0
-            if response.usage and hasattr(response.usage, "prompt_tokens_details") and response.usage.prompt_tokens_details:
+            if (
+                response.usage
+                and hasattr(response.usage, "prompt_tokens_details")
+                and response.usage.prompt_tokens_details
+            ):
                 cached_tokens = getattr(response.usage.prompt_tokens_details, "cached_tokens", 0)
             usage = Usage(
                 prompt_tokens=prompt_tokens,

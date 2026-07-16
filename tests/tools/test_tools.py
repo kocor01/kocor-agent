@@ -65,7 +65,7 @@ class TestToolRegistry:
 
         tool_call = ToolCall(
             id="call_1",
-            function=FunctionCall(name="unknown_tool", arguments='{}'),
+            function=FunctionCall(name="unknown_tool", arguments="{}"),
         )
         result = registry.execute(tool_call)
 
@@ -199,6 +199,7 @@ class TestCreateDefaultTools:
         result = tools.execute(tool_call)
         # 新 write_file 返回 JSON，可能含 error 或 bytes_written
         import json
+
         try:
             data = json.loads(result.content)
             assert "bytes_written" in data or "error" in data
@@ -238,9 +239,8 @@ class TestCreateDefaultTools:
                         arguments='{"path": "../outside.txt", "content": "hack"}',
                     ),
                 )
-                result = tools.execute(tool_call)
+                tools.execute(tool_call)
 
-    
 
 class TestToolTimeout:
     """测试工具执行超时"""

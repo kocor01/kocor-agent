@@ -264,7 +264,6 @@ def _replace_fuzzy(
     """模糊替换。"""
     content_lines = content.splitlines()
     old_lines = old_string.splitlines()
-    new_lines = new_string.splitlines()
 
     # 找到匹配区域
     matches = _find_matches(content_lines, old_lines, strategy)

@@ -31,10 +31,14 @@ class TestToolCallDisplay:
         f = _StreamFormatter()
         buf = io.StringIO()
         with patch("sys.stdout", buf):
-            f.handle_chunk(StreamChunk(
-                tool_calls=[ToolCall(id="1", function=FunctionCall(name="read_file", arguments='{"path":"a.txt"}'))],
-                is_final=True,
-            ))
+            f.handle_chunk(
+                StreamChunk(
+                    tool_calls=[
+                        ToolCall(id="1", function=FunctionCall(name="read_file", arguments='{"path":"a.txt"}'))
+                    ],
+                    is_final=True,
+                )
+            )
         output = buf.getvalue()
         assert "工具调用" in output
 
@@ -67,21 +71,27 @@ class TestToolCallDisplay:
         f = _StreamFormatter()
         buf = io.StringIO()
         with patch("sys.stdout", buf):
-            f.handle_chunk(StreamChunk(
-                tool_calls=[
-                    ToolCall(id="c1", function=FunctionCall(name="read_file", arguments='{"path":"a.txt"}')),
-                    ToolCall(id="c2", function=FunctionCall(name="write_file", arguments='{"path":"b.txt"}')),
-                ],
-                is_final=True,
-            ))
-            f.handle_chunk(StreamChunk(
-                tool_result=_make_tool_result(content="result a"),
-                is_final=True,
-            ))
-            f.handle_chunk(StreamChunk(
-                tool_result=_make_tool_result(content="result b"),
-                is_final=True,
-            ))
+            f.handle_chunk(
+                StreamChunk(
+                    tool_calls=[
+                        ToolCall(id="c1", function=FunctionCall(name="read_file", arguments='{"path":"a.txt"}')),
+                        ToolCall(id="c2", function=FunctionCall(name="write_file", arguments='{"path":"b.txt"}')),
+                    ],
+                    is_final=True,
+                )
+            )
+            f.handle_chunk(
+                StreamChunk(
+                    tool_result=_make_tool_result(content="result a"),
+                    is_final=True,
+                )
+            )
+            f.handle_chunk(
+                StreamChunk(
+                    tool_result=_make_tool_result(content="result b"),
+                    is_final=True,
+                )
+            )
         output = buf.getvalue()
         assert "read_file" in output
         assert "write_file" in output
@@ -100,9 +110,13 @@ class TestToolResultDisplay:
         f = _StreamFormatter()
         buf = io.StringIO()
         with patch("sys.stdout", buf):
-            f.handle_chunk(StreamChunk(
-                tool_calls=[ToolCall(id="c1", function=FunctionCall(name="read_file", arguments='{"path": "a.txt"}'))],
-            ))
+            f.handle_chunk(
+                StreamChunk(
+                    tool_calls=[
+                        ToolCall(id="c1", function=FunctionCall(name="read_file", arguments='{"path": "a.txt"}'))
+                    ],
+                )
+            )
             # 模拟工具结果
             result = _make_tool_result(content="file content here")
             f.handle_chunk(StreamChunk(tool_result=result))
@@ -118,15 +132,19 @@ class TestToolResultDisplay:
         buf = io.StringIO()
         long_content = "A" * 1200
         with patch("sys.stdout", buf):
-            f.handle_chunk(StreamChunk(
-                tool_calls=[ToolCall(id="c1", function=FunctionCall(name="read_file", arguments='{"path":"big.txt"}'))],
-            ))
+            f.handle_chunk(
+                StreamChunk(
+                    tool_calls=[
+                        ToolCall(id="c1", function=FunctionCall(name="read_file", arguments='{"path":"big.txt"}'))
+                    ],
+                )
+            )
             result = _make_tool_result(content=long_content)
             f.handle_chunk(StreamChunk(tool_result=result))
             f.handle_chunk(StreamChunk(is_final=True))
         output = _strip_ansi(buf.getvalue())
         # 截断后不超过 500+4+400 = 904
-        content_part = output[output.find("AAA"):]
+        content_part = output[output.find("AAA") :]
         # 确保截断标记出现
         assert "..." in content_part if len(long_content) > 1000 else True
 
@@ -135,12 +153,14 @@ class TestToolResultDisplay:
         f = _StreamFormatter()
         buf = io.StringIO()
         with patch("sys.stdout", buf):
-            f.handle_chunk(StreamChunk(
-                tool_calls=[
-                    ToolCall(id="c1", function=FunctionCall(name="read", arguments='{"path":"a.txt"}')),
-                    ToolCall(id="c2", function=FunctionCall(name="write", arguments='{"path":"b.txt"}')),
-                ],
-            ))
+            f.handle_chunk(
+                StreamChunk(
+                    tool_calls=[
+                        ToolCall(id="c1", function=FunctionCall(name="read", arguments='{"path":"a.txt"}')),
+                        ToolCall(id="c2", function=FunctionCall(name="write", arguments='{"path":"b.txt"}')),
+                    ],
+                )
+            )
             f.handle_chunk(StreamChunk(tool_result=_make_tool_result(content="content a")))
             f.handle_chunk(StreamChunk(tool_result=_make_tool_result(content="content b")))
             f.handle_chunk(StreamChunk(is_final=True))
@@ -153,9 +173,13 @@ class TestToolResultDisplay:
         """工具结果后 is_final 清除状态供下一轮使用。"""
         f = _StreamFormatter()
         with patch("sys.stdout", io.StringIO()):
-            f.handle_chunk(StreamChunk(
-                tool_calls=[ToolCall(id="c1", function=FunctionCall(name="read_file", arguments='{"path":"a.txt"}'))],
-            ))
+            f.handle_chunk(
+                StreamChunk(
+                    tool_calls=[
+                        ToolCall(id="c1", function=FunctionCall(name="read_file", arguments='{"path":"a.txt"}'))
+                    ],
+                )
+            )
             f.handle_chunk(StreamChunk(tool_result=_make_tool_result(content="result")))
             f.handle_chunk(StreamChunk(is_final=True, tool_result=True))
 
@@ -244,9 +268,11 @@ class TestMixedContent:
         buf = io.StringIO()
         with patch("sys.stdout", buf):
             f.handle_chunk(StreamChunk(content="我来搜索"))
-            f.handle_chunk(StreamChunk(
-                tool_calls=[ToolCall(id="c1", function=FunctionCall(name="search", arguments='{"q":"test"}'))],
-            ))
+            f.handle_chunk(
+                StreamChunk(
+                    tool_calls=[ToolCall(id="c1", function=FunctionCall(name="search", arguments='{"q":"test"}'))],
+                )
+            )
             f.handle_chunk(StreamChunk(is_final=True))
         output = buf.getvalue()
         assert "回答内容" in output
@@ -262,9 +288,13 @@ class TestMixedContent:
         with patch("sys.stdout", buf):
             f.handle_chunk(StreamChunk(reasoning="思考中"))
             f.handle_chunk(StreamChunk(content="我来读取文件"))
-            f.handle_chunk(StreamChunk(
-                tool_calls=[ToolCall(id="c1", function=FunctionCall(name="read_file", arguments='{"path":"a.txt"}'))],
-            ))
+            f.handle_chunk(
+                StreamChunk(
+                    tool_calls=[
+                        ToolCall(id="c1", function=FunctionCall(name="read_file", arguments='{"path":"a.txt"}'))
+                    ],
+                )
+            )
             f.handle_chunk(StreamChunk(is_final=True))
         output = buf.getvalue()
         assert "思维过程" in output
@@ -305,7 +335,9 @@ class TestEmptyAndEdgeContent:
         f = _StreamFormatter()
         buf = io.StringIO()
         with patch("sys.stdout", buf):
-            f.handle_chunk(StreamChunk(usage=Usage(prompt_tokens=10, completion_tokens=5, total_tokens=15, cached_tokens=0)))
+            f.handle_chunk(
+                StreamChunk(usage=Usage(prompt_tokens=10, completion_tokens=5, total_tokens=15, cached_tokens=0))
+            )
         output = buf.getvalue()
         assert output == ""
 
@@ -374,9 +406,13 @@ class TestFlushRemaining:
         f = _StreamFormatter()
         buf = io.StringIO()
         with patch("sys.stdout", buf):
-            f.handle_chunk(StreamChunk(
-                tool_calls=[ToolCall(id="c1", function=FunctionCall(name="read_file", arguments='{"path":"a.txt"}'))],
-            ))
+            f.handle_chunk(
+                StreamChunk(
+                    tool_calls=[
+                        ToolCall(id="c1", function=FunctionCall(name="read_file", arguments='{"path":"a.txt"}'))
+                    ],
+                )
+            )
             # 工具结果未到，直接 flush（必须在 patch 上下文中）
             f.flush_remaining()
         output = buf.getvalue()
@@ -478,6 +514,7 @@ class TestPrivateOutput:
 
 class _MockToolResult:
     """模拟工具结果消息，仅用于测试 tool_result chunk。"""
+
     def __init__(self, content=""):
         self.content = content
         self.role = "tool"
