@@ -10,6 +10,8 @@
 from __future__ import annotations
 
 import argparse
+import json
+import logging
 import os
 import sys
 
@@ -169,3 +171,10 @@ def main() -> None:
     finally:
         agent.tool_manager.mcp_manager.shutdown_all()
         agent.tool_manager.stop_cron_scheduler()
+
+        # Debug 模式输出会话指标摘要
+        if args.debug:
+            cli_logger = logging.getLogger(__name__)
+            metrics_data = agent.metrics
+            if metrics_data:
+                cli_logger.debug("Session metrics:\n%s", json.dumps(metrics_data, indent=2, ensure_ascii=False))

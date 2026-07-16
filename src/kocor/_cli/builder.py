@@ -12,6 +12,7 @@ from kocor.agent import Agent
 from kocor.config import Config
 from kocor.event.event_manager import EventEmitter
 from kocor.event.event_subscribe import EventSubscribe
+from kocor.event.subscribes.metrics import MetricsCollector
 from kocor.hook.hook_manager import HookManager
 from kocor.llm_provider.llm_factory import LlmFactory
 from kocor.logger import Logger
@@ -44,6 +45,7 @@ class AgentBuilder:
         self.hook_manager = HookManager()
         self.permission_mgr = None
         self.session_manager = None
+        self._metrics: MetricsCollector | None = None
 
     def build_llm(self) -> AgentBuilder:
         """创建 LLM 客户端。"""
@@ -83,9 +85,10 @@ class AgentBuilder:
         return self
 
     def build_hooks(self, logger: Logger) -> AgentBuilder:
-        """注册钩子和事件订阅。"""
+        """注册钩子和事件订阅（含指标收集器）。"""
         self.hook_manager.register_all(logger=logger)
-        EventSubscribe(self.event_emitter).subscribe_all(logger=logger)
+        self._metrics = MetricsCollector()
+        EventSubscribe(self.event_emitter).subscribe_all(logger=logger, metrics=self._metrics)
         return self
 
     def build_session(self) -> AgentBuilder:
@@ -119,6 +122,10 @@ class AgentBuilder:
             max_iterations=self.config.max_iterations,
             session_manager=self.session_manager,
         )
+
+        # 挂载指标收集器
+        if self._metrics:
+            agent._metrics_collector = self._metrics
 
         # 注册进程退出清理
         atexit.register(self.tool_manager.stop_cron_scheduler)

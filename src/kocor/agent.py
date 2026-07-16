@@ -133,6 +133,13 @@ class Agent:
         self._cron_started = False
         self.loop.stop()
 
+    def metrics(self) -> dict | None:
+        """返回当前会话的运行时指标摘要（若有收集器）。"""
+        collector = getattr(self, "_metrics_collector", None)
+        if collector is None:
+            return None
+        return collector.report()
+
     def run(self, user_input: str) -> str:
         """执行一次完整的 Agent 循环。"""
         result = self._execute_with_session(user_input)

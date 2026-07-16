@@ -119,7 +119,14 @@ class ContextManager:
     # ── 公开方法 ──
 
     def build_initial_context(self, user_input: str) -> None:
-        """构建本轮初始上下文：系统提示、消息列表、Token 预算。"""
+        """构建本轮初始上下文：系统提示、消息列表、Token 预算。
+
+        每次构建前刷新记忆快照，使 LLM 看到最新的持久化记忆。
+        """
+        # 每次对话构建前刷新记忆快照，使新记忆对 LLM 可见
+        if self.memory:
+            self.memory.refresh_snapshot()
+
         self._runtime.system_content = self._prompt_builder.build()
 
         self._runtime.tool_definitions = self.tools.get_definitions() if self.tools else []
