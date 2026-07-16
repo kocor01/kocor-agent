@@ -12,6 +12,7 @@ from typing import Iterator, Protocol
 import httpx
 
 from kocor.config import Config
+from kocor.llm_provider.exceptions import LLMConnectionError, LLMTimeoutError
 from kocor.llm_provider.message import Message, StreamChunk, Usage
 from kocor.tools.definitions import ToolDefinition
 
@@ -197,8 +198,10 @@ class BaseLLMClient(ABC):
         try:
             response = self._api_generate(input_data, tool_data, actual_max_tokens, temperature, system=system_data)
             return self._normalize_out(response)
-        except (httpx.ReadTimeout, httpx.ConnectTimeout):
-            raise KeyboardInterrupt()
+        except httpx.TimeoutException:
+            raise LLMTimeoutError(provider=self.provider, timeout_seconds=self.config.tool_timeout)
+        except httpx.ConnectError:
+            raise LLMConnectionError(provider=self.provider)
 
     def stream(
         self,
@@ -217,9 +220,7 @@ class BaseLLMClient(ABC):
         tool_data = self._normalize_tools(tools)
         try:
             yield from self._api_stream(input_data, tool_data, actual_max_tokens, temperature, system=system_data)
-        except (httpx.ReadTimeout, httpx.ConnectTimeout):
-            # Windows 上 blocking socket read 会阻止 KeyboardInterrupt 传递。
-            # 设置 read timeout 后，socket 读取在超时时回到 Python 字节码层，
-            # 此时 KeyboardInterrupt 可以被传递。但超时异常本身不是 KeyboardInterrupt，
-            # 我们需要在此处跳过超时异常，让上层的 KeyboardInterrupt 处理逻辑生效。
-            raise KeyboardInterrupt()
+        except httpx.TimeoutException:
+            raise LLMTimeoutError(provider=self.provider, timeout_seconds=self.config.tool_timeout)
+        except httpx.ConnectError:
+            raise LLMConnectionError(provider=self.provider)
