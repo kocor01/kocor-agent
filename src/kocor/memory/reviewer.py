@@ -51,7 +51,7 @@ class BackgroundReviewer:
         review_msgs = [
             Message(role="system", content=system_prompt),
         ]
-        # 取最近 nudge_interval 条消息供审查（配置为 0 时取全部）
+        # 取最近 nudge_interval 条消息供审查（min=10，不会为 0）
         window = Config.load().nudge_interval or len(messages)
         recent = messages[-window:] if len(messages) > window else messages
         review_msgs.extend(recent)

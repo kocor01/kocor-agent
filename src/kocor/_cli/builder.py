@@ -66,9 +66,10 @@ class AgentBuilder:
                 if self.tool_manager is None:
                     self.tool_manager = ToolManager()
                 self.tool_manager.memory_store = self._memory
-                self._background_reviewer = BackgroundReviewer(
-                    llm=self.llm, store=self._memory
-                )
+                if Config.load().reviewer_enabled:
+                    self._background_reviewer = BackgroundReviewer(
+                        llm=self.llm, store=self._memory
+                    )
 
     def _init_subagent(self) -> None:
         """创建 SubagentRunner（可选）。

@@ -209,6 +209,42 @@ class TestAgentBuilderMemoryTodo:
         finally:
             cfg.memory_enabled = original
 
+    def test_reviewer_disabled(self, mock_llm_factory):
+        """reviewer_enabled=False 时，memory 创建但 BackgroundReviewer 不创建。"""
+        cfg = Config.load()
+        orig_reviewer = cfg.reviewer_enabled
+        orig_memory = cfg.memory_enabled
+        cfg.reviewer_enabled = False
+        cfg.memory_enabled = True
+        try:
+            from kocor._cli.builder import AgentBuilder
+            builder = AgentBuilder()
+            builder._init_llm()
+            builder._init_memory()
+            assert builder._memory is not None
+            assert builder._background_reviewer is None
+        finally:
+            cfg.reviewer_enabled = orig_reviewer
+            cfg.memory_enabled = orig_memory
+
+    def test_reviewer_enabled(self, mock_llm_factory):
+        """reviewer_enabled=True 时，BackgroundReviewer 正常创建。"""
+        cfg = Config.load()
+        orig_reviewer = cfg.reviewer_enabled
+        orig_memory = cfg.memory_enabled
+        cfg.reviewer_enabled = True
+        cfg.memory_enabled = True
+        try:
+            from kocor._cli.builder import AgentBuilder
+            builder = AgentBuilder()
+            builder._init_llm()
+            builder._init_memory()
+            assert builder._memory is not None
+            assert builder._background_reviewer is not None
+        finally:
+            cfg.reviewer_enabled = orig_reviewer
+            cfg.memory_enabled = orig_memory
+
     def test_init_context(self, mock_llm_factory):
         """_init_context 应创建 ContextManager。"""
         from kocor._cli.builder import AgentBuilder
