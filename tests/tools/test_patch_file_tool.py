@@ -5,12 +5,12 @@ import os
 import tempfile
 
 from kocor.tools.toolsets.file.file_state import FileStateTracker
-from kocor.tools.toolsets.patch_file_tool import PatchFile
+from kocor.tools.toolsets.patch_file_tool import PatchFileTool
 from tests.tools.conftest import chdir_cm
 
 
 class TestPatchFile:
-    """测试 PatchFile 工具。"""
+    """测试 PatchFileTool 工具。"""
 
     def setup_method(self):
         self.tracker = FileStateTracker()
@@ -30,7 +30,7 @@ class TestPatchFile:
         content = "def foo():\n    return 1\n"
         path = self._make_file(content, monkeypatch=monkeypatch)
         try:
-            result = PatchFile.handler(
+            result = PatchFileTool.handler(
                 file_state=self.tracker, path=path, old_string="def foo():", new_string="def bar():"
             )
             data = json.loads(result)
@@ -46,7 +46,7 @@ class TestPatchFile:
         content = "    if x:\n        return 1\n"
         path = self._make_file(content, monkeypatch=monkeypatch)
         try:
-            result = PatchFile.handler(
+            result = PatchFileTool.handler(
                 file_state=self.tracker, path=path, old_string="if x:\n    return 1", new_string="if x:\n    return 2"
             )
             data = json.loads(result)
@@ -61,7 +61,7 @@ class TestPatchFile:
         content = "x = 1\nx = 2\nx = 3\n"
         path = self._make_file(content, monkeypatch=monkeypatch)
         try:
-            result = PatchFile.handler(
+            result = PatchFileTool.handler(
                 file_state=self.tracker, path=path, old_string="x = ", new_string="y = ", replace_all=True
             )
             data = json.loads(result)
@@ -73,7 +73,7 @@ class TestPatchFile:
 
     def test_sensitive_path_rejected(self):
         """敏感路径被拒绝。"""
-        result = PatchFile.handler(file_state=self.tracker, path="/etc/passwd", old_string="root", new_string="admin")
+        result = PatchFileTool.handler(file_state=self.tracker, path="/etc/passwd", old_string="root", new_string="admin")
         data = json.loads(result)
         assert "error" in data
 
@@ -82,7 +82,7 @@ class TestPatchFile:
         content = "original content\n"
         path = self._make_file(content, monkeypatch=monkeypatch)
         try:
-            result = PatchFile.handler(
+            result = PatchFileTool.handler(
                 file_state=self.tracker, path=path, old_string="nonexistent", new_string="replacement"
             )
             data = json.loads(result)
@@ -99,7 +99,7 @@ class TestPatchFile:
         path = self._make_file(content, monkeypatch=monkeypatch)
         try:
             # old_string 行尾差异（\r\n vs \n）
-            result = PatchFile.handler(
+            result = PatchFileTool.handler(
                 file_state=self.tracker,
                 path=path,
                 old_string="def foo():\r\n    return 1",
@@ -118,7 +118,7 @@ class TestPatchFile:
             path = os.path.join(tmpdir, ".env")
             with open(path, "w") as f:
                 f.write("KEY=value\n")
-            result = PatchFile.handler(
+            result = PatchFileTool.handler(
                 file_state=self.tracker, path=path, old_string="KEY=value", new_string="KEY=newvalue"
             )
             data = json.loads(result)
@@ -129,7 +129,7 @@ class TestPatchFile:
         content = "def foo():\n    pass\n"
         path = self._make_file(content, monkeypatch=monkeypatch)
         try:
-            result = PatchFile.handler(
+            result = PatchFileTool.handler(
                 file_state=self.tracker,
                 path=path,
                 old_string="def foo():",

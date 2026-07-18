@@ -75,12 +75,12 @@ class ToolManager:
         from kocor.tools.toolsets.bash_tool import BashTool, ProcessTool
         from kocor.tools.toolsets.cron_tool import CronTool
         from kocor.tools.toolsets.memory_tool import MemoryTool
-        from kocor.tools.toolsets.patch_file_tool import PatchFile
-        from kocor.tools.toolsets.read_file_tool import ReadFile
-        from kocor.tools.toolsets.search_file_tool import SearchFiles
+        from kocor.tools.toolsets.patch_file_tool import PatchFileTool
+        from kocor.tools.toolsets.read_file_tool import ReadFileTool
+        from kocor.tools.toolsets.search_file_tool import SearchFilesTool
         from kocor.tools.toolsets.subagent.tool import SubagentTool
         from kocor.tools.toolsets.todo_tool import TodoTool
-        from kocor.tools.toolsets.write_file_tool import WriteFile
+        from kocor.tools.toolsets.write_file_tool import WriteFileTool
 
         self.memory_store = None
         self.todo_store = None
@@ -97,8 +97,8 @@ class ToolManager:
 
         # 始终注册的核心工具
         core_tools = [
-            ReadFile, WriteFile, PatchFile, BashTool,
-            SearchFiles, ProcessTool, MemoryTool, TodoTool,
+            ReadFileTool, WriteFileTool, PatchFileTool, BashTool,
+            SearchFilesTool, ProcessTool, MemoryTool, TodoTool,
         ]
         for tool_cls in core_tools:
             handler = tool_cls.handler_factory(**deps)

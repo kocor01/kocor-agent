@@ -5,11 +5,11 @@ import os
 import tempfile
 
 from kocor.tools.toolsets.file.file_state import FileStateTracker
-from kocor.tools.toolsets.read_file_tool import ReadFile
+from kocor.tools.toolsets.read_file_tool import ReadFileTool
 
 
 class TestReadFile:
-    """测试 ReadFile 工具。"""
+    """测试 ReadFileTool 工具。"""
 
     def setup_method(self):
         self.tracker = FileStateTracker()
@@ -33,7 +33,7 @@ class TestReadFile:
         content = "line1\nline2\nline3\n"
         path = self._make_file(content, monkeypatch=monkeypatch)
         try:
-            result = ReadFile.handler(file_state=self.tracker, path=path)
+            result = ReadFileTool.handler(file_state=self.tracker, path=path)
             data = json.loads(result)
             assert "line1" in data["content"]
             assert "line2" in data["content"]
@@ -46,7 +46,7 @@ class TestReadFile:
         content = "hello\nworld\nfoo\n"
         path = self._make_file(content, monkeypatch=monkeypatch)
         try:
-            result = ReadFile.handler(file_state=self.tracker, path=path, offset=1, limit=10)
+            result = ReadFileTool.handler(file_state=self.tracker, path=path, offset=1, limit=10)
             data = json.loads(result)
             assert "1|hello" in data["content"]
             assert "2|world" in data["content"]
@@ -59,7 +59,7 @@ class TestReadFile:
         content = "a\nb\nc\nd\ne\n"
         path = self._make_file(content, monkeypatch=monkeypatch)
         try:
-            result = ReadFile.handler(file_state=self.tracker, path=path, offset=3, limit=2)
+            result = ReadFileTool.handler(file_state=self.tracker, path=path, offset=3, limit=2)
             data = json.loads(result)
             assert "3|c" in data["content"]
             assert "4|d" in data["content"]
@@ -69,7 +69,7 @@ class TestReadFile:
 
     def test_file_not_found(self):
         """文件不存在返回错误。"""
-        result = ReadFile.handler(file_state=self.tracker, path="/tmp/nonexistent_file_xyz.py")
+        result = ReadFileTool.handler(file_state=self.tracker, path="/tmp/nonexistent_file_xyz.py")
         data = json.loads(result)
         assert "error" in data
 
@@ -77,7 +77,7 @@ class TestReadFile:
         """空文件返回空内容。"""
         path = self._make_file("", monkeypatch=monkeypatch)
         try:
-            result = ReadFile.handler(file_state=self.tracker, path=path)
+            result = ReadFileTool.handler(file_state=self.tracker, path=path)
             data = json.loads(result)
             assert data["content"] == ""
             assert data["total_lines"] == 0
@@ -88,7 +88,7 @@ class TestReadFile:
         """二进制扩展名文件被阻断。"""
         path = self._make_file("not really png", suffix=".png", monkeypatch=monkeypatch)
         try:
-            result = ReadFile.handler(file_state=self.tracker, path=path)
+            result = ReadFileTool.handler(file_state=self.tracker, path=path)
             data = json.loads(result)
             assert "error" in data
             assert "binary" in data["error"].lower() or "Cannot" in data["error"]
@@ -101,7 +101,7 @@ class TestReadFile:
             old_cwd = os.getcwd()
             os.chdir(tmpdir)
             try:
-                result = ReadFile.handler(file_state=self.tracker, path="../etc/passwd")
+                result = ReadFileTool.handler(file_state=self.tracker, path="../etc/passwd")
                 assert "denied" in result.lower() or "Error" in result
             finally:
                 os.chdir(old_cwd)
@@ -113,7 +113,7 @@ class TestReadFile:
         content = "\n".join(lines) + "\n"
         path = self._make_file(content, monkeypatch=monkeypatch)
         try:
-            result = ReadFile.handler(file_state=self.tracker, path=path, offset=1, limit=2000)
+            result = ReadFileTool.handler(file_state=self.tracker, path=path, offset=1, limit=2000)
             data = json.loads(result)
             assert data["truncated"] is True
             assert "truncated_by" in data
@@ -126,9 +126,9 @@ class TestReadFile:
         path = self._make_file(content, monkeypatch=monkeypatch)
         try:
             # 首次读取
-            ReadFile.handler(file_state=self.tracker, path=path)
+            ReadFileTool.handler(file_state=self.tracker, path=path)
             # 再次读取
-            result = ReadFile.handler(file_state=self.tracker, path=path)
+            result = ReadFileTool.handler(file_state=self.tracker, path=path)
             data = json.loads(result)
             if "status" in data:
                 assert data["status"] == "unchanged"

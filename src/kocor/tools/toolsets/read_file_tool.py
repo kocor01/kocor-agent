@@ -89,7 +89,7 @@ def _normalize_pagination(offset: int | None, limit: int | None) -> tuple[int, i
 # ── 工具类 ───────────────────────────────────────────────────────
 
 
-class ReadFile:
+class ReadFileTool:
     """读取文件内容工具。
 
     特性：
@@ -134,7 +134,7 @@ class ReadFile:
     def handler_factory(**deps):
         """返回带 file_state 注入的 handler。"""
         fs = deps.get("file_state")
-        return lambda **kw: ReadFile.handler(file_state=fs, **kw)
+        return lambda **kw: ReadFileTool.handler(file_state=fs, **kw)
 
     @staticmethod
     def handler(

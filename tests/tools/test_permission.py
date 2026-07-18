@@ -2,8 +2,8 @@
 
 from kocor.llm_provider.message import FunctionCall, ToolCall
 from kocor.tools.permission import PermissionManager
-from kocor.tools.toolsets.read_file_tool import ReadFile
-from kocor.tools.toolsets.write_file_tool import WriteFile
+from kocor.tools.toolsets.read_file_tool import ReadFileTool
+from kocor.tools.toolsets.write_file_tool import WriteFileTool
 
 
 def _tc(name: str, args: str = "{}") -> ToolCall:
@@ -13,8 +13,8 @@ def _tc(name: str, args: str = "{}") -> ToolCall:
 
 class TestBuiltinToolSafety:
     def test_tool_class_has_safety_level(self):
-        assert ReadFile.SAFETY_LEVEL == PermissionManager.SAFETY_SAFE
-        assert WriteFile.SAFETY_LEVEL == PermissionManager.SAFETY_DANGEROUS
+        assert ReadFileTool.SAFETY_LEVEL == PermissionManager.SAFETY_SAFE
+        assert WriteFileTool.SAFETY_LEVEL == PermissionManager.SAFETY_DANGEROUS
 
     def test_tool_manager_builds_safety_map(self):
         from kocor.tools.tool_manager import ToolManager

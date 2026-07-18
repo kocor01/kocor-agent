@@ -4,11 +4,11 @@ import json
 import os
 import tempfile
 
-from kocor.tools.toolsets.search_file_tool import SearchFiles
+from kocor.tools.toolsets.search_file_tool import SearchFilesTool
 
 
 class TestSearchFiles:
-    """测试 SearchFiles 工具。"""
+    """测试 SearchFilesTool 工具。"""
 
     def _make_files(self, base_dir: str):
         """在 base_dir 中创建测试文件。"""
@@ -29,7 +29,7 @@ class TestSearchFiles:
             old_cwd = os.getcwd()
             os.chdir(tmpdir)
             try:
-                result = SearchFiles.handler(pattern="def foo")
+                result = SearchFilesTool.handler(pattern="def foo")
                 data = json.loads(result)
                 assert data["total_count"] >= 1
                 assert len(data.get("matches", data.get("files", [])) or []) >= 1
@@ -43,7 +43,7 @@ class TestSearchFiles:
             old_cwd = os.getcwd()
             os.chdir(tmpdir)
             try:
-                result = SearchFiles.handler(pattern="XYZZZZ_NOT_FOUND")
+                result = SearchFilesTool.handler(pattern="XYZZZZ_NOT_FOUND")
                 data = json.loads(result)
                 assert data["total_count"] == 0
             finally:
@@ -56,7 +56,7 @@ class TestSearchFiles:
             old_cwd = os.getcwd()
             os.chdir(tmpdir)
             try:
-                result = SearchFiles.handler(pattern="def", file_glob="*.py")
+                result = SearchFilesTool.handler(pattern="def", file_glob="*.py")
                 data = json.loads(result)
                 assert data["total_count"] >= 1
             finally:
@@ -69,7 +69,7 @@ class TestSearchFiles:
             old_cwd = os.getcwd()
             os.chdir(tmpdir)
             try:
-                result = SearchFiles.handler(pattern=".py", target="files")
+                result = SearchFilesTool.handler(pattern=".py", target="files")
                 data = json.loads(result)
                 # 至少找到 1 个文件
                 assert len(data.get("files", [])) >= 1
@@ -83,7 +83,7 @@ class TestSearchFiles:
             old_cwd = os.getcwd()
             os.chdir(tmpdir)
             try:
-                result = SearchFiles.handler(pattern="def", limit=1)
+                result = SearchFilesTool.handler(pattern="def", limit=1)
                 data = json.loads(result)
                 assert data["total_count"] >= 1
                 # limit 可能不影响 total_count 但影响实际返回结果数
@@ -98,7 +98,7 @@ class TestSearchFiles:
             old_cwd = os.getcwd()
             os.chdir(tmpdir)
             try:
-                result = SearchFiles.handler(pattern="def", output_mode="count")
+                result = SearchFilesTool.handler(pattern="def", output_mode="count")
                 data = json.loads(result)
                 assert data["total_count"] >= 1
             finally:
