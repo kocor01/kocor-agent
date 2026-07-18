@@ -19,6 +19,11 @@ class AuditLogHook:
         self._logger = logger
 
     def run(self, context: HookContext) -> HookResult:
+        """记录本次 LLM 生成的 token 消耗到审计日志。
+
+        从 context.response.usage 提取 token 计数，
+        如无 usage 信息则标记为 "unavailable"。
+        """
         entry = {
             "timestamp": datetime.now().isoformat(),
             "iteration": context.iteration,

@@ -67,6 +67,7 @@ def _format_job(job: dict[str, Any]) -> dict[str, Any]:
 
 
 def _repeat_display(job: dict[str, Any]) -> str:
+    """格式化重复策略为可读文本（如 "3/5"、"forever"）。"""
     times = (job.get("repeat") or {}).get("times")
     completed = (job.get("repeat") or {}).get("completed", 0)
     if times is None:
@@ -79,6 +80,7 @@ def _repeat_display(job: dict[str, Any]) -> str:
 def _canonical_skills(
     skill: str | None = None, skills: list[str] | None = None
 ) -> list[str]:
+    """规范化技能列表，去重、去空、去首尾空白。"""
     if skills is None:
         raw_items = [skill] if skill else []
     elif isinstance(skills, str):

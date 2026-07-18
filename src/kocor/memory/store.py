@@ -81,7 +81,11 @@ class MemoryStore:
     # ── 生命周期 ────────────────────────────────────────
 
     def load_from_disk(self) -> MemorySnapshot:
-        """加载文件、去重、威胁扫描、生成冻结快照。"""
+        """加载文件、去重、威胁扫描、生成冻结快照。
+
+        快照在会话内保持不变（即使磁盘文件被外部修改），
+        确保 system prompt 前缀缓存跨轮次有效。
+        """
         for path in (self._memory_path, self._user_path):
             if not path.exists():
                 path.write_text("", encoding="utf-8")
@@ -139,20 +143,27 @@ class MemoryStore:
     # ── 单操作 ────────────────────────────────────────
 
     def add(self, target: MemoryTarget, content: str) -> MemoryOpResult:
+        """添加一条记忆。"""
         return self._apply_single(MemoryOp(action="add", target=target, content=content))
 
     def replace(self, target: MemoryTarget, old_substring: str, new_content: str) -> MemoryOpResult:
+        """替换匹配子串的首条记忆。"""
         return self._apply_single(
             MemoryOp(action="replace", target=target, content=new_content, old_substring=old_substring)
         )
 
     def remove(self, target: MemoryTarget, substring: str) -> MemoryOpResult:
+        """删除包含子串的首条记忆。"""
         return self._apply_single(
             MemoryOp(action="remove", target=target, old_substring=substring)
         )
 
     def apply_batch(self, ops: list[MemoryOp]) -> MemoryOpResult:
-        """批量原子操作。按最终预算校验，任一失败则不写入磁盘。"""
+        """批量原子操作。按最终预算校验，任一失败则不写入磁盘。
+
+        原子性保证：所有操作先在内存中模拟，预算校验全部通过后
+        才统一写盘。任一操作失败（威胁扫描、预算超限）则不落盘。
+        """
         if not ops:
             return MemoryOpResult(success=True, target=None)
 
@@ -242,9 +253,13 @@ class MemoryStore:
         )
 
     def _apply_op_to_entries(self, op: MemoryOp, entries: list[str]) -> MemoryOpResult:
+        """在内存中的 entries 列表上应用操作（不写磁盘）。
+
+        子串匹配策略：取首次匹配项，若多条同时命中则报 ambiguous 错误——
+        避免 LLM 误以为重复执行就能区分目标。
+        """
         if op.target == MemoryTarget.USER and not self.user_enabled:
             return MemoryOpResult(success=False, target=op.target, error="user profile disabled")
-        """在内存中的 entries 列表上应用操作（不写磁盘）。"""
         if op.action == "add":
             if not op.content:
                 return MemoryOpResult(success=False, target=op.target, error="empty content for add")
@@ -300,12 +315,15 @@ class MemoryStore:
     # ── 内部：文件 I/O ────────────────────────────────
 
     def _path_of(self, target: MemoryTarget) -> Path:
+        """返回目标（MEMORY/USER）对应的磁盘路径。"""
         return self._memory_path if target == MemoryTarget.MEMORY else self._user_path
 
     def _limit_of(self, target: MemoryTarget) -> int:
+        """返回目标对应的字符上限。"""
         return self.memory_limit if target == MemoryTarget.MEMORY else self.user_limit
 
     def _usage_dict(self, target: MemoryTarget) -> dict[str, int]:
+        """返回目标当前用量字典（用于 MemoryOpResult）。"""
         entries = self.list_entries(target)
         return {"used": self._calc_usage(entries), "limit": self._limit_of(target)}
 
@@ -316,7 +334,11 @@ class MemoryStore:
         return sum(len(e) for e in entries) + len(ENTRY_SEPARATOR) * (len(entries) - 1)
 
     def _read_and_dedup(self, path: Path) -> list[str]:
-        """读取文件并按首次出现去重。"""
+        """读取文件并按首次出现去重。
+
+        保留首次出现（后写入的重复内容被忽略），
+        而非保留最后一次，避免并发写入时老内容覆盖新内容。
+        """
         if not path.exists():
             return []
         text = path.read_text(encoding="utf-8")
@@ -336,11 +358,18 @@ class MemoryStore:
         return result
 
     def _write_entries(self, target: MemoryTarget, entries: list[str]) -> None:
+        """将条目列表写入目标文件（原子写入）。"""
         content = ENTRY_SEPARATOR.join(entries)
         self._write_raw(self._path_of(target), content)
 
     def _write_raw(self, path: Path, content: str) -> None:
-        """原子写入：文件锁 + 临时文件 + os.replace。"""
+        """原子写入：文件锁 + 临时文件 + os.replace。
+
+        三步保证不会写入半截文件：
+        1. 先写 .tmp 文件
+        2. os.replace 原子替换（不会截断目标文件）
+        3. 并发保护由 _FileLock 提供
+        """
         self.memory_dir.mkdir(parents=True, exist_ok=True)
         with _FileLock(path):
             tmp = path.with_suffix(path.suffix + ".tmp")
@@ -349,6 +378,11 @@ class MemoryStore:
 
     @staticmethod
     def _maybe_block(entry: str) -> str:
+        """威胁扫描：命中时将条目替换为 [BLOCKED] 而非直接删除。
+
+        保持条目索引不变，让 LLM 知道它尝试读取的内容被阻止了，
+        而不是"凭空消失"。（快照中的占位符，磁盘原文件不受影响。）
+        """
         matches = scan_strict(entry)
         if not matches:
             return entry
@@ -362,6 +396,7 @@ class MemoryStore:
         memory_usage: tuple[int, int],
         user_usage: tuple[int, int],
     ) -> str:
+        """格式化记忆快照为 LLM 可读的文本，含容量使用百分比。"""
         parts: list[str] = []
 
         if memory_entries:

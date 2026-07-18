@@ -70,6 +70,7 @@ _EMOJI_NEIGHBOUR_CP_RANGES = (
 
 
 def _is_emoji_cp(cp: int) -> bool:
+    """判断 Unicode 码点是否在 emoji 邻近范围内。"""
     return any(lo <= cp <= hi for lo, hi in _EMOJI_NEIGHBOUR_CP_RANGES)
 
 

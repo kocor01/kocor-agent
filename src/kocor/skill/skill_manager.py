@@ -498,6 +498,7 @@ def skill(
     }
 
     def decorator(func):
+        """将函数注册为技能并返回 SkillDefinition。"""
         skill_name = name or func.__name__
         skill_desc = description or (func.__doc__ or "").strip()
 

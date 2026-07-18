@@ -85,6 +85,7 @@ class Loop:
         self._stop_requested = True
 
     def _reset_state(self) -> None:
+        """重置循环内部状态，准备下一轮执行。"""
         self.context.reset()
         self._consecutive_duplicate_count = 0
         self._last_tool_call_signature = None
@@ -399,15 +400,18 @@ class Loop:
     # ── 辅助方法 ──
 
     def _budget_exhausted_message(self) -> str:
+        """生成预算耗尽时的终止消息。"""
         return f"Agent 在 {self.context.iteration} 次迭代后未完成。"
 
     def _stuck_in_loop_message(self) -> str:
+        """生成死循环检测时的终止消息。"""
         return (
             f"Agent 在第 {self.context.iteration} 次迭代检测到重复工具调用"
             f"（连续 {self._consecutive_duplicate_count} 次），已提前终止。"
         )
 
     def _stopped_message(self) -> str:
+        """生成用户中断时的终止消息。"""
         self._stop_requested = False
         return f"Agent 在第 {self.context.iteration} 次迭代被终止。"
 
@@ -443,6 +447,7 @@ class Loop:
         return None
 
     def _emit_event(self, event_type: str, **data) -> None:
+        """触发循环生命周期事件。"""
         self.event_emitter.fire(Event(
             type=event_type,
             iteration=self.context.iteration,

@@ -15,6 +15,7 @@ _IS_WINDOWS = platform.system() == "Windows"
 
 
 def _is_windows() -> bool:
+    """判断当前系统是否为 Windows。"""
     return _IS_WINDOWS
 
 

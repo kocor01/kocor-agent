@@ -381,7 +381,12 @@ class Agent:
     # ── slash 命令 ──
 
     def _handle_slash_command(self, user_input: str) -> str:
-        # 解析 /<skill_name> [args] 格式
+        """解析 /<skill_name> [args] 格式并执行技能。
+
+        根据技能类型调度:
+          - PROMPT 技能: 将渲染结果注入 LLM 上下文，走 ReAct 循环
+          - CODE 技能: 直接返回执行结果，不走 LLM
+        """
         parts = user_input[1:].strip().split(maxsplit=1)
         skill_name = parts[0]
         skill_args = parts[1] if len(parts) > 1 else ""
@@ -424,6 +429,7 @@ class Agent:
             return result.content
 
     def _list_slash_skills(self) -> str:
+        """返回所有支持斜杠调用的技能名称列表（逗号分隔）。"""
         names = [
             f"/{s.name}"
             for s in self.tool_manager.skill_manager.list_skills(enabled_only=True)

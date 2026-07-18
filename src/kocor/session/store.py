@@ -39,6 +39,7 @@ class SessionDB:
         self._connect()
 
     def _connect(self) -> None:
+        """连接 SQLite 数据库，启用 WAL 模式，初始化表结构。"""
         Path(self._db_path).parent.mkdir(parents=True, exist_ok=True)
         self._conn = sqlite3.connect(self._db_path, check_same_thread=False)
         self._conn.execute("PRAGMA journal_mode=WAL")
@@ -46,6 +47,7 @@ class SessionDB:
         self._init_tables()
 
     def _init_tables(self) -> None:
+        """创建 sessions 和 messages 表（如不存在）。"""
         self._conn.executescript("""
             CREATE TABLE IF NOT EXISTS sessions (
                 session_id     TEXT PRIMARY KEY,
@@ -88,6 +90,7 @@ class SessionDB:
         self._conn.commit()
 
     def close(self) -> None:
+        """关闭数据库连接，确保未提交数据落盘。"""
         if self._conn:
             self.flush()
             self._conn.close()
@@ -96,6 +99,7 @@ class SessionDB:
     # -- 会话元数据 --
 
     def save_entry(self, entry: SessionEntry) -> None:
+        """持久化会话元数据（INSERT OR REPLACE）。"""
         with self._lock:
             self._conn.execute(
                 """INSERT OR REPLACE INTO sessions
@@ -154,6 +158,7 @@ class SessionDB:
         return result
 
     def end_session(self, session_id: str, reason: str) -> None:
+        """标记会话为已结束，记录结束原因。"""
         now = datetime.now().isoformat()
         self._conn.execute(
             "UPDATE sessions SET ended_at = ?, end_reason = ? WHERE session_id = ?",
@@ -162,6 +167,7 @@ class SessionDB:
         self._conn.commit()
 
     def reopen_session(self, session_id: str) -> None:
+        """重新打开已结束的会话（清除 ended_at/end_reason）。"""
         self._conn.execute(
             "UPDATE sessions SET ended_at = NULL, end_reason = NULL WHERE session_id = ?",
             (session_id,),
@@ -169,6 +175,7 @@ class SessionDB:
         self._conn.commit()
 
     def get_session(self, session_id: str) -> dict | None:
+        """按 session_id 查询原始行数据（返回 dict）。"""
         row = self._conn.execute(
             "SELECT * FROM sessions WHERE session_id = ?", (session_id,)
         ).fetchone()
@@ -177,10 +184,12 @@ class SessionDB:
         return dict(row)
 
     def session_count(self) -> int:
+        """返回总会话数。"""
         row = self._conn.execute("SELECT COUNT(*) AS cnt FROM sessions").fetchone()
         return row["cnt"] if row else 0
 
     def session_id_exists(self, session_id: str) -> bool:
+        """检查指定 session_id 是否存在。"""
         row = self._conn.execute(
             "SELECT 1 FROM sessions WHERE session_id = ?", (session_id,)
         ).fetchone()
@@ -202,6 +211,10 @@ class SessionDB:
         message: Message,
         usage: Usage | None = None,
     ) -> None:
+        """持久化一条消息到指定会话。
+
+        自动清洗前导换行、关联 tool 消息到对应工具调用、设置首个用户消息为会话标题。
+        """
         # 持久化前清洗前导换行（模型常返回 "\n\n..." 格式的内容）
         content = message.content.lstrip("\n")
         tool_calls_json = None
@@ -297,6 +310,7 @@ class SessionDB:
         return None
 
     def get_messages(self, session_id: str) -> list[Message]:
+        """按时间顺序返回指定会话的所有消息。"""
         rows = self._conn.execute(
             "SELECT * FROM messages WHERE session_id = ? ORDER BY id ASC",
             (session_id,),
@@ -331,6 +345,7 @@ class SessionDB:
 
     @staticmethod
     def _row_to_entry(row: sqlite3.Row) -> SessionEntry:
+        """将 SQLite 行转换为 SessionEntry 对象。"""
         return SessionEntry(
             session_key=row["session_key"],
             session_id=row["session_id"],
@@ -349,6 +364,7 @@ class SessionDB:
 
     @staticmethod
     def _row_to_message(row: sqlite3.Row) -> Message:
+        """将 SQLite 行转换为 Message 对象（含 tool_calls 反序列化）。"""
         tool_calls = None
         if row["tool_calls"]:
             try:
@@ -402,19 +418,24 @@ class SessionStore:
             self._entries = self._db.load_all_entries()
 
     def get_entry(self, session_key: str) -> SessionEntry | None:
+        """按 session_key 获取内存中的会话条目。"""
         return self._entries.get(session_key)
 
     def set_entry(self, entry: SessionEntry) -> None:
+        """设置会话条目（内存 + 可选 SQLite）。"""
         self._entries[entry.session_key] = entry
         if self._db:
             self._db.save_entry(entry)
 
     def delete_entry(self, session_key: str) -> None:
+        """从内存中删除会话条目。"""
         self._entries.pop(session_key, None)
 
     def has_any(self) -> bool:
+        """内存中是否有任何会话条目。"""
         return len(self._entries) > 0
 
     @property
     def db(self) -> SessionDB | None:
+        """可选的 SQLite 后端实例。"""
         return self._db

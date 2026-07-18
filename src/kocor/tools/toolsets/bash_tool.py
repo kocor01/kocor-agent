@@ -114,7 +114,7 @@ class BashTool:
         timeout: int = 180,
         env: LocalEnvironment | None = None,
     ) -> str:
-        # 安全检查：空命令
+        """执行一条 bash 命令并返回 JSON 格式结果。"""
         if not command:
             return json.dumps({"error": "Empty command"}, ensure_ascii=False)
 
@@ -261,6 +261,7 @@ class ProcessTool:
         offset: int = 0,
         limit: int = 200,
     ) -> str:
+        """管理后台进程（列出 / 读取 / 停止）。"""
         if action == "list":
             sessions = process_registry.list_sessions()
             if not sessions:

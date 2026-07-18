@@ -178,6 +178,7 @@ class AgentBuilder:
         if self.llm is not None:
 
             def on_config_reload(new_config):
+                """配置热加载时重建 LLM 客户端。"""
                 from kocor.llm_provider.llm_factory import LlmFactory
                 agent.llm = LlmFactory.create()
 

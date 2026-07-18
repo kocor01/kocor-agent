@@ -22,6 +22,7 @@ class OpenAIClient(BaseLLMClient):
     """OpenAI LLM 客户端。"""
 
     def _create_client(self):
+        """创建 OpenAI SDK 客户端（懒加载，首次调用时创建）。"""
         return None  # 懒加载：首次 _get_client() 时创建
 
     def _get_client(self) -> OpenAI:
@@ -35,6 +36,7 @@ class OpenAIClient(BaseLLMClient):
 
     @property
     def provider(self) -> str:
+        """返回提供商标识 "openai"。"""
         return "openai"
 
     def _api_generate(self, messages_data, tools_data, max_tokens, temperature, system=None):

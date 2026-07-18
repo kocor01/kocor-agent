@@ -69,7 +69,9 @@ class Hook(Protocol):
 
     @property
     def hook_point(self) -> HookPoint:
+        """返回钩子注册的触发点。"""
         ...
 
     def run(self, context: HookContext) -> HookResult:
+        """执行钩子逻辑，返回执行结果。"""
         ...

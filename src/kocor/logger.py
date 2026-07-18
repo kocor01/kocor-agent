@@ -13,6 +13,7 @@ class _EventEncoder(json.JSONEncoder):
     """将 dataclass 和 __dict__ 对象递归序列化为 JSON。"""
 
     def default(self, obj):
+        """将 dataclass 和 __dict__ 对象递归序列化为 JSON。"""
         if dataclasses.is_dataclass(obj):
             return dataclasses.asdict(obj)
         if hasattr(obj, "__dict__"):
@@ -70,15 +71,19 @@ class Logger:
         )
 
     def debug(self, message: str) -> None:
+        """写入 DEBUG 级别的运行时日志。"""
         self._default_logger.debug(message)
 
     def info(self, message: str) -> None:
+        """写入 INFO 级别的运行时日志。"""
         self._default_logger.info(message)
 
     def warning(self, message: str) -> None:
+        """写入 WARNING 级别的运行时日志。"""
         self._default_logger.warning(message)
 
     def error(self, message: str) -> None:
+        """写入 ERROR 级别的运行时日志。"""
         self._default_logger.error(message)
 
     def audit(self, message: str) -> None:

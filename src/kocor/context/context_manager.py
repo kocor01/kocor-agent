@@ -167,9 +167,11 @@ class ContextManager:
         )
 
     def count_message_tokens(self) -> int:
+        """计算当前消息列表的 token 数。"""
         return self._token_counter.count_messages(self._runtime.messages)
 
     def count_tool_tokens(self) -> int:
+        """计算当前工具定义的 token 数。"""
         return self._token_counter.count_tools(self._runtime.tool_definitions)
 
     def compress_if_needed(self) -> None:
@@ -203,13 +205,17 @@ class ContextManager:
         ]
 
     def advance_iteration(self) -> None:
+        """轮次计数加 1。"""
         self._runtime.iteration += 1
 
     def append(self, message: Message) -> None:
+        """向当前消息列表追加一条消息。"""
         self._runtime.messages.append(message)
 
     def reset(self) -> None:
+        """重置运行时上下文（含所有状态）。"""
         self._runtime.reset()
 
     def reset_conversation(self) -> None:
+        """重置会话（保留 system prompt 和工具定义）。"""
         self._runtime.reset_conversation()

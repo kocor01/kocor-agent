@@ -85,6 +85,7 @@ _IMMUTABLE_JOB_FIELDS = frozenset({"id"})
 
 
 def _jobs_lock_file() -> Path:
+    """返回跨进程文件锁路径。"""
     return CRON_DIR / JOBS_LOCK_NAME
 
 
@@ -317,6 +318,7 @@ def _normalize_skill_list(skill: str | None = None, skills: list[str] | None = N
 
 
 def _normalize_job_text(value: Any, fallback: str = "") -> str:
+    """安全转换为字符串，空值返回 fallback。"""
     if value is None:
         return fallback
     return str(value)

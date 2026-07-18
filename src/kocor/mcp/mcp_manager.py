@@ -96,6 +96,7 @@ class McpManager:
                 pass
 
     def _load_permissions(self) -> dict:
+        """从配置文件加载 MCP 工具权限级别。"""
         if not self.config_path or not os.path.exists(self.config_path):
             return {}
 

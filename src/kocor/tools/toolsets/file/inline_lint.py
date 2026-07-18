@@ -53,11 +53,13 @@ def lint_content(filepath: str, content: str) -> dict[str, Any]:
 
 
 def _format_error(exc: Exception) -> str:
+    """格式化异常为单行错误文本。"""
     tb = traceback.format_exception_only(type(exc), exc)
     return "".join(tb).strip()
 
 
 def _parse_toml(content: str) -> None:
+    """TOML 格式校验（优先用 tomllib，回退到简易行解析）。"""
     try:
         import tomllib
         tomllib.loads(content)

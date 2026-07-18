@@ -21,12 +21,14 @@ logger = logging.getLogger(__name__)
 
 # ── 常量配置（通过 Config 读取） ────────────────────────────────
 def _get_read_chars():
+    """从 Config 读取单次最大读取字符数。"""
     try:
         return Config.load().file_read_max_chars
     except Exception:
         return 100_000
 
 def _get_read_lines():
+    """从 Config 读取单次最大读取行数。"""
     try:
         return Config.load().file_read_max_lines
     except Exception:

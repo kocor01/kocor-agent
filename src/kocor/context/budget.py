@@ -28,18 +28,22 @@ class TokenBudget:
 
     @property
     def remaining(self) -> int:
+        """剩余可用 token 数。"""
         return self.limit - self.used_prompt
 
     @property
     def usage_ratio(self) -> float:
+        """当前使用比例（0.0 ~ 1.0）。"""
         if self.limit <= 0:
             return 0.0
         return self.used_prompt / self.limit
 
     def should_summarize(self) -> bool:
+        """是否触发摘要（使用率 ≥ 摘要阈值）。"""
         return self.usage_ratio >= self.threshold_summary
 
     def should_truncate(self) -> bool:
+        """是否触发截断（使用率 ≥ 截断阈值）。"""
         return self.usage_ratio >= self.threshold_truncate
 
     def reset(self) -> None:

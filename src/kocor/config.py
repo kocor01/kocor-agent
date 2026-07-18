@@ -342,6 +342,7 @@ class Config:
             return False
 
         def _handler(signum, frame):
+            """SIGHUP 触发器：重载配置。"""
             cls._notify_reload()
 
         signal.signal(signal.SIGHUP, _handler)

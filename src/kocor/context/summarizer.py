@@ -84,7 +84,6 @@ class HistorySummarizer:
             truncate_len = int(len(history_text) * ratio)
             history_text = history_text[:truncate_len] + "\n[... 截断 ...]"
 
-        # 调用 LLM 生成摘要
         prompt = self.summarization_prompt.format(history_text=history_text)
         msg = Message(role="user", content=prompt)
 
@@ -105,12 +104,14 @@ class HistorySummarizer:
         )
 
     def _run_hooks(self, point: HookPoint, **extra) -> None:
+        """触发摘要相关的 Hook 回调。"""
         if self._hook_manager is None:
             return
         ctx = HookContext(iteration=0, messages=[], extra=extra)
         self._hook_manager.run(point, ctx)
 
     def _emit_event(self, event_type: str, **data) -> None:
+        """触发摘要相关的事件通知。"""
         if self._event_emitter is None:
             return
         self._event_emitter.fire(Event(

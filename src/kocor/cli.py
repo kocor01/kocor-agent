@@ -22,7 +22,8 @@ from kocor.logger import Logger
 from kocor.tools.permission import PermissionManager
 
 
-def parse_args():
+def parse_args() -> argparse.Namespace:
+    """解析 CLI 命令行参数，返回命名空间对象。"""
     parser = argparse.ArgumentParser(description="Kocor Agent - 小而美的 LLM 自主 Agent 助手")
     parser.add_argument(
         "--no-stream",
@@ -70,10 +71,14 @@ def _repl_loop(
     import signal
 
     def _sigint_handler(signum, frame):
+        """设置 Agent 停止标志并抛出 KeyboardInterrupt。
+
+        Windows 上此 handler 与默认 KeyboardInterrupt 共存（两者都执行）；
+        Unix 上自定义 handler 替换默认行为，需手动抛出。
+        """
         agent.stop()
         # Unix 上自定义 handler 替换默认 KeyboardInterrupt，需手动抛出；
-        # Windows 上 Python 会额外自动抛出 KeyboardInterrupt，双重抛出无害
-        # （第二次抛出在 finally 中会被抑制）。
+        # Windows 上 Python 会额外自动抛出，双重抛出无害。
         raise KeyboardInterrupt()
 
     signal.signal(signal.SIGINT, _sigint_handler)
@@ -104,6 +109,13 @@ def _repl_loop(
 
 
 def main() -> None:
+    """Kocor Agent 入口函数。
+
+    支持三种模式:
+      - REPL 模式: 无参数且 stdin 是终端时进入交互式循环
+      - 管道模式: 从 stdin 读取输入
+      - 参数模式: 从命令行参数读取输入
+    """
     args = parse_args()
     stream_enabled = args.stream
     user_args = args.user_input

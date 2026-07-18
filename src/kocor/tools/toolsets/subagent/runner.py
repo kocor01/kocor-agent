@@ -186,7 +186,8 @@ class SubagentRunner:
         completed_count = 0
 
         def run_one(index: int, t: dict) -> dict:
-            return self._run_single_child(
+                """在线程池中执行单个子代理任务。"""
+                return self._run_single_child(
                 goal=t.get("goal", ""),
                 context=t.get("context"),
             )

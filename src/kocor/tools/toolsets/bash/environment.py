@@ -96,6 +96,7 @@ def _pipe_stdin(proc: subprocess.Popen, data: str) -> None:
     """在守护线程中向 proc.stdin 写入数据，避免管道缓冲区死锁。"""
 
     def _write():
+        """在守护线程中向管道写入数据。"""
         try:
             raw = data.encode("utf-8") if isinstance(data, str) else data
             target = getattr(proc.stdin, "buffer", proc.stdin)
@@ -515,6 +516,7 @@ class BaseEnvironment(ABC):
     # ------------------------------------------------------------------
 
     def stop(self):
+        """停止环境，清理子进程和临时资源。"""
         self.cleanup()
 
     def __del__(self):
@@ -568,6 +570,7 @@ class LocalEnvironment(BaseEnvironment):
         timeout: int = 120,
         stdin_data: str | None = None,
     ) -> subprocess.Popen:
+        """启动 bash 子进程，配置运行环境和安全 cwd。"""
         bash = _find_bash()
         args = [bash, "-l", "-c", cmd_string] if login else [bash, "-c", cmd_string]
         run_env = _make_run_env()

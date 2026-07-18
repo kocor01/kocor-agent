@@ -42,10 +42,12 @@ class StreamSession:
 
     @property
     def is_stopped(self) -> bool:
+        """外部是否请求了中断。"""
         return self._is_stopped
 
     @property
     def has_tool_calls(self) -> bool:
+        """当前累积中是否包含工具调用。"""
         return bool(self._accumulated_tool_calls)
 
     def iter_chunks(self) -> Iterator[StreamChunk]:

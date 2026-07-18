@@ -36,6 +36,7 @@ def _strategy_line_trimmed(content: str, old_string: str, **_kwargs) -> bool:
 def _strategy_whitespace_normalized(content: str, old_string: str, **_kwargs) -> bool:
     """策略 3：合并连续空白（空格、制表符）后比较。"""
     def _normalize(s: str) -> str:
+        """合并连续空白字符。"""
         return re.sub(r"\s+", " ", s).strip()
     return _normalize(old_string) in _normalize(content)
 
@@ -43,6 +44,7 @@ def _strategy_whitespace_normalized(content: str, old_string: str, **_kwargs) ->
 def _strategy_indentation_flexible(content: str, old_string: str, **_kwargs) -> bool:
     """策略 4：剥离所有行首缩进后比较。"""
     def _strip_indent(s: str) -> str:
+        """去掉每行行首缩进。"""
         return "\n".join(line.lstrip() for line in s.split("\n"))
     return _strip_indent(old_string) in _strip_indent(content)
 

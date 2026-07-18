@@ -56,6 +56,7 @@ class _StreamFormatter:
         print(*args, **kwargs)
 
     def _round_header(self, n: int) -> None:
+        """打印轮次头部分隔。"""
         title = f"⚡ 第 {n} 次请求"
         fill = self.width - 2 - len(title)
         self._output(f"\n── {title} {'─' * max(0, fill)}")
@@ -85,6 +86,7 @@ class _StreamFormatter:
             self._render_markdown(block)
 
     def handle_chunk(self, chunk) -> None:
+        """处理流式回复的一个 chunk，分发到各处理方法。"""
         if not chunk.tool_result and not self._in_round():
             self.round_num += 1
             self.pending_round = True
@@ -100,9 +102,11 @@ class _StreamFormatter:
         self._handle_end_of_round(chunk)
 
     def _in_round(self) -> bool:
+        """当前是否在处理一个轮次中。"""
         return bool(self.pending_round or self.has_reasoning or self.has_content or self.has_tool_section)
 
     def _handle_reasoning(self, chunk) -> None:
+        """渲染思维链输出。"""
         if not chunk.reasoning:
             return
         if not self.has_reasoning:
@@ -112,6 +116,7 @@ class _StreamFormatter:
         self._output(chunk.reasoning, end="", flush=True)
 
     def _handle_content(self, chunk) -> None:
+        """渲染文本内容输出。"""
         if not chunk.content:
             return
         content = self._prepare_content(chunk.content)
@@ -175,6 +180,7 @@ class _StreamFormatter:
             self._render_markdown(line)
 
     def _handle_tool_calls(self, chunk) -> None:
+        """渲染工具调用信息。"""
         if not chunk.tool_calls:
             return
         seen_ids = {tc.id for tc in self.tool_calls}
@@ -188,6 +194,7 @@ class _StreamFormatter:
             self.has_tool_section = True
 
     def _handle_tool_results(self, chunk) -> None:
+        """渲染工具执行结果（智能截断长内容）。"""
         if not chunk.tool_result:
             return
         if self.tool_result_idx < len(self.tool_calls):
@@ -217,6 +224,7 @@ class _StreamFormatter:
             self._in_code_block = False
 
     def _handle_end_of_round(self, chunk) -> None:
+        """刷新所有缓冲区，重置轮次状态。"""
         if not chunk.is_final:
             return
         self._flush_all_buffers()
@@ -229,6 +237,7 @@ class _StreamFormatter:
             self.tool_result_idx = 0
 
     def flush_remaining(self) -> None:
+        """刷新所有残留缓冲区，输出未展示的工具调用。"""
         self._flush_all_buffers()
         for tc in self.tool_calls[self.tool_result_idx:]:
             self._output(f"• {tc.function.name}({tc.function.arguments})")
@@ -294,6 +303,7 @@ def _print_welcome(
 
 
 def _print_stream_formatted(chunks: Iterator[StreamChunk]) -> None:
+    """按流式格式输出 LLM 回复。"""
     formatter = _StreamFormatter()
     for chunk in chunks:
         formatter.handle_chunk(chunk)

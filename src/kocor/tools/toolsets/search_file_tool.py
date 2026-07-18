@@ -29,6 +29,7 @@ def _normalize_search_pagination(
     limit: int | None,
     offset: int | None,
 ) -> tuple[int, int]:
+    """规范化分页参数，填充默认值并限制最大结果数。"""
     if limit is None or limit < 1:
         limit = _MAX_RESULTS
     if offset is None or offset < 0:
@@ -43,6 +44,7 @@ def _search_with_rg(
     pattern: str, path: str, file_glob: str,
     limit: int, offset: int, output_mode: str, context: int,
 ) -> dict[str, Any]:
+    """使用 ripgrep 搜索文件内容，支持分页和上下文行。"""
     cmd = ["rg", "--line-number", "--no-heading", "--color", "never"]
     if output_mode == "count":
         cmd.append("--count")
@@ -65,6 +67,7 @@ def _search_with_rg(
 
 
 def _parse_rg_output(result, output_mode: str, limit: int, offset: int) -> dict[str, Any]:
+    """解析 ripgrep 输出为结构化结果（含分页）。"""
     stdout = result.stdout
     if output_mode == "files_only":
         files = [f for f in stdout.splitlines() if f.strip()]
@@ -86,6 +89,7 @@ def _search_with_grep(
     pattern: str, path: str, file_glob: str,
     limit: int, offset: int, output_mode: str, context: int,
 ) -> dict[str, Any]:
+    """使用系统 grep 搜索文件内容（ripgrep 不可用时的回退方案）。"""
     cmd = ["grep", "-rn"]
     if output_mode == "count":
         cmd.append("-c")
@@ -197,6 +201,7 @@ def _match_glob(fname: str, pattern: str) -> bool:
 
 
 def _search_files_with_rg(pattern: str, path: str, limit: int, offset: int) -> dict[str, Any]:
+    """使用 ripgrep 搜索文件名（按修改时间排序）。"""
     cmd = ["rg", "--files", "--sortr=modified"]
     if pattern:
         cmd.extend(["--glob", f"*{pattern}*"])
@@ -212,6 +217,7 @@ def _search_files_with_rg(pattern: str, path: str, limit: int, offset: int) -> d
 
 
 def _search_files_with_find(pattern: str, path: str, limit: int, offset: int) -> dict[str, Any]:
+    """使用系统 find 搜索文件名（ripgrep 不可用时的回退方案）。"""
     cmd = ["find", path, "-type", "f"]
     if pattern:
         cmd.extend(["-name", f"*{pattern}*"])
@@ -251,6 +257,7 @@ def _search_files_with_python(pattern: str, path: str, limit: int, offset: int) 
 
 
 def _parse_content_matches(output: str, limit: int, offset: int) -> dict[str, Any]:
+    """解析 grep/rg 输出为结构化匹配结果，超出阈值时自动压缩为路径分组格式。"""
     if not output.strip():
         return {"matches": [], "total_count": 0}
     matches = []
@@ -283,6 +290,7 @@ def _parse_content_matches(output: str, limit: int, offset: int) -> dict[str, An
 
 
 def _densify_matches(matches: list[dict]) -> str:
+    """将匹配列表压缩为路径分组的紧凑文本格式。"""
     lines: list[str] = []
     cur: str | None = None
     for m in matches:
@@ -362,6 +370,7 @@ class SearchFiles:
         output_mode: str = "content",
         context: int = 0,
     ) -> str:
+        """搜索文件或文件内容，返回 JSON 格式结果。"""
         try:
             limit, offset = _normalize_search_pagination(limit, offset)
             allowed_dir = os.path.realpath(os.getcwd())

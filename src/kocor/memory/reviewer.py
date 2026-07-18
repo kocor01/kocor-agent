@@ -32,6 +32,10 @@ class BackgroundReviewer:
         self.store = store
 
     def review(self, messages: list[Message]) -> None:
+        """审查消息列表，提取记忆并通过 LLM 判断是否需持久化。
+
+        构建系统提示（含已有记忆），让 LLM 判断增量内容后调用 memory_tool。
+        """
         memory_tool = ToolDefinition(
             name=MemoryTool.NAME,
             description=MemoryTool.DESCRIPTION,

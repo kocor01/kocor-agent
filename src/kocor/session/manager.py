@@ -307,6 +307,7 @@ class SessionManager:
         auto_reset_reason: str | None = None,
         is_fresh_reset: bool = False,
     ) -> SessionEntry:
+        """创建并持久化一个新的会话条目。"""
         session_id = self._generate_session_id(now)
         entry = SessionEntry(
             session_key=session_key,
@@ -321,5 +322,6 @@ class SessionManager:
         return entry
 
     def _end_old_session(self, session_id: str, reason: str) -> None:
+        """结束旧会话（如有 SQLite 后端）。"""
         if self.store.db:
             self.store.db.end_session(session_id, reason)

@@ -24,6 +24,7 @@ class AnthropicClient(BaseLLMClient):
     """Anthropic LLM 客户端。"""
 
     def _create_client(self):
+        """创建 Anthropic SDK 客户端。"""
         return Anthropic(
             api_key=_reveal(self.config.anthropic_api_key),
             auth_token=_reveal(self.config.anthropic_api_key),  # anthropic 兼容不同厂商模型
@@ -32,6 +33,7 @@ class AnthropicClient(BaseLLMClient):
 
     @property
     def provider(self) -> str:
+        """返回提供商标识 "anthropic"。"""
         return "anthropic"
 
     def _prepare_messages(self, messages: list[Message]) -> tuple:
