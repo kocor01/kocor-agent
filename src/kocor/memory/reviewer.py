@@ -7,12 +7,12 @@ from __future__ import annotations
 
 import json
 
+from kocor.config import Config
 from kocor.llm_provider.llm_client import LLMClient
 from kocor.llm_provider.message import Message
 from kocor.memory.store import MemoryStore
-from kocor.memory.types import MemoryTarget
 from kocor.tools.definitions import ToolDefinition
-from kocor.tools.permission import PermissionManager
+from kocor.tools.toolsets.memory_tool import MemoryTool
 
 MEMORY_REVIEW_PROMPT = """你正在回顾一段对话，判断是否有值得长期记忆的内容。
 
@@ -33,33 +33,27 @@ class BackgroundReviewer:
 
     def review(self, messages: list[Message]) -> None:
         memory_tool = ToolDefinition(
-            name="memory",
-            description=("保存长期记忆。你可以通过 operations 数组一次性 add/replace/remove。"
-                         'add: {"action":"add", "target":"memory|user", "content":"..."}'),
-            parameters={
-                "type": "object",
-                "properties": {
-                    "operations": {
-                        "type": "array",
-                        "items": {
-                            "type": "object",
-                            "properties": {
-                                "action": {"enum": ["add", "replace", "remove"]},
-                                "target": {"enum": ["memory", "user"]},
-                                "content": {"type": "string"},
-                                "old_substring": {"type": "string"},
-                            },
-                        },
-                    },
-                },
-            },
-            safety_level=PermissionManager.SAFETY_SAFE,
+            name=MemoryTool.NAME,
+            description=MemoryTool.DESCRIPTION,
+            parameters=MemoryTool.PARAMETERS,
+            safety_level=MemoryTool.SAFETY_LEVEL,
         )
 
+        # 构建系统提示：附上当前已保存的记忆，供 LLM 判断增量
+        current_memory = self.store.format_for_system_prompt()
+        system_prompt = MEMORY_REVIEW_PROMPT
+        if current_memory:
+            system_prompt += (
+                "\n\n当前已保存的记忆（请在此基础之上判断是否需要新增/更新）：\n"
+                + current_memory
+            )
+
         review_msgs = [
-            Message(role="system", content=MEMORY_REVIEW_PROMPT),
+            Message(role="system", content=system_prompt),
         ]
-        recent = messages[-6:] if len(messages) > 6 else messages
+        # 取最近 nudge_interval 条消息供审查（配置为 0 时取全部）
+        window = Config.load().nudge_interval or len(messages)
+        recent = messages[-window:] if len(messages) > window else messages
         review_msgs.extend(recent)
 
         response = self.llm.generate(review_msgs, tools=[memory_tool])
@@ -69,27 +63,9 @@ class BackgroundReviewer:
         for tc in response.tool_calls:
             if tc.function.name == "memory":
                 try:
-                    args = json.loads(tc.function.arguments)
+                    ops = json.loads(tc.function.arguments).get("operations", [])
                 except json.JSONDecodeError:
                     continue
-                ops = args.get("operations", [])
                 if not ops:
                     continue
-                self._handle_memory_ops(ops)
-
-    def _handle_memory_ops(self, ops: list[dict]) -> None:
-        for op in ops:
-            action = op.get("action")
-            try:
-                target = MemoryTarget(op.get("target", "memory"))
-            except ValueError:
-                continue
-
-            if action == "add":
-                content = op.get("content", "")
-                if content:
-                    self.store.add(target, content)
-            elif action == "replace":
-                self.store.replace(target, op.get("old_substring", ""), op.get("content", ""))
-            elif action == "remove":
-                self.store.remove(target, op.get("old_substring", ""))
+                MemoryTool.handler(store=self.store, operations=ops)

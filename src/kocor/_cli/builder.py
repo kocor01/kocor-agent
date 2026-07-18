@@ -40,6 +40,8 @@ class AgentBuilder:
         self.llm: LLMClient | None = None
         self.session_manager: SessionManager | None = None
         self._metrics: MetricsCollector | None = None
+        # 记忆子系统：MemoryStore 负责持久化，BackgroundReviewer 负责审查。
+        # 两者独立（pure data ≠ LLM process），但装配时成对出现。
         self._memory: MemoryStore | None = None
         self._background_reviewer: BackgroundReviewer | None = None
         self._todo_store: TodoStore | None = None

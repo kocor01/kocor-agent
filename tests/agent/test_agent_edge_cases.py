@@ -290,9 +290,11 @@ class TestCheckNudge:
     def test_nudge_not_called_without_memory(self):
         """无 MemoryStore 时 nudge 不触发。"""
         agent = make_agent(llm=FakeLLMClient())
-        with patch.object(agent, '_background_reviewer', None):
-            # 不会报错
-            agent._check_nudge()
+        agent._memory = None
+        agent._background_reviewer = MagicMock()
+        # 不会报错，也不会触发
+        agent._check_nudge()
+        assert agent._turns_since_memory == 0
 
     def test_nudge_interval_respected(self):
         """到达 nudge_interval 时触发审查。"""
@@ -300,6 +302,7 @@ class TestCheckNudge:
         # 模拟 MemoryStore 和 BackgroundReviewer
         mock_reviewer = MagicMock()
         agent._background_reviewer = mock_reviewer
+        agent._memory = MagicMock()  # _check_nudge 需要 _memory 非空
         agent._turns_since_memory = 0
 
         # 设置 nudge_interval 为 3

@@ -443,13 +443,12 @@ class Agent:
 
         审查后刷新记忆快照，使新写入的记忆对下一轮 LLM 调用可见。
         """
-        if not self._background_reviewer:
+        if not self._memory or not self._background_reviewer:
             return
         self._turns_since_memory += 1
         nudge_interval = Config.load().nudge_interval
         if self._turns_since_memory >= nudge_interval:
             self._background_reviewer.review(self.context.session_history)
             # 审查后刷新快照，使新记忆立即对 LLM 可见
-            if self._memory:
-                self._memory.refresh_snapshot()
+            self._memory.refresh_snapshot()
             self._turns_since_memory = 0
