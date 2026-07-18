@@ -98,10 +98,7 @@ def assemble_child_loop(
     )
 
     # 3. 非交互权限
-    permission_mgr = PermissionManager(
-        policy=PermissionManager.POLICY_NONINTERACTIVE,
-        tool_manager=child_tm,
-    )
+    child_tm.permission_mgr.policy = PermissionManager.POLICY_NONINTERACTIVE
     # 非交互策略从 Config 读取 subagent_auto_approve，
     # 但为了覆盖当前子代理的 auto_approve 值，临时写入 Config。
     # 注意：这是线程安全的写入（Config 是全局单例），多个子代理并发时会竞争。
@@ -146,7 +143,6 @@ def assemble_child_loop(
         llm=parent_llm,
         context=child_ctx,
         tool_manager=child_tm,
-        permission_mgr=permission_mgr,
         hook_manager=hook_mgr,
         event_emitter=child_emitter,
         max_iterations=max_iterations,

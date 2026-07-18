@@ -45,18 +45,22 @@ class PermissionManager:
         always_ask: set[str] | None = None,
         cache_enabled: bool = True,
         cache_max_size: int = 50,
-        tool_manager=None,
     ):
         self.policy = policy
         # 始终允许列表（跳过所有检查）
         self._always_allow = always_allow or set()
         # 始终询问列表（即使 safe 等级也要确认）
         self._always_ask = always_ask or set()
+        # 安全等级映射：工具名 → safety_level
+        self._safety_map: dict[str, str] = {}
         # 会话缓存：已批准的工具名（FIFO 淘汰）
         self._cache: OrderedDict[str, None] = OrderedDict()
         self.cache_enabled = cache_enabled
         self.cache_max_size = cache_max_size
-        self._tool_manager = tool_manager
+
+    def update_safety(self, tool_name: str, safety_level: str) -> None:
+        """记录工具的安全等级。"""
+        self._safety_map[tool_name] = safety_level
 
     def check(self, tool_call) -> bool:
         """检查工具调用是否应被允许。
@@ -83,10 +87,7 @@ class PermissionManager:
             return self._ask_user(tool_name, args)
 
         # 4. 基于策略的决策
-        safety = (
-            getattr(self._tool_manager._tools.get(tool_name), 'safety_level', PermissionManager.SAFETY_CAUTION)
-            if self._tool_manager else PermissionManager.SAFETY_CAUTION
-        )
+        safety = self._safety_map.get(tool_name, PermissionManager.SAFETY_CAUTION)
 
         if self.policy == PermissionManager.POLICY_PERMISSIVE:
             return True

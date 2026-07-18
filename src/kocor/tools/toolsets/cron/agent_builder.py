@@ -38,7 +38,6 @@ def build_cron_agent() -> tuple:
     from kocor.event.event_manager import EventEmitter
     from kocor.hook.hook_manager import HookManager
     from kocor.llm_provider.llm_factory import LlmFactory
-    from kocor.tools.permission import PermissionManager
     from kocor.tools.tool_manager import ToolManager
     from kocor.tools.toolsets.cron.scheduler import CronScheduler
     from kocor.tools.toolsets.todo_tool import TodoStore
@@ -46,6 +45,7 @@ def build_cron_agent() -> tuple:
     # 独立 Agent（无 cronjob 工具，无 worker 子进程）
     llm = LlmFactory.create()
     tool_manager = ToolManager()
+    tool_manager.permission_mgr.policy = "permissive"
     tool_manager.register_builtin_tools(include_cron=False)
     todo_store = TodoStore()
     context = ContextManager(tools=tool_manager, todo_store=todo_store)
@@ -55,7 +55,6 @@ def build_cron_agent() -> tuple:
         tool_manager=tool_manager,
         todo_store=todo_store,
         context=context,
-        permission_mgr=PermissionManager(policy=PermissionManager.POLICY_PERMISSIVE),
         hook_manager=HookManager(),
         event_emitter=EventEmitter(),
         max_iterations=cfg.max_iterations,

@@ -18,8 +18,7 @@ from kocor.llm_provider.llm_factory import LlmFactory
 from kocor.logger import Logger
 from kocor.memory.reviewer import BackgroundReviewer
 from kocor.memory.store import MemoryStore
-from kocor.session.manager import SessionManager as _SessionManager
-from kocor.tools.permission import PermissionManager
+from kocor.session.manager import SessionManager
 from kocor.tools.tool_manager import ToolManager
 from kocor.tools.toolsets.todo_tool import TodoStore
 
@@ -39,8 +38,7 @@ class AgentBuilder:
         self.event_emitter: EventEmitter | None = None
         self.hook_manager: HookManager | None = None
         self.llm: LLMClient | None = None
-        self.permission_mgr: PermissionManager | None = None
-        self.session_manager: _SessionManager | None = None
+        self.session_manager: SessionManager | None = None
         self._metrics: MetricsCollector | None = None
         self._memory: MemoryStore | None = None
         self._background_reviewer: BackgroundReviewer | None = None
@@ -105,13 +103,6 @@ class AgentBuilder:
             include_subagent=Config.load().subagent_enabled,
         )
 
-    def _init_permission_mgr(self) -> None:
-        """创建 PermissionManager。"""
-        self.permission_mgr = PermissionManager(
-            policy=Config.load().permission_policy,
-            tool_manager=self.tool_manager,
-        )
-
     def _init_hook_manager(self, logger: Logger) -> None:
         """创建 HookManager、EventEmitter 并注册钩子和事件订阅。"""
         if self.hook_manager is None:
@@ -125,7 +116,7 @@ class AgentBuilder:
     def _init_session_manager(self) -> None:
         """创建会话管理器（可选）。"""
         if Config.load().session_enabled:
-            from kocor.session import SessionManager, SessionResetPolicy, SessionStore
+            from kocor.session import SessionResetPolicy, SessionStore
 
             db_path = Config.load().session_db_path
             session_name = Config.load().session_name or None
@@ -159,7 +150,6 @@ class AgentBuilder:
         self._init_subagent()
         self._init_todo_store()
         self._init_tool_manager()
-        self._init_permission_mgr()
         self._init_hook_manager(logger)
         self._init_session_manager()
         self._init_context()
@@ -168,7 +158,6 @@ class AgentBuilder:
             tool_manager=self.tool_manager,
             todo_store=self._todo_store,
             context=self.context,
-            permission_mgr=self.permission_mgr,
             hook_manager=self.hook_manager,
             event_emitter=self.event_emitter,
             max_iterations=Config.load().max_iterations,

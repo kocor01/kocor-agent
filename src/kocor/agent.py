@@ -21,7 +21,6 @@ from kocor.memory.store import MemoryStore
 # 可选的会话管理
 from kocor.session.manager import SessionManager as _SessionManager
 from kocor.skill.types import InvokeStrategy, SkillContext, SkillType
-from kocor.tools.permission import PermissionManager
 from kocor.tools.tool_manager import ToolManager
 from kocor.tools.toolsets.todo_tool import TodoStore
 
@@ -44,7 +43,6 @@ class Agent:
         tool_manager: ToolManager,  # 必传
         todo_store: TodoStore,  # 必传
         context: ContextManager,  # 必传
-        permission_mgr: PermissionManager,  # 必传
         hook_manager: HookManager,  # 必传
         event_emitter: EventEmitter,  # 必传
         max_iterations: int,  # 必传
@@ -61,7 +59,6 @@ class Agent:
             tool_manager: 工具管理器
             todo_store: 任务列表存储
             context: 运行时上下文管理器
-            permission_mgr: 权限管理器
             hook_manager: 钩子管理器
             event_emitter: 事件发射器
             max_iterations: 最大 ReAct 迭代次数
@@ -72,7 +69,6 @@ class Agent:
         self.llm = llm
         self.tool_manager = tool_manager
         self.system_prompt = Config.load().default_system_prompt
-        self.permission_mgr = permission_mgr
         self.hook_manager = hook_manager
         self.event_emitter = event_emitter
         self.max_iterations = max_iterations
@@ -107,7 +103,6 @@ class Agent:
             llm=self.llm,
             context=self.context,
             tool_manager=self.tool_manager,
-            permission_mgr=self.permission_mgr,
             hook_manager=self.hook_manager,
             event_emitter=self.event_emitter,
             max_iterations=self.max_iterations,

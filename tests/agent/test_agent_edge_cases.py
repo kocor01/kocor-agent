@@ -520,7 +520,7 @@ class TestAgentLightweightInit:
         """仅传 llm 的极简初始化。"""
         agent = make_agent(llm=FakeLLMClient())
         assert agent.tool_manager is not None
-        assert agent.permission_mgr is not None
+        assert agent.tool_manager.permission_mgr is not None
         assert agent.hook_manager is not None
         assert agent.event_emitter is not None
         assert agent.max_iterations > 0

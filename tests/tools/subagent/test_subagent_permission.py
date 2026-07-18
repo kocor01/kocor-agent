@@ -17,7 +17,7 @@ class TestNonInteractivePermission:
 
     def setup_method(self):
         self._saved_auto_approve = Config.load().subagent_auto_approve
-        # 构造一个带安全等级的 ToolManager
+        # 构造一个带安全等级的 ToolManager（register 时自动同步到 permission_mgr）
         self.tm = ToolManager()
         self.tm.register(
             name="safe_tool", description="s", parameters={"type": "object"},
@@ -31,6 +31,7 @@ class TestNonInteractivePermission:
             name="dangerous_tool", description="d", parameters={"type": "object"},
             handler=lambda **kw: "ok", safety_level=PermissionManager.SAFETY_DANGEROUS,
         )
+        self.pm = self.tm.permission_mgr
 
     def teardown_method(self):
         Config.load().subagent_auto_approve = self._saved_auto_approve
@@ -41,36 +42,24 @@ class TestNonInteractivePermission:
     # --- 默认拒绝危险 ---
 
     def test_noninteractive_allows_safe(self):
-        pm = PermissionManager(
-            policy=PermissionManager.POLICY_NONINTERACTIVE,
-            tool_manager=self.tm,
-        )
-        assert pm.check(self._make_call("safe_tool")) is True
+        self.pm.policy = PermissionManager.POLICY_NONINTERACTIVE
+        assert self.pm.check(self._make_call("safe_tool")) is True
 
     def test_noninteractive_allows_caution(self):
-        pm = PermissionManager(
-            policy=PermissionManager.POLICY_NONINTERACTIVE,
-            tool_manager=self.tm,
-        )
-        assert pm.check(self._make_call("caution_tool")) is True
+        self.pm.policy = PermissionManager.POLICY_NONINTERACTIVE
+        assert self.pm.check(self._make_call("caution_tool")) is True
 
     def test_noninteractive_denies_dangerous_by_default(self):
         """auto_approve=False（默认）时，dangerous 工具被拒绝。"""
         Config.load().subagent_auto_approve = False
-        pm = PermissionManager(
-            policy=PermissionManager.POLICY_NONINTERACTIVE,
-            tool_manager=self.tm,
-        )
-        assert pm.check(self._make_call("dangerous_tool")) is False
+        self.pm.policy = PermissionManager.POLICY_NONINTERACTIVE
+        assert self.pm.check(self._make_call("dangerous_tool")) is False
 
     def test_noninteractive_auto_approve_allows_dangerous(self):
         """auto_approve=True 时，dangerous 工具被放行。"""
         Config.load().subagent_auto_approve = True
-        pm = PermissionManager(
-            policy=PermissionManager.POLICY_NONINTERACTIVE,
-            tool_manager=self.tm,
-        )
-        assert pm.check(self._make_call("dangerous_tool")) is True
+        self.pm.policy = PermissionManager.POLICY_NONINTERACTIVE
+        assert self.pm.check(self._make_call("dangerous_tool")) is True
 
     # --- 永不调用 input() ---
 
@@ -82,15 +71,12 @@ class TestNonInteractivePermission:
         monkeypatch.setattr("builtins.input", bomb)
 
         Config.load().subagent_auto_approve = False
-        pm = PermissionManager(
-            policy=PermissionManager.POLICY_NONINTERACTIVE,
-            tool_manager=self.tm,
-        )
+        self.pm.policy = PermissionManager.POLICY_NONINTERACTIVE
         # safe 和 caution 直接放行不调 input；dangerous 直接拒绝也不调
-        assert pm.check(self._make_call("safe_tool")) is True
-        assert pm.check(self._make_call("caution_tool")) is True
-        assert pm.check(self._make_call("dangerous_tool")) is False
+        assert self.pm.check(self._make_call("safe_tool")) is True
+        assert self.pm.check(self._make_call("caution_tool")) is True
+        assert self.pm.check(self._make_call("dangerous_tool")) is False
 
         # auto_approve=True 时 dangerous 也放行，同样不调 input
         Config.load().subagent_auto_approve = True
-        assert pm.check(self._make_call("dangerous_tool")) is True
+        assert self.pm.check(self._make_call("dangerous_tool")) is True

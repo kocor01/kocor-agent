@@ -24,6 +24,10 @@ class ToolManager:
         self._tools: dict[str, ToolDefinition] = {}
         # 工具处理器字典：name → Callable（执行时按名查找）
         self._handlers: dict[str, Callable] = {}
+        # 权限管理器：工具调用的策略决策层
+        self.permission_mgr = PermissionManager(
+            policy=Config.load().permission_policy,
+        )
         # 文件状态追踪器：去重缓存、连续读检测、补丁失败计数
         self.file_state = FileStateTracker()
         # 本地执行环境（延迟初始化，首次 bash 调用时创建）
@@ -186,6 +190,7 @@ class ToolManager:
             timeout=timeout,
         )
         self._handlers[name] = handler
+        self.permission_mgr.update_safety(name, safety_level)
 
     def get_definitions(self) -> list[ToolDefinition]:
         """返回所有工具的 ToolDefinition 列表"""

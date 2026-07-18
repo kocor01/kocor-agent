@@ -159,7 +159,7 @@ class TestAssembleChildLoop:
 
     def test_noninteractive_permission(self):
         loop = self._make_loop(goal="test")
-        assert loop.permission_mgr.policy == "noninteractive"
+        assert loop.tool_manager.permission_mgr.policy == "noninteractive"
 
     def test_empty_hook_manager(self):
         loop = self._make_loop(goal="test")

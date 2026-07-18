@@ -83,6 +83,8 @@ class MockToolRegistry:
 
     def __init__(self):
         self.executed = []
+        self.permission_mgr = MagicMock()
+        self.permission_mgr.check.return_value = True
 
     def get_definitions(self, filter_category=None):
         return []
@@ -110,15 +112,13 @@ def _make_loop(llm_responses=None, max_iterations=10):
     llm = MockLLM(responses=llm_responses or [Message(role="assistant", content="ok")])
     mock_ctx = MockContext()
     tool_mgr = MockToolRegistry()
-    pm = MagicMock()
-    pm.check.return_value = True
+    tool_mgr.permission_mgr.check.return_value = True
     hm = HookManager()
     ee = EventEmitter()
     return Loop(
         llm=llm,
         context=mock_ctx,
         tool_manager=tool_mgr,
-        permission_mgr=pm,
         hook_manager=hm,
         event_emitter=ee,
         max_iterations=max_iterations,
@@ -382,7 +382,7 @@ class TestExecuteOneToolEdgeCases:
     def test_permission_denied_returns_error_message(self):
         """权限拒绝时返回 Permission Denied 消息给 LLM。"""
         loop = _make_loop()
-        loop.permission_mgr.check.return_value = False
+        loop.tool_manager.permission_mgr.check.return_value = False
 
         tc = ToolCall(id="call_1", function=FunctionCall(name="write_file", arguments='{"path": "/etc/passwd"}'))
         result = loop._execute_one_tool(tc)
@@ -417,14 +417,15 @@ class TestExecuteOneToolEdgeCases:
         class ErrorToolRegistry:
             skill_manager = None
 
+            def __init__(self):
+                self.permission_mgr = MagicMock()
+                self.permission_mgr.check.return_value = True
+
             def get_definitions(self, filter_category=None):
                 return []
 
             def execute(self, tool_call):
                 raise RuntimeError("connection timeout")
-
-            def start_cron_scheduler(self):
-                pass
 
             def stop_cron_scheduler(self):
                 pass

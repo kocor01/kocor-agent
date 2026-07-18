@@ -11,7 +11,6 @@ from kocor.config import Config
 from kocor.llm_provider.llm_client import LLMClient
 from kocor.llm_provider.message import Message
 from kocor.tools.definitions import ToolDefinition
-from kocor.tools.permission import PermissionManager
 
 
 class FakeLLMClient(LLMClient):
@@ -105,14 +104,13 @@ class TestAgentBuilderAssembly:
         builder._init_tool_manager()
         assert builder.tool_manager is not None
 
-    def test_init_permission_mgr(self):
-        """_init_permission_mgr 应创建 PermissionManager。"""
-        from kocor._cli.builder import AgentBuilder
-        builder = AgentBuilder()
-        builder._init_permission_mgr()
-        assert builder.permission_mgr is not None
+    def test_tool_manager_has_permission_mgr(self):
+        """ToolManager 初始化后应自带 PermissionManager。"""
+        from kocor.tools.tool_manager import ToolManager
+        tm = ToolManager()
+        assert tm.permission_mgr is not None
         # 默认策略为 default
-        assert builder.permission_mgr.policy == PermissionManager.POLICY_DEFAULT
+        assert tm.permission_mgr.policy == "default"
 
     def test_init_hook_manager(self, mock_llm_factory):
         """_init_hook_manager 应注册钩子。"""
@@ -156,7 +154,7 @@ class TestAgentBuilderAssembly:
         assert isinstance(agent, Agent)
         assert agent.llm is not None
         assert agent.tool_manager is not None
-        assert agent.permission_mgr is not None
+        assert agent.tool_manager.permission_mgr is not None
         # 新增组件：ctx、todo_store 应已装配
         assert agent.context is not None
         assert agent._todo_store is not None

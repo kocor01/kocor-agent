@@ -25,7 +25,6 @@ from kocor._stream_session import StreamSession
 from kocor.llm_provider.exceptions import LLMConnectionError, LLMTimeoutError
 from kocor.llm_provider.llm_client import LLMClient
 from kocor.llm_provider.message import Message, StreamChunk
-from kocor.tools.permission import PermissionManager
 from kocor.tools.tool_manager import ToolManager
 
 
@@ -43,7 +42,6 @@ class Loop:
         llm: LLMClient,
         context: ContextManager,
         tool_manager: ToolManager,
-        permission_mgr: PermissionManager,
         hook_manager: HookManager,
         event_emitter: EventEmitter,
         max_iterations: int,
@@ -51,7 +49,6 @@ class Loop:
         self.llm = llm
         self.context = context
         self.tool_manager = tool_manager
-        self.permission_mgr = permission_mgr
         self.hook_manager = hook_manager
         self.event_emitter = event_emitter
         self.max_iterations = max_iterations
@@ -292,7 +289,7 @@ class Loop:
         tool_name = tool_call.function.name
 
         # 阶段 1：权限检查——拒绝的回调反馈给 LLM，让其不再尝试
-        if not self.permission_mgr.check(tool_call):
+        if not self.tool_manager.permission_mgr.check(tool_call):
             return Message(
                 role="tool",
                 content="[Permission Denied] 用户拒绝了此工具调用，请勿再尝试使用此工具。",
