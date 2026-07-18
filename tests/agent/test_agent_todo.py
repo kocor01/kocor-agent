@@ -7,6 +7,7 @@ import json
 from kocor.agent import Agent
 from kocor.llm_provider.message import FunctionCall, Message, ToolCall
 from tests.agent.test_agent import FakeLLMClient
+from tests.conftest import make_agent
 
 
 def _todo_result(todos: list[dict]) -> str:
@@ -43,19 +44,19 @@ class TestAgentTodoWiring:
 
     def test_init_creates_todo_store(self):
         llm = FakeLLMClient([Message(role="assistant", content="ok")])
-        agent = Agent(llm=llm)
+        agent = make_agent(llm=llm)
         assert agent._todo_store is not None
         assert agent._todo_store.has_items() is False
 
     def test_todo_store_injected_to_tool_manager(self):
         llm = FakeLLMClient([Message(role="assistant", content="ok")])
-        agent = Agent(llm=llm)
+        agent = make_agent(llm=llm)
         assert agent.tool_manager.todo_store is agent._todo_store
 
     def test_todo_store_injected_to_context_manager(self):
         llm = FakeLLMClient([Message(role="assistant", content="ok")])
-        agent = Agent(llm=llm)
-        assert agent.ctx.todo_store is agent._todo_store
+        agent = make_agent(llm=llm)
+        assert agent.context.todo_store is agent._todo_store
 
 
 class TestAgentTodoHydrate:
@@ -64,7 +65,7 @@ class TestAgentTodoHydrate:
     def test_hydrate_restores_from_history_when_empty(self):
         """store 为空时，hydrate 从历史回填最后一次 todo 结果。"""
         llm = FakeLLMClient([Message(role="assistant", content="ok")])
-        agent = Agent(llm=llm)
+        agent = make_agent(llm=llm)
 
         history = [
             Message(role="user", content="start"),
@@ -83,7 +84,7 @@ class TestAgentTodoHydrate:
     def test_hydrate_skipped_when_store_nonempty(self):
         """store 非空时，hydrate 不覆盖实时状态。"""
         llm = FakeLLMClient([Message(role="assistant", content="ok")])
-        agent = Agent(llm=llm)
+        agent = make_agent(llm=llm)
         agent._todo_store.write([{"id": "9", "content": "live task", "status": "pending"}])
 
         history = [

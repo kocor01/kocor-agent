@@ -6,6 +6,7 @@ from kocor.agent import Agent
 from kocor.config import Config
 from kocor.llm_provider.llm_client import LLMClient
 from kocor.llm_provider.message import Message
+from tests.conftest import make_agent
 
 
 class FakeLLMClient(LLMClient):
@@ -36,14 +37,14 @@ class TestContextManagerIntegration:
     def test_default_agent_still_works(self):
         """默认配置的 Agent 应正常工作（向后兼容）。"""
         llm = FakeLLMClient()
-        agent = Agent(llm=llm)
+        agent = make_agent(llm=llm)
         result = agent.run("你好")
         assert result == "OK"
 
     def test_system_prompt_now_has_env_info(self):
         """使用 ContextBuilder 后 system prompt 应包含环境信息。"""
         llm = FakeLLMClient()
-        agent = Agent(llm=llm)
+        agent = make_agent(llm=llm)
         agent.run("你好")
         # 验证最后一次 LLM 请求的 system prompt
         system_msg = llm.last_messages[0]
@@ -51,18 +52,21 @@ class TestContextManagerIntegration:
         assert "当前工作目录" in system_msg.content
 
     def test_agent_with_memory_dir(self):
-        """配置 memory_dir 后 Agent 应自动创建 MemoryStore。"""
+        """配置 memory_dir 后 Agent 应加载记忆文件。"""
         import tempfile
         from pathlib import Path
+
+        from kocor.memory.store import MemoryStore
 
         mem_dir = tempfile.mkdtemp()
         # 预先写入一条记忆到 USER.md
         Path(mem_dir, "USER.md").write_text("用户: 张三", encoding="utf-8")
 
         llm = FakeLLMClient()
-        Config.load().memory_dir = mem_dir
+        store = MemoryStore(memory_dir=mem_dir, memory_limit=2200, user_limit=1375, user_enabled=True)
+        store.load_from_disk()
         try:
-            agent = Agent(llm=llm)
+            agent = make_agent(llm=llm, memory=store)
             agent.run("你好")
         finally:
             Config.load().memory_dir = None
@@ -73,7 +77,7 @@ class TestContextManagerIntegration:
     def test_agent_context_strategy_does_not_break(self):
         """配置 context_strategy 不影响基本功能。"""
         llm = FakeLLMClient()
-        agent = Agent(llm=llm)
+        agent = make_agent(llm=llm)
         result = agent.run("测试")
         assert result == "OK"
 
@@ -99,7 +103,7 @@ class TestContextManagerIntegration:
                 yield StreamChunk(is_final=True)
 
         llm = FakeStreamLLM()
-        agent = Agent(llm=llm)
+        agent = make_agent(llm=llm)
         list(agent.stream("你好"))
         system_msg = llm.last_messages[0]
         assert system_msg.role == "system"
@@ -129,7 +133,7 @@ class TestMultiTurnConversation:
                 raise NotImplementedError
 
         llm = HistoryTrackingLLM()
-        agent = Agent(llm=llm)
+        agent = make_agent(llm=llm)
 
         agent.run("第一轮问题")
         turn1_msgs = llm.all_calls[0]
@@ -163,7 +167,7 @@ class TestMultiTurnConversation:
                 raise NotImplementedError
 
         llm = TrackingLLM()
-        agent = Agent(llm=llm)
+        agent = make_agent(llm=llm)
 
         agent.run("问题1")
         agent.reset_conversation()

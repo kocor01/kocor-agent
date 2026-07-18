@@ -127,19 +127,9 @@ def main() -> None:
 
     logger = Logger(Config.load().log_level, log_dir=Config.load().log_dir)
 
-    # 使用 AgentBuilder 链式装配 Agent 及其所有依赖组件，
-    # 按依赖顺序：LLM → Subagent → 工具 → 权限 → 钩子 → 会话 → 组装
+    # 使用 AgentBuilder 装配 Agent 及其所有依赖组件
     from kocor._cli.builder import AgentBuilder
-    agent = (
-        AgentBuilder()
-        .build_llm()          # 先创建 LLM 客户端
-        .build_subagent()     # 再创建子代理运行器（需 LLM）
-        .build_tools()        # 注册所有工具（需 SubagentRunner）
-        .build_permission()   # 权限管理（需工具列表）
-        .build_hooks(logger)  # 钩子和事件订阅
-        .build_session()      # 可选的会话持久化
-        .build()              # 最终组装 Agent
-    )
+    agent = AgentBuilder().build(logger=logger)
 
     if is_repl:
         print()

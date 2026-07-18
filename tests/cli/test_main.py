@@ -7,14 +7,8 @@ from kocor.llm_provider.message import FunctionCall, StreamChunk, ToolCall
 
 
 def _make_mock_agent_builder(mock_agent: MagicMock) -> MagicMock:
-    """创建链式调用的 mock AgentBuilder。"""
+    """创建 mock AgentBuilder。"""
     mock_builder = MagicMock()
-    mock_builder.build_llm.return_value = mock_builder
-    mock_builder.build_subagent.return_value = mock_builder
-    mock_builder.build_tools.return_value = mock_builder
-    mock_builder.build_permission.return_value = mock_builder
-    mock_builder.build_hooks.return_value = mock_builder
-    mock_builder.build_session.return_value = mock_builder
     mock_builder.build.return_value = mock_agent
     return mock_builder
 

@@ -14,6 +14,7 @@ import pytest
 from kocor.agent import Agent
 from kocor.config import Config
 from kocor.llm_provider.llm_client import LLMClient
+from tests.conftest import make_agent
 from kocor.llm_provider.message import Message, StreamChunk, ToolResult
 from kocor.skill.skill_manager import SkillManager
 from kocor.skill.types import InvokeStrategy, SkillDefinition, SkillType
@@ -69,30 +70,30 @@ class TestHandleBuiltinCommands:
 
     def test_unknown_command_returns_none(self):
         """未知命令返回 None 走后续路由。"""
-        agent = Agent(llm=FakeLLMClient())
+        agent = make_agent(llm=FakeLLMClient())
         result = agent._handle_builtin_commands("/unknown")
         assert result is None
 
     def test_reset_command(self):
         """reset 命令重置会话。"""
         llm = FakeLLMClient([Message(role="assistant", content="hi")])
-        agent = Agent(llm=llm)
+        agent = make_agent(llm=llm)
         agent.run("你好")
-        assert len(agent.ctx.session_history) > 0
+        assert len(agent.context.session_history) > 0
 
         result = agent.run("/reset")
         assert "会话已重置" in result
-        assert len(agent.ctx.session_history) == 0
+        assert len(agent.context.session_history) == 0
 
     def test_new_command(self):
         """new 命令创建新会话。"""
-        agent = Agent(llm=FakeLLMClient())
+        agent = make_agent(llm=FakeLLMClient())
         result = agent.run("/new")
         assert "新会话" in result
 
     def test_sessions_command_without_session_manager(self):
         """无 session_manager 时 /sessions 返回提示。"""
-        agent = Agent(llm=FakeLLMClient())
+        agent = make_agent(llm=FakeLLMClient())
         result = agent.run("/sessions")
         # 没有 session_manager 时，/sessions 不是内置命令，走 skill 路由
         # 所以返回 None 对应内容
@@ -100,14 +101,14 @@ class TestHandleBuiltinCommands:
 
     def test_session_command_without_args(self):
         """无参数的 /session 命令。"""
-        agent = Agent(llm=FakeLLMClient())
+        agent = make_agent(llm=FakeLLMClient())
         result = agent.run("/session")
         # 没有 session_manager 时，走 skill 路由
         assert result is not None
 
     def test_reset_after_new_resets(self):
         """连续 /reset 和 /new 都正常工作。"""
-        agent = Agent(llm=FakeLLMClient())
+        agent = make_agent(llm=FakeLLMClient())
         r1 = agent.run("/reset")
         assert "会话已重置" in r1
         r2 = agent.run("/new")
@@ -128,7 +129,7 @@ class TestHandleSlashCommandEdgeCases:
         tool_mgr = ToolManager()
         tool_mgr.skill_manager = skill_mgr
 
-        agent = Agent(llm=FakeLLMClient(), tool_manager=tool_mgr)
+        agent = make_agent(llm=FakeLLMClient(), tool_manager=tool_mgr)
         result = agent.run("/nonexistent")
         assert "Unknown skill" in result
         assert "nonexistent" in result
@@ -146,7 +147,7 @@ class TestHandleSlashCommandEdgeCases:
         tool_mgr = ToolManager()
         tool_mgr.skill_manager = skill_mgr
 
-        agent = Agent(llm=FakeLLMClient(), tool_manager=tool_mgr)
+        agent = make_agent(llm=FakeLLMClient(), tool_manager=tool_mgr)
         result = agent.run("/code_only")
         assert "cannot be invoked" in result
 
@@ -163,7 +164,7 @@ class TestHandleSlashCommandEdgeCases:
         tool_mgr = ToolManager()
         tool_mgr.skill_manager = skill_mgr
 
-        agent = Agent(llm=FakeLLMClient(), tool_manager=tool_mgr)
+        agent = make_agent(llm=FakeLLMClient(), tool_manager=tool_mgr)
         result = agent.run("/hello world")
         assert result == "Hello, world!"
 
@@ -181,7 +182,7 @@ class TestHandleSlashCommandEdgeCases:
         tool_mgr = ToolManager()
         tool_mgr.skill_manager = skill_mgr
 
-        agent = Agent(llm=FakeLLMClient([Message(role="assistant", content="这是回答")]), tool_manager=tool_mgr)
+        agent = make_agent(llm=FakeLLMClient([Message(role="assistant", content="这是回答")]), tool_manager=tool_mgr)
         result = agent.run("/ask 你好吗")
         assert result == "这是回答"
 
@@ -199,7 +200,7 @@ class TestHandleSlashCommandEdgeCases:
         tool_mgr = ToolManager()
         tool_mgr.skill_manager = skill_mgr
 
-        agent = Agent(llm=FakeLLMClient([Message(role="assistant", content="专家回答")]), tool_manager=tool_mgr)
+        agent = make_agent(llm=FakeLLMClient([Message(role="assistant", content="专家回答")]), tool_manager=tool_mgr)
         result = agent.run("/system_prompt")
         assert result == "专家回答"
 
@@ -223,7 +224,7 @@ class TestHandleSlashCommandEdgeCases:
         tool_mgr = ToolManager()
         tool_mgr.skill_manager = skill_mgr
 
-        agent = Agent(llm=FakeLLMClient(), tool_manager=tool_mgr)
+        agent = make_agent(llm=FakeLLMClient(), tool_manager=tool_mgr)
         result = agent._list_slash_skills()
         assert "/a_skill" in result
         assert "/b_skill" in result
@@ -244,7 +245,7 @@ class TestStreamSlashCommand:
         tool_mgr = ToolManager()
         tool_mgr.skill_manager = skill_mgr
 
-        agent = Agent(llm=FakeLLMClient(), tool_manager=tool_mgr)
+        agent = make_agent(llm=FakeLLMClient(), tool_manager=tool_mgr)
         chunks = list(agent.stream("/unknown"))
         assert len(chunks) == 1
         assert chunks[0].is_final is True
@@ -260,22 +261,22 @@ class TestStreamSlashCommand:
         tool_mgr = ToolManager()
         tool_mgr.skill_manager = skill_mgr
 
-        agent = Agent(llm=FakeLLMClient(), tool_manager=tool_mgr)
+        agent = make_agent(llm=FakeLLMClient(), tool_manager=tool_mgr)
         chunks = list(agent.stream("/ping"))
         assert len(chunks) == 1
         assert chunks[0].content == "pong"
 
     def test_stream_builtin_reset(self):
         """流模式中 /reset 内置命令。"""
-        agent = Agent(llm=FakeLLMClient())
+        agent = make_agent(llm=FakeLLMClient())
         # 先运行一条消息建立会话
         agent.run("hello")
-        assert len(agent.ctx.session_history) > 0
+        assert len(agent.context.session_history) > 0
 
         chunks = list(agent.stream("/reset"))
         assert len(chunks) == 1
         assert "会话已重置" in chunks[0].content
-        assert len(agent.ctx.session_history) == 0
+        assert len(agent.context.session_history) == 0
 
 
 # ═══════════════════════════════════════════════
@@ -288,14 +289,14 @@ class TestCheckNudge:
 
     def test_nudge_not_called_without_memory(self):
         """无 MemoryStore 时 nudge 不触发。"""
-        agent = Agent(llm=FakeLLMClient())
+        agent = make_agent(llm=FakeLLMClient())
         with patch.object(agent, '_background_reviewer', None):
             # 不会报错
             agent._check_nudge()
 
     def test_nudge_interval_respected(self):
         """到达 nudge_interval 时触发审查。"""
-        agent = Agent(llm=FakeLLMClient())
+        agent = make_agent(llm=FakeLLMClient())
         # 模拟 MemoryStore 和 BackgroundReviewer
         mock_reviewer = MagicMock()
         agent._background_reviewer = mock_reviewer
@@ -361,12 +362,12 @@ class TestSessionManagementEdgeCases:
 
     def test_session_before_run_without_manager(self):
         """无 session_manager 时 _session_before_run 不报错。"""
-        agent = Agent(llm=FakeLLMClient())
+        agent = make_agent(llm=FakeLLMClient())
         agent._session_before_run()  # 不应报错
 
     def test_session_after_run_without_manager(self):
         """无 session_manager 时 _session_after_run 不报错。"""
-        agent = Agent(llm=FakeLLMClient())
+        agent = make_agent(llm=FakeLLMClient())
         agent._session_after_run()  # 不应报错
 
     def test_session_before_run_auto_reset_injects_notification(self, session_manager):
@@ -378,7 +379,7 @@ class TestSessionManagementEdgeCases:
         policy = SessionResetPolicy(mode="idle", idle_minutes=60)
         sm = SessionManager(store=session_manager.store, policy=policy)
 
-        agent = Agent(llm=FakeLLMClient([Message(role="assistant", content="ok")]), session_manager=sm)
+        agent = make_agent(llm=FakeLLMClient([Message(role="assistant", content="ok")]), session_manager=sm)
 
         # 第一次运行创建会话
         agent.run("first")
@@ -398,7 +399,7 @@ class TestSessionManagementEdgeCases:
 
     def test_session_after_run_updates_metadata(self, session_manager):
         """_session_after_run 更新会话元数据。"""
-        agent = Agent(
+        agent = make_agent(
             llm=FakeLLMClient([Message(role="assistant", content="ok")]),
             session_manager=session_manager,
         )
@@ -410,7 +411,7 @@ class TestSessionManagementEdgeCases:
 
     def test_session_after_run_handles_missing_entry(self, session_manager):
         """会话条目不存在时 _session_after_run 不报错。"""
-        agent = Agent(
+        agent = make_agent(
             llm=FakeLLMClient([Message(role="assistant", content="ok")]),
             session_manager=session_manager,
         )
@@ -425,7 +426,7 @@ class TestSessionManagementEdgeCases:
             Message(role="assistant", content="回答 2"),
             Message(role="assistant", content="回答 3"),
         ])
-        agent = Agent(llm=llm, session_manager=session_manager)
+        agent = make_agent(llm=llm, session_manager=session_manager)
 
         agent.run("消息 1")
         agent.run("消息 2")
@@ -437,7 +438,7 @@ class TestSessionManagementEdgeCases:
 
     def test_switch_session_with_invalid_id(self, session_manager):
         """切换到不存在的会话 ID 返回提示。"""
-        agent = Agent(
+        agent = make_agent(
             llm=FakeLLMClient([Message(role="assistant", content="ok")]),
             session_manager=session_manager,
         )
@@ -472,7 +473,7 @@ class TestAgentStopReset:
     def test_stop_resets_cron_flag(self):
         """stop() 重置 cron 启动标志。"""
         tool_mgr = MagicMock()
-        agent = Agent(llm=FakeLLMClient(), tool_manager=tool_mgr)
+        agent = make_agent(llm=FakeLLMClient(), tool_manager=tool_mgr)
         agent._cron_started = True
 
         agent.stop()
@@ -482,17 +483,17 @@ class TestAgentStopReset:
 
     def test_reset_conversation_clears_history(self):
         """reset_conversation() 清空历史。"""
-        agent = Agent(llm=FakeLLMClient([Message(role="assistant", content="ok")]))
+        agent = make_agent(llm=FakeLLMClient([Message(role="assistant", content="ok")]))
         agent.run("hello")
-        assert len(agent.ctx.session_history) > 0
+        assert len(agent.context.session_history) > 0
 
         agent.reset_conversation()
-        assert len(agent.ctx.session_history) == 0
+        assert len(agent.context.session_history) == 0
         assert agent._persisted_msg_idx == 0
 
     def test_reset_conversation_with_session_manager(self, session_manager):
         """reset_conversation() 同时重置会话管理器。"""
-        agent = Agent(
+        agent = make_agent(
             llm=FakeLLMClient([Message(role="assistant", content="ok")]),
             session_manager=session_manager,
         )
@@ -517,7 +518,7 @@ class TestAgentLightweightInit:
 
     def test_llm_only(self):
         """仅传 llm 的极简初始化。"""
-        agent = Agent(llm=FakeLLMClient())
+        agent = make_agent(llm=FakeLLMClient())
         assert agent.tool_manager is not None
         assert agent.permission_mgr is not None
         assert agent.hook_manager is not None
@@ -527,21 +528,21 @@ class TestAgentLightweightInit:
 
     def test_minimal_agent_runs(self):
         """极简初始化的 Agent 能运行。"""
-        agent = Agent(llm=FakeLLMClient([Message(role="assistant", content="hello")]))
+        agent = make_agent(llm=FakeLLMClient([Message(role="assistant", content="hello")]))
         result = agent.run("hi")
         assert result == "hello"
 
     def test_minimal_agent_streams(self):
         """极简初始化的 Agent 能流式运行。"""
         llm = FakeLLMClient([Message(role="assistant", content="hello")])
-        agent = Agent(llm=llm)
+        agent = make_agent(llm=llm)
         chunks = list(agent.stream("hi"))
         contents = [c.content for c in chunks if c.content]
         assert "hello" in "".join(contents)
 
     def test_agent_handle_builtin_commands_without_session(self):
         """无 session_manager 时内置命令不报错。"""
-        agent = Agent(llm=FakeLLMClient())
+        agent = make_agent(llm=FakeLLMClient())
 
         # 不需要 session 的命令
         assert agent._handle_builtin_commands("/reset") is not None

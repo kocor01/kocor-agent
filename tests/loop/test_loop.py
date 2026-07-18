@@ -2,6 +2,7 @@
 
 from kocor.agent import Agent
 from kocor.event.event_manager import EventEmitter, EventType
+from tests.conftest import make_agent
 from kocor.hook.base import HookAction, HookPoint, HookResult
 from kocor.hook.hook_manager import HookManager
 from kocor.llm_provider.message import FunctionCall, Message, StreamChunk, ToolCall
@@ -83,14 +84,14 @@ class TestAgentLoop:
                 Message(role="assistant", content="Hello! How can I help?"),
             ]
         )
-        agent = Agent(
+        agent = make_agent(
             llm=llm,
             tool_manager=MockToolRegistry(),
             permission_mgr=PermissionManager(policy=PermissionManager.POLICY_PERMISSIVE),
         )
         result = agent.run("hi")
         assert result == "Hello! How can I help?"
-        assert agent.ctx.iteration == 1
+        assert agent.context.iteration == 1
 
     def test_single_tool_call(self):
         """Agent 执行工具并返回结果。"""
@@ -106,14 +107,14 @@ class TestAgentLoop:
                 Message(role="assistant", content="The file contains: hello"),
             ]
         )
-        agent = Agent(
+        agent = make_agent(
             llm=llm,
             tool_manager=MockToolRegistry(),
             permission_mgr=PermissionManager(policy=PermissionManager.POLICY_PERMISSIVE),
         )
         result = agent.run("read test.txt")
         assert "hello" in result
-        assert agent.ctx.iteration == 2
+        assert agent.context.iteration == 2
 
     def test_multiple_tool_calls_one_iteration(self):
         """Agent 在一次 LLM 响应中处理多个工具调用。"""
@@ -130,7 +131,7 @@ class TestAgentLoop:
                 Message(role="assistant", content="Both files read."),
             ]
         )
-        agent = Agent(
+        agent = make_agent(
             llm=llm,
             tool_manager=MockToolRegistry(),
             permission_mgr=PermissionManager(policy=PermissionManager.POLICY_PERMISSIVE),
@@ -158,7 +159,7 @@ class TestAgentLoop:
             ]
         )
         pm = PermissionManager(policy=PermissionManager.POLICY_STRICT, always_ask={"write_file"})
-        agent = Agent(
+        agent = make_agent(
             llm=llm,
             tool_manager=MockToolRegistry(),
             permission_mgr=pm,
@@ -174,7 +175,7 @@ class TestAgentLoop:
             tool_calls=[ToolCall(id="call_1", function=FunctionCall(name="read_file", arguments='{"path": "x.txt"}'))],
         )
         llm = MockLLM(responses=[tool_response] * 10)
-        agent = Agent(
+        agent = make_agent(
             llm=llm,
             tool_manager=MockToolRegistry(),
             permission_mgr=PermissionManager(policy=PermissionManager.POLICY_PERMISSIVE),
@@ -182,7 +183,7 @@ class TestAgentLoop:
         )
         result = agent.run("do work")
         assert "迭代" in result or "限制" in result
-        assert agent.ctx.iteration <= 3
+        assert agent.context.iteration <= 3
 
     def test_pre_generate_event(self):
         """事件发射器触发 pre_generate 事件。"""
@@ -191,7 +192,7 @@ class TestAgentLoop:
         emitter.subscribe(EventType.PRE_GENERATE, lambda e: events.append(e))
 
         llm = MockLLM(responses=[Message(role="assistant", content="ok")])
-        agent = Agent(
+        agent = make_agent(
             llm=llm,
             tool_manager=MockToolRegistry(),
             permission_mgr=PermissionManager(policy=PermissionManager.POLICY_PERMISSIVE),
@@ -225,7 +226,7 @@ class TestAgentLoop:
                 Message(role="assistant", content="done"),
             ]
         )
-        agent = Agent(
+        agent = make_agent(
             llm=llm,
             tool_manager=MockToolRegistry(),
             permission_mgr=PermissionManager(policy=PermissionManager.POLICY_PERMISSIVE),
@@ -267,7 +268,7 @@ class TestAgentLoop:
                 Message(role="assistant", content="There was an error."),
             ]
         )
-        agent = Agent(
+        agent = make_agent(
             llm=llm,
             tool_manager=ErrorToolRegistry(),
             permission_mgr=PermissionManager(policy=PermissionManager.POLICY_PERMISSIVE, always_allow={"write_file"}),
@@ -278,7 +279,7 @@ class TestAgentLoop:
     def test_stream_basic(self):
         """流模式应产出数据块。"""
         llm = MockLLM(responses=[Message(role="assistant", content="streaming result")])
-        agent = Agent(
+        agent = make_agent(
             llm=llm,
             tool_manager=MockToolRegistry(),
             permission_mgr=PermissionManager(policy=PermissionManager.POLICY_PERMISSIVE),
@@ -302,7 +303,7 @@ class TestAgentLoop:
                 Message(role="assistant", content="Final answer"),
             ]
         )
-        agent = Agent(
+        agent = make_agent(
             llm=llm,
             tool_manager=MockToolRegistry(),
             permission_mgr=PermissionManager(policy=PermissionManager.POLICY_PERMISSIVE),
@@ -320,7 +321,7 @@ class TestAgentLoop:
             tool_calls=[ToolCall(id="call_1", function=FunctionCall(name="read_file", arguments='{"path": "x.txt"}'))],
         )
         llm = MockLLM(responses=[tool_response] * 5)
-        agent = Agent(
+        agent = make_agent(
             llm=llm,
             tool_manager=MockToolRegistry(),
             permission_mgr=PermissionManager(policy=PermissionManager.POLICY_PERMISSIVE),
@@ -363,20 +364,20 @@ class TestAgentLoop:
                 Message(role="assistant", content="done reading big file"),
             ]
         )
-        agent = Agent(
+        agent = make_agent(
             llm=llm,
             tool_manager=LongResultToolRegistry(),
             permission_mgr=PermissionManager(policy=PermissionManager.POLICY_PERMISSIVE),
         )
         agent.run("read big file")
-        tool_messages = [m for m in agent.ctx.messages if m.role == "tool"]
+        tool_messages = [m for m in agent.context.messages if m.role == "tool"]
         if tool_messages:
             assert len(tool_messages[-1].content) < len(long_content)
 
     def test_run_with_empty_input(self):
         """空输入也能正常运行。"""
         llm = MockLLM(responses=[Message(role="assistant", content="")])
-        agent = Agent(
+        agent = make_agent(
             llm=llm,
             tool_manager=MockToolRegistry(),
             permission_mgr=PermissionManager(policy=PermissionManager.POLICY_PERMISSIVE),
@@ -398,13 +399,13 @@ class TestLoopPublicEntry:
     def test_run_messages_is_public(self):
         """run_messages 为公共方法，可对预置的 ctx.messages 运行循环。"""
         llm = MockLLM(responses=[Message(role="assistant", content="公共入口回复")])
-        agent = Agent(
+        agent = make_agent(
             llm=llm,
             tool_manager=MockToolRegistry(),
             permission_mgr=PermissionManager(policy=PermissionManager.POLICY_PERMISSIVE),
         )
         # 模拟 PROMPT 技能路径：调用方已构造好 messages，直接进入循环
-        agent.ctx.messages = [
+        agent.context.messages = [
             Message(role="system", content="system"),
             Message(role="user", content="hello"),
         ]
@@ -414,35 +415,35 @@ class TestLoopPublicEntry:
     def test_run_messages_auto_extracts_session_history(self):
         """循环结束后 session_history 自动填充，无需外部调用 extract。"""
         llm = MockLLM(responses=[Message(role="assistant", content="回复X")])
-        agent = Agent(
+        agent = make_agent(
             llm=llm,
             tool_manager=MockToolRegistry(),
             permission_mgr=PermissionManager(policy=PermissionManager.POLICY_PERMISSIVE),
         )
-        agent.ctx.messages = [
+        agent.context.messages = [
             Message(role="system", content="system"),
             Message(role="user", content="hello"),
         ]
         agent.loop.run_messages()
-        roles = [m.role for m in agent.ctx.session_history]
+        roles = [m.role for m in agent.context.session_history]
         assert "user" in roles
         assert "assistant" in roles
 
     def test_stream_messages_is_public_and_auto_extracts(self):
         """stream_messages 为公共方法，消费完毕后 session_history 自动填充。"""
         llm = MockLLM(responses=[Message(role="assistant", content="流式回复")])
-        agent = Agent(
+        agent = make_agent(
             llm=llm,
             tool_manager=MockToolRegistry(),
             permission_mgr=PermissionManager(policy=PermissionManager.POLICY_PERMISSIVE),
         )
-        agent.ctx.messages = [
+        agent.context.messages = [
             Message(role="system", content="system"),
             Message(role="user", content="hello"),
         ]
         chunks = list(agent.loop.stream_messages())
         assert len(chunks) > 0
-        roles = [m.role for m in agent.ctx.session_history]
+        roles = [m.role for m in agent.context.session_history]
         assert "assistant" in roles
 
 
@@ -458,7 +459,7 @@ class TestDuplicateToolCallDetection:
             tool_calls=[ToolCall(id="call_1", function=FunctionCall(name="search", arguments='{"q": "test"}'))],
         )
         llm = MockLLM(responses=[tool_response] * 3 + [Message(role="assistant", content="done")])
-        agent = Agent(
+        agent = make_agent(
             llm=llm,
             tool_manager=MockToolRegistry(),
             permission_mgr=PermissionManager(policy=PermissionManager.POLICY_PERMISSIVE),
@@ -476,7 +477,7 @@ class TestDuplicateToolCallDetection:
             tool_calls=[ToolCall(id="call_1", function=FunctionCall(name="search", arguments='{"q": "test"}'))],
         )
         llm = MockLLM(responses=[tool_response] * 5)
-        agent = Agent(
+        agent = make_agent(
             llm=llm,
             tool_manager=MockToolRegistry(),
             permission_mgr=PermissionManager(policy=PermissionManager.POLICY_PERMISSIVE),
@@ -485,7 +486,7 @@ class TestDuplicateToolCallDetection:
         result = agent.run("search")
         # 在第 3 次迭代时检测到重复，提前终止（而不是等 10 次预算用完）
         assert "重复" in result
-        assert agent.ctx.iteration == 3
+        assert agent.context.iteration == 3
 
     def test_duplicate_detection_resets_on_different_call(self):
         """不同工具调用会重置重复计数。"""
@@ -508,7 +509,7 @@ class TestDuplicateToolCallDetection:
             Message(role="assistant", content="done"),
         ]
         llm = MockLLM(responses=responses)
-        agent = Agent(
+        agent = make_agent(
             llm=llm,
             tool_manager=MockToolRegistry(),
             permission_mgr=PermissionManager(policy=PermissionManager.POLICY_PERMISSIVE),
@@ -525,7 +526,7 @@ class TestDuplicateToolCallDetection:
             tool_calls=[ToolCall(id="call_1", function=FunctionCall(name="search", arguments='{"q": "test"}'))],
         )
         llm = MockLLM(responses=[tool_response] * 5)
-        agent = Agent(
+        agent = make_agent(
             llm=llm,
             tool_manager=MockToolRegistry(),
             permission_mgr=PermissionManager(policy=PermissionManager.POLICY_PERMISSIVE),
@@ -557,7 +558,7 @@ class TestDuplicateToolCallDetection:
             Message(role="assistant", content="done"),
         ]
         llm = MockLLM(responses=responses)
-        agent = Agent(
+        agent = make_agent(
             llm=llm,
             tool_manager=MockToolRegistry(),
             permission_mgr=PermissionManager(policy=PermissionManager.POLICY_PERMISSIVE),
@@ -575,7 +576,7 @@ class TestDuplicateToolCallDetection:
 
         # 第一次运行：连续相同调用触发检测
         llm1 = MockLLM(responses=[tool_response] * 5)
-        agent = Agent(
+        agent = make_agent(
             llm=llm1,
             tool_manager=MockToolRegistry(),
             permission_mgr=PermissionManager(policy=PermissionManager.POLICY_PERMISSIVE),
@@ -615,7 +616,7 @@ class TestDuplicateToolCallDetection:
             ],
         )
         llm = MockLLM(responses=[multi_tool] * 5)
-        agent = Agent(
+        agent = make_agent(
             llm=llm,
             tool_manager=MockToolRegistry(),
             permission_mgr=PermissionManager(policy=PermissionManager.POLICY_PERMISSIVE),
@@ -624,7 +625,7 @@ class TestDuplicateToolCallDetection:
         result = agent.run("read both")
         assert "重复" in result
         # 在第 3 次迭代时触发
-        assert agent.ctx.iteration == 3
+        assert agent.context.iteration == 3
 
 
 # ── 停止/中断机制 ──
@@ -642,7 +643,7 @@ class TestAgentStop:
         )
         llm = MockLLM(responses=[tool_response] * 10)
         hook_manager = HookManager()
-        agent = Agent(
+        agent = make_agent(
             llm=llm,
             tool_manager=MockToolRegistry(),
             permission_mgr=PermissionManager(policy=PermissionManager.POLICY_PERMISSIVE),
@@ -666,14 +667,14 @@ class TestAgentStop:
 
         # 应在预算耗尽前停止
         assert "终止" in result or "已停止" in result or "stop" in result.lower()
-        assert agent.ctx.iteration < 10
+        assert agent.context.iteration < 10
         # 停止后 agent 应可再次运行
         assert agent.loop._stop_requested is False
 
     def test_agent_stop_does_not_break_next_run(self):
         """stop() 不会影响下一次正常执行。"""
         llm = MockLLM(responses=[Message(role="assistant", content="第二次运行正常")])
-        agent = Agent(
+        agent = make_agent(
             llm=llm,
             tool_manager=MockToolRegistry(),
             permission_mgr=PermissionManager(policy=PermissionManager.POLICY_PERMISSIVE),
@@ -692,7 +693,7 @@ class TestAgentStop:
         )
         llm = MockLLM(responses=[tool_response] * 10)
         hook_manager = HookManager()
-        agent = Agent(
+        agent = make_agent(
             llm=llm,
             tool_manager=MockToolRegistry(),
             permission_mgr=PermissionManager(policy=PermissionManager.POLICY_PERMISSIVE),
@@ -726,7 +727,7 @@ class TestAgentStop:
             def generate(self, messages, tools=None):
                 raise KeyboardInterrupt()
 
-        agent = Agent(
+        agent = make_agent(
             llm=InterruptingLLM(responses=[]),
             tool_manager=MockToolRegistry(),
             permission_mgr=PermissionManager(policy=PermissionManager.POLICY_PERMISSIVE),
@@ -744,7 +745,7 @@ class TestAgentStop:
             def stream(self, messages, tools=None):
                 raise KeyboardInterrupt()
 
-        agent = Agent(
+        agent = make_agent(
             llm=InterruptingStreamLLM(responses=[]),
             tool_manager=MockToolRegistry(),
             permission_mgr=PermissionManager(policy=PermissionManager.POLICY_PERMISSIVE),
@@ -785,7 +786,7 @@ class TestHookActions:
 
         hook_manager.register(AbortHook())
 
-        agent = Agent(
+        agent = make_agent(
             llm=llm,
             tool_manager=MockToolRegistry(),
             permission_mgr=PermissionManager(policy=PermissionManager.POLICY_PERMISSIVE),
@@ -794,7 +795,7 @@ class TestHookActions:
         result = agent.run("test")
         # 立即返回，不执行工具、不进入下一轮
         assert result == "I'll call a tool"
-        assert agent.ctx.iteration == 1
+        assert agent.context.iteration == 1
 
     def test_post_generate_abort_terminates_stream(self):
         """流模式下 POST_GENERATE ABORT 终止循环。"""
@@ -819,7 +820,7 @@ class TestHookActions:
 
         hook_manager.register(AbortHook())
 
-        agent = Agent(
+        agent = make_agent(
             llm=llm,
             tool_manager=MockToolRegistry(),
             permission_mgr=PermissionManager(policy=PermissionManager.POLICY_PERMISSIVE),
@@ -831,7 +832,7 @@ class TestHookActions:
         assert len(final) >= 1
         assert any("I'll call a tool" in (c.content or "") for c in final)
         # 工具不应被执行
-        assert agent.ctx.iteration == 1
+        assert agent.context.iteration == 1
 
     def test_post_generate_abort_skips_execution(self):
         """POST_GENERATE 返回 ABORT 时跳过工具执行。"""
@@ -857,7 +858,7 @@ class TestHookActions:
 
         hook_manager.register(AbortHook())
 
-        agent = Agent(
+        agent = make_agent(
             llm=llm,
             tool_manager=tool_registry,
             permission_mgr=PermissionManager(policy=PermissionManager.POLICY_PERMISSIVE),
@@ -892,7 +893,7 @@ class TestHookActions:
 
         hook_manager.register(AbortHook())
 
-        agent = Agent(
+        agent = make_agent(
             llm=llm,
             tool_manager=tool_registry,
             permission_mgr=PermissionManager(policy=PermissionManager.POLICY_PERMISSIVE),
@@ -929,7 +930,7 @@ class TestHookActions:
 
         hook_manager.register(AbortHook())
 
-        agent = Agent(
+        agent = make_agent(
             llm=llm,
             tool_manager=MockToolRegistry(),
             permission_mgr=PermissionManager(policy=PermissionManager.POLICY_PERMISSIVE),
@@ -953,7 +954,7 @@ class TestHookActions:
 
         hook_manager.register(AbortHook())
 
-        agent = Agent(
+        agent = make_agent(
             llm=llm,
             tool_manager=MockToolRegistry(),
             permission_mgr=PermissionManager(policy=PermissionManager.POLICY_PERMISSIVE),
@@ -961,7 +962,7 @@ class TestHookActions:
         )
         result = agent.run("test")
         assert result == ""  # ABORT 时返回空字符串
-        assert agent.ctx.iteration == 1  # 迭代计数已增加，但不执行 LLM 生成
+        assert agent.context.iteration == 1  # 迭代计数已增加，但不执行 LLM 生成
 
     def test_pre_generate_abort_terminates_stream(self):
         """流模式下 PRE_GENERATE ABORT 终止循环。"""
@@ -976,7 +977,7 @@ class TestHookActions:
 
         hook_manager.register(AbortHook())
 
-        agent = Agent(
+        agent = make_agent(
             llm=llm,
             tool_manager=MockToolRegistry(),
             permission_mgr=PermissionManager(policy=PermissionManager.POLICY_PERMISSIVE),
@@ -985,7 +986,7 @@ class TestHookActions:
         chunks = list(agent.stream("test"))
         # 应有一个 final chunk
         assert any(c.is_final for c in chunks)
-        assert agent.ctx.iteration == 1
+        assert agent.context.iteration == 1
 
     def test_pre_tool_abort_skips_tool(self):
         """PRE_TOOL 返回 ABORT 时跳过工具（同 SKIP_TOOL）。"""
@@ -1012,7 +1013,7 @@ class TestHookActions:
 
         hook_manager.register(AbortHook())
 
-        agent = Agent(
+        agent = make_agent(
             llm=llm,
             tool_manager=tool_registry,
             permission_mgr=PermissionManager(policy=PermissionManager.POLICY_PERMISSIVE),
@@ -1053,7 +1054,7 @@ class TestHookActions:
 
         hook_manager.register(AbortAfterToolHook())
 
-        agent = Agent(
+        agent = make_agent(
             llm=llm,
             tool_manager=tool_registry,
             permission_mgr=PermissionManager(policy=PermissionManager.POLICY_PERMISSIVE),
@@ -1093,7 +1094,7 @@ class TestHookActions:
 
         hook_manager.register(AbortOnErrorHook())
 
-        agent = Agent(
+        agent = make_agent(
             llm=llm,
             tool_manager=ErrorToolRegistry(),
             permission_mgr=PermissionManager(policy=PermissionManager.POLICY_PERMISSIVE),

@@ -4,6 +4,7 @@ from unittest.mock import MagicMock
 
 from kocor.agent import Agent
 from kocor.llm_provider.message import Message, StreamChunk
+from tests.conftest import make_agent
 from kocor.skill.skill_manager import SkillManager
 from kocor.skill.types import InvokeStrategy, SkillDefinition, SkillType
 from kocor.tools.tool_manager import ToolManager
@@ -25,7 +26,7 @@ class TestSlashCommandRun:
         skill_registry = SkillManager()
         tool_manager = ToolManager()
         tool_manager.skill_manager = skill_registry
-        agent = Agent(
+        agent = make_agent(
             llm=_make_mock_llm(),
             tool_manager=tool_manager,
         )
@@ -50,7 +51,7 @@ class TestSlashCommandRun:
         )
         skill_registry.register(skill)
 
-        agent = Agent(
+        agent = make_agent(
             llm=_make_mock_llm(),
             tool_manager=tool_manager,
         )
@@ -74,7 +75,7 @@ class TestSlashCommandRun:
         )
         skill_registry.register(skill)
 
-        agent = Agent(
+        agent = make_agent(
             llm=_make_mock_llm(),
             tool_manager=tool_manager,
         )
@@ -96,7 +97,7 @@ class TestSlashCommandRun:
         )
         skill_registry.register(skill)
 
-        agent = Agent(
+        agent = make_agent(
             llm=llm,
             tool_manager=tool_manager,
         )
@@ -121,7 +122,7 @@ class TestSlashCommandRun:
         )
         skill_registry.register(skill)
 
-        agent = Agent(
+        agent = make_agent(
             llm=_make_mock_llm(),
             tool_manager=tool_manager,
         )
@@ -143,7 +144,7 @@ class TestSlashCommandRun:
         )
         skill_registry.register(skill)
 
-        agent = Agent(
+        agent = make_agent(
             llm=_make_mock_llm(),
             tool_manager=tool_manager,
         )
@@ -166,7 +167,7 @@ class TestSlashCommandRun:
         )
         skill_registry.register(skill)
 
-        agent = Agent(
+        agent = make_agent(
             llm=llm,
             tool_manager=tool_manager,
         )
@@ -178,7 +179,7 @@ class TestSlashCommandRun:
         tool_manager = ToolManager()
         tool_manager.skill_manager = skill_registry
         llm = _make_mock_llm("normal answer")
-        agent = Agent(
+        agent = make_agent(
             llm=llm,
             tool_manager=tool_manager,
         )
@@ -206,7 +207,7 @@ class TestSlashCommandStream:
         )
         skill_registry.register(skill)
 
-        agent = Agent(
+        agent = make_agent(
             llm=_make_mock_llm(),
             tool_manager=tool_manager,
         )
@@ -219,7 +220,7 @@ class TestSlashCommandStream:
         skill_registry = SkillManager()
         tool_manager = ToolManager()
         tool_manager.skill_manager = skill_registry
-        agent = Agent(
+        agent = make_agent(
             llm=_make_mock_llm(),
             tool_manager=tool_manager,
         )
@@ -235,7 +236,7 @@ class TestSlashCommandStream:
             StreamChunk(content="answer", is_final=True),
         ])
 
-        agent = Agent(
+        agent = make_agent(
             llm=llm,
             tool_manager=tool_manager,
         )
@@ -247,7 +248,7 @@ class TestNoSkills:
     """测试没有 skill registry 时的行为"""
 
     def test_run_without_skills(self):
-        agent = Agent(llm=_make_mock_llm("ok"))
+        agent = make_agent(llm=_make_mock_llm("ok"))
         result = agent.run("hello")
         assert result == "ok"
 
@@ -256,6 +257,6 @@ class TestNoSkills:
         llm.stream.return_value = iter([
             StreamChunk(content="result", is_final=True),
         ])
-        agent = Agent(llm=llm)
+        agent = make_agent(llm=llm)
         chunks = list(agent.stream("hello"))
         assert chunks[0].content == "result"

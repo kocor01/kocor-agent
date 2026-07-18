@@ -109,46 +109,46 @@ class TestAssembleChildLoop:
 
     def test_loop_runs_goal_in_user_message(self):
         loop = self._make_loop(goal="测试目标")
-        assert len(loop.ctx.messages) == 2
-        assert loop.ctx.messages[0].role == "system"
-        assert loop.ctx.messages[1].role == "user"
-        assert "测试目标" in loop.ctx.messages[1].content
+        assert len(loop.context.messages) == 2
+        assert loop.context.messages[0].role == "system"
+        assert loop.context.messages[1].role == "user"
+        assert "测试目标" in loop.context.messages[1].content
 
     def test_context_included_in_user_message(self):
         loop = self._make_loop(goal="修复 bug", context="文件路径: /tmp/a.py")
-        content = loop.ctx.messages[1].content
+        content = loop.context.messages[1].content
         assert "文件路径: /tmp/a.py" in content
         assert "上下文:" in content
 
     def test_depth_zero_leaf_strips_subagent(self):
         Config.load().subagent_max_depth = 1
         loop = self._make_loop(goal="test", depth=0, max_depth=1)
-        names = set(d.name for d in loop.ctx.tool_definitions)
+        names = set(d.name for d in loop.context.tool_definitions)
         assert "subagent" not in names
 
     def test_depth_zero_orchestrator_keeps_subagent(self):
         Config.load().subagent_max_depth = 2
         loop = self._make_loop(goal="test", depth=0, max_depth=2)
-        names = set(d.name for d in loop.ctx.tool_definitions)
+        names = set(d.name for d in loop.context.tool_definitions)
         assert "subagent" in names
 
     def test_depth_one_orchestrator(self):
         Config.load().subagent_max_depth = 3
         # depth=1, max_depth=3 → 1+1=2 < 3 → orchestrator
         loop = self._make_loop(goal="test", depth=1, max_depth=3)
-        names = set(d.name for d in loop.ctx.tool_definitions)
+        names = set(d.name for d in loop.context.tool_definitions)
         assert "subagent" in names
 
     def test_depth_one_leaf_when_max_depth_2(self):
         Config.load().subagent_max_depth = 2
         # depth=1, max_depth=2 → 1+1=2 >= 2 → leaf
         loop = self._make_loop(goal="test", depth=1, max_depth=2)
-        names = set(d.name for d in loop.ctx.tool_definitions)
+        names = set(d.name for d in loop.context.tool_definitions)
         assert "subagent" not in names
 
     def test_system_prompt_is_focused(self):
         loop = self._make_loop(goal="搜索 bug")
-        prompt = loop.ctx.messages[0].content
+        prompt = loop.context.messages[0].content
         assert "聚焦的子代理" in prompt
         assert "搜索 bug" in prompt
         assert "【输出要求】" in prompt

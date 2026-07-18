@@ -5,18 +5,15 @@ from __future__ import annotations
 import concurrent.futures
 import threading
 import time
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from kocor.config import Config
-from kocor.event.event_manager import Event, EventType
+from kocor.event.event_manager import Event, EventEmitter, EventType
+from kocor.llm_provider.llm_client import LLMClient
+from kocor.loop import Loop
+from kocor.tools.tool_manager import ToolManager
 from kocor.tools.toolsets.subagent.child_builder import assemble_child_loop
 from kocor.tools.toolsets.subagent.summary import extract_summary
-
-if TYPE_CHECKING:
-    from kocor.event.event_manager import EventEmitter
-    from kocor.llm_provider.llm_client import LLMClient
-    from kocor.loop import Loop
-    from kocor.tools.tool_manager import ToolManager
 
 
 class SubagentRunner:
@@ -133,7 +130,7 @@ class SubagentRunner:
             else:
                 final_text = child_loop.run_messages()
             status = "completed"
-            if child_loop.ctx.iteration >= child_loop.max_iterations:
+            if child_loop.context.iteration >= child_loop.max_iterations:
                 status = "budget_exhausted"
         except concurrent.futures.TimeoutError:
             final_text = None
@@ -154,12 +151,12 @@ class SubagentRunner:
                 "duration": time.monotonic() - start,
                 "usage": {
                     "prompt_tokens": (
-                    getattr(child_loop.ctx.usage, "prompt_tokens", 0)
-                    if child_loop.ctx.usage else 0
+                    getattr(child_loop.context.usage, "prompt_tokens", 0)
+                    if child_loop.context.usage else 0
                 ),
                 "completion_tokens": (
-                    getattr(child_loop.ctx.usage, "completion_tokens", 0)
-                    if child_loop.ctx.usage else 0
+                    getattr(child_loop.context.usage, "completion_tokens", 0)
+                    if child_loop.context.usage else 0
                 ),
                 },
             }
@@ -173,7 +170,7 @@ class SubagentRunner:
 
         result = extract_summary(final_text, status=status)
         result["duration"] = context_data.get("duration", time.monotonic() - start)
-        result["iterations"] = child_loop.ctx.iteration
+        result["iterations"] = child_loop.context.iteration
         return result
 
     def _execute_batch(self, tasks: list[dict]) -> dict[str, Any]:

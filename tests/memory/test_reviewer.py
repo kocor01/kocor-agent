@@ -118,15 +118,17 @@ class TestBackgroundReviewer:
         """Agent 在 N 轮后应触发后台审查。"""
         from kocor.agent import Agent
         from kocor.config import Config
+        from kocor.memory.reviewer import BackgroundReviewer
         from tests.agent.test_agent_context import FakeLLMClient
+        from tests.conftest import make_agent
 
         store = MemoryStore(memory_dir=str(tmp_path), memory_limit=2200, user_limit=1375, user_enabled=True)
         store.load_from_disk()
 
         llm = FakeLLMClient()
-        Config.load().memory_dir = str(tmp_path)
+        reviewer = BackgroundReviewer(llm=llm, store=store)
         try:
-            agent = Agent(llm=llm)
+            agent = make_agent(llm=llm, memory=store, background_reviewer=reviewer)
             # 注入 counter 为 nudge_interval - 1
             agent._turns_since_memory = 1
             agent.run("你好")

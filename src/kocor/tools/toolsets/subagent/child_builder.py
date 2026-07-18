@@ -2,21 +2,17 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 from kocor.config import Config
 from kocor.context.context_manager import ContextManager
 from kocor.event.event_manager import EventEmitter
 from kocor.hook.hook_manager import HookManager
+from kocor.llm_provider.llm_client import LLMClient
 from kocor.llm_provider.message import Message
 from kocor.loop import Loop
 from kocor.tools.permission import PermissionManager
 from kocor.tools.tool_manager import ToolManager
 from kocor.tools.toolsets.subagent.system_prompt import build_subagent_system_prompt
 from kocor.tools.toolsets.todo_tool import TodoStore
-
-if TYPE_CHECKING:
-    from kocor.llm_provider.llm_client import LLMClient
 
 
 def _build_child_tool_manager(
@@ -131,7 +127,7 @@ def assemble_child_loop(
     )
 
     # 7. 构建 ContextManager 并手动 seed 消息
-    ctx = ContextManager(
+    child_ctx = ContextManager(
         tools=child_tm,
         memory=None,  # 子代理不加载父级记忆
         todo_store=child_tm.todo_store,
@@ -139,16 +135,16 @@ def assemble_child_loop(
     user_message = goal
     if context and context.strip():
         user_message = f"{goal}\n\n上下文:\n{context.strip()}"
-    ctx.messages = [
+    child_ctx.messages = [
         Message(role="system", content=system_prompt),
         Message(role="user", content=user_message),
     ]
-    ctx.tool_definitions = child_tm.get_definitions()
+    child_ctx.tool_definitions = child_tm.get_definitions()
 
     # 8. 构建 Loop
     child_loop = Loop(
         llm=parent_llm,
-        ctx=ctx,
+        context=child_ctx,
         tool_manager=child_tm,
         permission_mgr=permission_mgr,
         hook_manager=hook_mgr,

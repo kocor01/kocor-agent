@@ -11,6 +11,7 @@ import pytest
 from kocor.agent import Agent
 from kocor.llm_provider.message import Message
 from kocor.session import SessionManager, SessionResetPolicy, SessionStore
+from tests.conftest import make_agent
 from kocor.skill.skill_manager import SkillManager
 from kocor.skill.types import InvokeStrategy, SkillDefinition, SkillType
 from kocor.tools.tool_manager import ToolManager
@@ -45,14 +46,14 @@ class TestAgentSessionIntegration:
     def test_agent_with_session_manager(self, session_manager):
         """带 SessionManager 的 Agent 正常运行。"""
         llm = FakeLLMClient([Message(role="assistant", content="你好，我是 Kocor")])
-        agent = Agent(llm=llm, session_manager=session_manager)
+        agent = make_agent(llm=llm, session_manager=session_manager)
         result = agent.run("你好")
         assert result == "你好，我是 Kocor"
 
     def test_agent_update_session_after_run(self, session_manager):
         """运行后会话元数据应更新。"""
         llm = FakeLLMClient([Message(role="assistant", content="OK")])
-        agent = Agent(llm=llm, session_manager=session_manager)
+        agent = make_agent(llm=llm, session_manager=session_manager)
         agent.run("test")
 
         info = session_manager.get_session_info(session_manager.session_key)
@@ -63,7 +64,7 @@ class TestAgentSessionIntegration:
     def test_agent_reset_via_command(self, session_manager):
         """Agent 接收 /reset 应重置会话。"""
         llm = FakeLLMClient([Message(role="assistant", content="OK")])
-        agent = Agent(llm=llm, session_manager=session_manager)
+        agent = make_agent(llm=llm, session_manager=session_manager)
         agent.run("第一条消息")
 
         info_before = session_manager.get_session_info(session_manager.session_key)
@@ -82,16 +83,16 @@ class TestAgentSessionIntegration:
     def test_agent_reset_conversation_method(self, session_manager):
         """reset_conversation() 应同时重置会话和上下文。"""
         llm = FakeLLMClient([Message(role="assistant", content="OK")])
-        agent = Agent(llm=llm, session_manager=session_manager)
+        agent = make_agent(llm=llm, session_manager=session_manager)
         agent.run("消息")
-        assert len(agent.ctx.session_history) > 0
+        assert len(agent.context.session_history) > 0
 
         info_before = session_manager.get_session_info(session_manager.session_key)
         sid_before = info_before.session_id
 
         agent.reset_conversation()
 
-        assert len(agent.ctx.session_history) == 0
+        assert len(agent.context.session_history) == 0
 
         info_after = session_manager.get_session_info(session_manager.session_key)
         assert info_after.session_id != sid_before
@@ -99,7 +100,7 @@ class TestAgentSessionIntegration:
     def test_agent_message_persisted(self, session_manager):
         """运行后消息应持久化到 SQLite。"""
         llm = FakeLLMClient([Message(role="assistant", content="I am Kocor")])
-        agent = Agent(llm=llm, session_manager=session_manager)
+        agent = make_agent(llm=llm, session_manager=session_manager)
         agent.run("你是谁？")
 
         info = session_manager.get_session_info(session_manager.session_key)
@@ -113,7 +114,7 @@ class TestAgentSessionIntegration:
     def test_agent_sessions_builtin_command(self, session_manager):
         """/sessions 命令应返回列表（含"暂无"提示）。"""
         llm = FakeLLMClient([Message(role="assistant", content="hello")])
-        agent = Agent(llm=llm, session_manager=session_manager)
+        agent = make_agent(llm=llm, session_manager=session_manager)
 
         # 无历史时
         result = agent.run("/sessions")
@@ -124,7 +125,7 @@ class TestAgentSessionIntegration:
     def test_agent_session_switch_builtin_command(self, session_manager):
         """/session 命令应能切换会话。"""
         llm = FakeLLMClient([Message(role="assistant", content="hello")])
-        agent = Agent(llm=llm, session_manager=session_manager)
+        agent = make_agent(llm=llm, session_manager=session_manager)
 
         # 创建第一个会话
         agent.run("消息 A")
@@ -153,7 +154,7 @@ class TestAgentSessionIntegration:
             Message(role="assistant", content="回复 2"),
             Message(role="assistant", content="回复 3"),
         ])
-        agent = Agent(llm=llm, session_manager=session_manager)
+        agent = make_agent(llm=llm, session_manager=session_manager)
         agent.run("第 1 条")
         agent.run("第 2 条")
         agent.run("第 3 条")
@@ -168,14 +169,14 @@ class TestAgentSessionIntegration:
     def test_agent_without_session_manager_still_works(self):
         """不传 session_manager 时原有行为不变。"""
         llm = FakeLLMClient([Message(role="assistant", content="OK")])
-        agent = Agent(llm=llm)
+        agent = make_agent(llm=llm)
         result = agent.run("hello")
         assert result == "OK"
 
     def test_agent_reset_without_session_manager_still_works(self):
         """不传 session_manager 时 /reset 走原有流程。"""
         llm = FakeLLMClient([Message(role="assistant", content="OK")])
-        agent = Agent(llm=llm)
+        agent = make_agent(llm=llm)
 
         # 没有 session_manager 时 /reset 应返回"Unknown"（因为没有注册 skill）
         result = agent.run("/reset")
@@ -190,7 +191,7 @@ class TestAgentSessionIntegration:
         sm = SessionManager(store=store, policy=policy, profile="test-auto-reset")
 
         llm = FakeLLMClient([Message(role="assistant", content="OK")])
-        agent = Agent(llm=llm, session_manager=sm)
+        agent = make_agent(llm=llm, session_manager=sm)
 
         # 创建会话
         agent.run("测试")
@@ -221,7 +222,7 @@ class TestAgentSessionIntegration:
             Message(role="assistant", content="回复 1"),
             Message(role="assistant", content="回复 2"),
         ])
-        agent = Agent(llm=llm, session_manager=session_manager)
+        agent = make_agent(llm=llm, session_manager=session_manager)
 
         # 第一次运行：建立会话，消息被持久化
         agent.run("第一条消息")
@@ -261,7 +262,7 @@ class TestAgentSessionIntegration:
             Message(role="assistant", content="回复 1"),
             Message(role="assistant", content="回复 2"),
         ])
-        agent = Agent(llm=llm, session_manager=sm)
+        agent = make_agent(llm=llm, session_manager=sm)
 
         # 第一次运行：建立会话，消息被持久化
         agent.run("第一条消息")
@@ -300,7 +301,7 @@ class TestAgentSessionIntegration:
             Message(role="assistant", content="回复 B"),
             Message(role="assistant", content="回复 C"),
         ])
-        agent = Agent(llm=llm, session_manager=session_manager)
+        agent = make_agent(llm=llm, session_manager=session_manager)
 
         # 第一次运行
         agent.run("消息 A")
@@ -355,7 +356,7 @@ class TestAgentSessionIntegration:
         tool_mgr = ToolManager()
         tool_mgr.skill_manager = skill_mgr
 
-        agent = Agent(llm=llm, tool_manager=tool_mgr, session_manager=session_manager)
+        agent = make_agent(llm=llm, tool_manager=tool_mgr, session_manager=session_manager)
         result = agent.run("/test 你好")
 
         assert result == "slash 技能回复"
@@ -389,7 +390,7 @@ class TestAgentSessionIntegration:
         tool_mgr = ToolManager()
         tool_mgr.skill_manager = skill_mgr
 
-        agent = Agent(llm=llm, tool_manager=tool_mgr, session_manager=session_manager)
+        agent = make_agent(llm=llm, tool_manager=tool_mgr, session_manager=session_manager)
         result = agent.run("/hello world")
 
         assert result == "你好，world!"

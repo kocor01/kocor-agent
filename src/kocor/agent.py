@@ -1,6 +1,6 @@
 """Agent 核心。
 
-Agent 身份、slash 命令路由、组件组装。ReAct 循环由 Loop 引擎驱动。
+Agent 身份、slash 命令路由。组件装配由 AgentBuilder 负责，ReAct 循环由 Loop 引擎驱动。
 """
 
 from __future__ import annotations
@@ -15,6 +15,7 @@ from kocor.hook.hook_manager import HookManager
 from kocor.llm_provider.llm_client import LLMClient
 from kocor.llm_provider.message import Message, StreamChunk
 from kocor.loop import Loop
+from kocor.memory.reviewer import BackgroundReviewer
 from kocor.memory.store import MemoryStore
 
 # 可选的会话管理
@@ -22,6 +23,7 @@ from kocor.session.manager import SessionManager as _SessionManager
 from kocor.skill.types import InvokeStrategy, SkillContext, SkillType
 from kocor.tools.permission import PermissionManager
 from kocor.tools.tool_manager import ToolManager
+from kocor.tools.toolsets.todo_tool import TodoStore
 
 logger = logging.getLogger(__name__)
 
@@ -39,24 +41,41 @@ class Agent:
     def __init__(
         self,
         llm: LLMClient,
-        tool_manager: ToolManager | None = None,
-        # Harness 参数（可选）
-        permission_mgr: PermissionManager | None = None,
-        hook_manager: HookManager | None = None,
-        event_emitter: EventEmitter | None = None,
-        max_iterations: int | None = None,
+        tool_manager: ToolManager,  # 必传
+        todo_store: TodoStore,  # 必传
+        context: ContextManager,  # 必传
+        permission_mgr: PermissionManager,  # 必传
+        hook_manager: HookManager,  # 必传
+        event_emitter: EventEmitter,  # 必传
+        max_iterations: int,  # 必传
         # 会话管理（可选）
         session_manager: _SessionManager | None = None,
+        # 记忆/审查（可选，通过 if 守卫安全使用）
+        memory: MemoryStore | None = None,
+        background_reviewer: BackgroundReviewer | None = None,
     ):
+        """初始化 Agent。
+
+        Args:
+            llm: LLM 客户端
+            tool_manager: 工具管理器
+            todo_store: 任务列表存储
+            context: 运行时上下文管理器
+            permission_mgr: 权限管理器
+            hook_manager: 钩子管理器
+            event_emitter: 事件发射器
+            max_iterations: 最大 ReAct 迭代次数
+            session_manager: 会话管理器（None 为无会话持久化）
+            memory: 记忆存储（None 为无记忆）
+            background_reviewer: 后台记忆审查器（None 为无审查）
+        """
         self.llm = llm
-        self.tool_manager = tool_manager or ToolManager()
+        self.tool_manager = tool_manager
         self.system_prompt = Config.load().default_system_prompt
-        # Harness 组件：未传时各自创建默认实例（非 None 安全），
-        # 使 Agent 在最小依赖场景下也能构造，降低测试和子代理装配门槛
-        self.permission_mgr = permission_mgr or PermissionManager(policy=PermissionManager.POLICY_PERMISSIVE)
-        self.hook_manager = hook_manager or HookManager()
-        self.event_emitter = event_emitter or EventEmitter()
-        self.max_iterations = max_iterations or Config.load().max_iterations
+        self.permission_mgr = permission_mgr
+        self.hook_manager = hook_manager
+        self.event_emitter = event_emitter
+        self.max_iterations = max_iterations
 
         # 会话管理
         self.session_manager = session_manager
@@ -71,40 +90,22 @@ class Agent:
         self._metrics_collector = None
 
         # 上下文管理：记忆系统、后台审查、轮次计数器
-        self._memory: MemoryStore | None = None
-        self._background_reviewer = None
+        self._memory: MemoryStore | None = memory
+        self._background_reviewer = background_reviewer
         self._turns_since_memory = 0
-        if Config.load().memory_enabled:
-            memory_dir = Config.load().memory_dir or None
-            if memory_dir:
-                self._memory = MemoryStore(
-                    memory_dir=memory_dir,
-                    memory_limit=Config.load().memory_char_limit,
-                    user_limit=Config.load().user_char_limit,
-                    user_enabled=Config.load().user_profile_enabled,
-                )
-                self._memory.load_from_disk()  # 加载持久化到磁盘的记忆文件
-                self.tool_manager.memory_store = self._memory  # 共享给 memory 工具
-                from kocor.memory.reviewer import BackgroundReviewer
-                self._background_reviewer = BackgroundReviewer(llm=self.llm, store=self._memory)
 
-        # 任务规划（todo）：零依赖、零风险，始终启用
-        from kocor.tools.toolsets.todo_tool import TodoStore
-        self._todo_store = TodoStore()  # 内存态任务列表，随 Agent 生灭
+        # 任务列表
+        self._todo_store = todo_store
         self.tool_manager.todo_store = self._todo_store  # 共享给 todo 工具
 
-        # 运行时上下文管理器：统一管理系统提示、消息列表、token 预算
-        self.ctx = ContextManager(
-            tools=self.tool_manager,
-            memory=self._memory,
-            todo_store=self._todo_store,
-        )
+        # 运行时上下文
+        self.context = context
 
         # ReAct 循环引擎：Agent 负责组装并拥有 harness 组件，Loop 仅持有引用、
         # 专注迭代机制。调用方通过 Loop 公共入口驱动循环，不访问其私有成员。
         self.loop = Loop(
             llm=self.llm,
-            ctx=self.ctx,
+            context=self.context,
             tool_manager=self.tool_manager,
             permission_mgr=self.permission_mgr,
             hook_manager=self.hook_manager,
@@ -202,7 +203,7 @@ class Agent:
 
         重置时刷新记忆快照，确保新对话看到最新记忆。
         """
-        self.ctx.reset_conversation()
+        self.context.reset_conversation()
         self._persisted_msg_idx = 0
         if self._memory:
             self._memory.refresh_snapshot()
@@ -227,17 +228,17 @@ class Agent:
         if entry.was_auto_reset:
             reason = entry.auto_reset_reason or "unknown"
             # 向 LLM 注入一条系统通知，说明会话已重置，让其感知上下文变化
-            self.ctx.append(Message(
+            self.context.append(Message(
                 role="user",
                 content=f"[会话因 {reason} 已自动重置，开始新对话]",
             ))
             self._persisted_msg_idx = 0
 
         # 恢复历史消息（跨进程重启时 session_history 为空）
-        if not self.ctx.session_history and self.session_manager.store.db:
+        if not self.context.session_history and self.session_manager.store.db:
             history = self.session_manager.load_messages(entry.session_id)
             if history:
-                self.ctx.session_history = history
+                self.context.session_history = history
                 self._persisted_msg_idx = len(history)
                 self._hydrate_todo_store(history)
 
@@ -260,7 +261,7 @@ class Agent:
         # 且 message_count=0，但 session_history 中可能有本轮新增消息。
         # 使用本地索引避免了 entry 状态与真实数据不同步的问题。
         prev_count = self._persisted_msg_idx
-        current_total = len(self.ctx.session_history)
+        current_total = len(self.context.session_history)
         msg_delta = max(0, current_total - prev_count)
 
         # token 用量从新增消息的 usage 累计（ReAct 循环可能有多次 API 调用，
@@ -270,7 +271,7 @@ class Agent:
         total_delta = 0
         cached_delta = 0
         for i in range(prev_count, current_total):
-            msg = self.ctx.session_history[i]
+            msg = self.context.session_history[i]
             if msg.usage:
                 prompt_delta += msg.usage.prompt_tokens
                 completion_delta += msg.usage.completion_tokens
@@ -289,7 +290,7 @@ class Agent:
         # 持久化新增消息（增量写入，避免每次全量转储）
         self._persisted_msg_idx = self.session_manager.persist_messages(
             session_key=session_key,
-            messages=self.ctx.session_history,
+            messages=self.context.session_history,
             start_index=prev_count,
         )
 
@@ -375,9 +376,9 @@ class Agent:
             return f"⚠️ 无法切换到会话 {target_id}。"
 
         # 恢复上下文
-        self.ctx.reset_conversation()
+        self.context.reset_conversation()
         self._persisted_msg_idx = 0
-        self.ctx.session_history = messages
+        self.context.session_history = messages
         self._hydrate_todo_store(messages)
 
         return f"✅ 已切换到会话 {target_id}（{len(messages)} 条消息）。\n你可以继续之前的对话了。"
@@ -418,8 +419,8 @@ class Agent:
             else:
                 # 技能注入为 user 消息（默认）
                 messages.append(Message(role="user", content=result.content))
-            self.ctx.reset()
-            self.ctx.messages = messages
+            self.context.reset()
+            self.context.messages = messages
             # 走 Loop 公共入口：循环结束后由 Loop 统一提取 session_history，
             # 随后 _session_after_run 据此持久化 PROMPT 技能触发的 LLM 回复
             return self.loop.run_messages()
@@ -452,7 +453,7 @@ class Agent:
         self._turns_since_memory += 1
         nudge_interval = Config.load().nudge_interval
         if self._turns_since_memory >= nudge_interval:
-            self._background_reviewer.review(self.ctx.session_history)
+            self._background_reviewer.review(self.context.session_history)
             # 审查后刷新快照，使新记忆立即对 LLM 可见
             if self._memory:
                 self._memory.refresh_snapshot()

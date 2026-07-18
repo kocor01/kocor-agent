@@ -5,6 +5,7 @@ from unittest.mock import MagicMock
 from kocor.agent import Agent
 from kocor.config import Config
 from kocor.llm_provider.llm_client import LLMClient
+from tests.conftest import make_agent
 from kocor.llm_provider.message import FunctionCall, Message, StreamChunk, ToolCall, ToolResult
 from kocor.tools.definitions import ToolDefinition
 
@@ -38,14 +39,14 @@ class TestAgentTextResponse:
     def test_single_turn(self):
         """单次对话直接返回文本"""
         llm = FakeLLMClient([Message(role="assistant", content="你好，我是 Kocor")])
-        agent = Agent(llm=llm)
+        agent = make_agent(llm=llm)
         result = agent.run("你好")
         assert result == "你好，我是 Kocor"
 
     def test_system_prompt_included(self):
         """system prompt 包含在消息中"""
         llm = FakeLLMClient([Message(role="assistant", content="hello")])
-        agent = Agent(llm=llm)
+        agent = make_agent(llm=llm)
         agent.run("hi")
 
         # 验证 llm.generate 收到的第一条消息是 system prompt
@@ -77,7 +78,7 @@ class TestAgentToolCall:
             content="hello",
         )
 
-        agent = Agent(llm=llm, tool_manager=mock_tools)
+        agent = make_agent(llm=llm, tool_manager=mock_tools)
         result = agent.run("读 a.txt")
         assert result == "文件内容是: hello"
         mock_tools.execute.assert_called_once()
@@ -115,7 +116,7 @@ class TestAgentToolCall:
 
         mock_tools.execute.side_effect = side_effect
 
-        agent = Agent(llm=llm, tool_manager=mock_tools)
+        agent = make_agent(llm=llm, tool_manager=mock_tools)
         result = agent.run("读 a.txt 和 b.txt")
         assert result == "两个文件都读完了"
         assert mock_tools.execute.call_count == 2
@@ -145,7 +146,7 @@ class TestAgentTimeout:
             content="content",
         )
 
-        agent = Agent(llm=llm, tool_manager=mock_tools, max_iterations=3)
+        agent = make_agent(llm=llm, tool_manager=mock_tools, max_iterations=3)
         result = agent.run("持续调用工具")
         assert "重复" in result
 
@@ -160,7 +161,7 @@ class TestAgentSystemPrompt:
     def test_custom_system_prompt(self):
         """自定义 system prompt"""
         llm = FakeLLMClient([Message(role="assistant", content="hi")])
-        agent = Agent(llm=llm)
+        agent = make_agent(llm=llm)
         agent.run("hi")
         assert llm.call_count == 1
 
@@ -208,7 +209,7 @@ class TestAgentStream:
                 StreamChunk(is_final=True),
             ]
         ])
-        agent = Agent(llm=llm)
+        agent = make_agent(llm=llm)
         chunks = list(agent.stream("你好"))
 
         assert len(chunks) == 3
@@ -246,7 +247,7 @@ class TestAgentStream:
 
         mock_tools.execute.side_effect = side_effect
 
-        agent = Agent(llm=llm, tool_manager=mock_tools)
+        agent = make_agent(llm=llm, tool_manager=mock_tools)
         chunks = list(agent.stream("读 a.txt"))
 
         # 文本 chunk + 工具调用 chunk + 文本 chunk + is_final
@@ -277,7 +278,7 @@ class TestAgentStream:
             content="content",
         )
 
-        agent = Agent(llm=llm, tool_manager=mock_tools, max_iterations=2)
+        agent = make_agent(llm=llm, tool_manager=mock_tools, max_iterations=2)
         chunks = list(agent.stream("持续调用工具"))
 
         # 最后应该有超时信息
@@ -328,7 +329,7 @@ class TestAgentCronRestart:
                 call_count += 1
 
         llm = FakeLLMClient([Message(role="assistant", content="hello")])
-        agent = Agent(llm=llm, tool_manager=TrackingToolRegistryMock())
+        agent = make_agent(llm=llm, tool_manager=TrackingToolRegistryMock())
 
         # 第一次 run → cron 启动（1 次）
         agent.run("hi")
@@ -355,7 +356,7 @@ class TestAgentCronRestartAfterCrash:
                 call_count += 1
 
         llm = FakeLLMClient([Message(role="assistant", content="hello")])
-        agent = Agent(llm=llm, tool_manager=TrackingToolRegistryMock())
+        agent = make_agent(llm=llm, tool_manager=TrackingToolRegistryMock())
 
         # 第一次 run → cron 启动（1 次）
         agent.run("hi")
@@ -386,7 +387,7 @@ class TestAgentStreamStartsCron:
         llm = FakeStreamLLMClient([
             [StreamChunk(content="hello"), StreamChunk(is_final=True)]
         ])
-        agent = Agent(llm=llm, tool_manager=TrackingToolRegistryMock())
+        agent = make_agent(llm=llm, tool_manager=TrackingToolRegistryMock())
 
         list(agent.stream("hi"))
         assert call_count == 1, f"stream 应启动 cron，实际: {call_count}"
@@ -398,7 +399,7 @@ class TestAgentRunPrompt:
     def test_run_prompt_returns_text(self):
         """run_prompt 返回 LLM 纯文本输出。"""
         llm = FakeLLMClient([Message(role="assistant", content="cron-output")])
-        agent = Agent(llm=llm)
+        agent = make_agent(llm=llm)
         result = agent.run_prompt("run cron job")
         assert result == "cron-output"
 
@@ -412,14 +413,14 @@ class TestAgentRunPrompt:
                 call_count += 1
 
         llm = FakeLLMClient([Message(role="assistant", content="ok")])
-        agent = Agent(llm=llm, tool_manager=Tracker())
+        agent = make_agent(llm=llm, tool_manager=Tracker())
         agent.run_prompt("test")
         assert call_count == 0, "run_prompt should not start cron"
 
     def test_run_prompt_skills_ignored(self):
         """skills 参数被日志记录但功能暂不实现。"""
         llm = FakeLLMClient([Message(role="assistant", content="out")])
-        agent = Agent(llm=llm)
+        agent = make_agent(llm=llm)
         # 不应因 skills 报错
         result = agent.run_prompt("hi", skills=["weather"])
         assert result == "out"

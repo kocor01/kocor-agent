@@ -64,26 +64,26 @@ def _skip_mcp_skill(monkeypatch):
 class TestAgentBuilderSubagent:
     """测试 Subagent 装配逻辑。"""
 
-    def test_build_subagent_enabled(self, mock_llm_factory):
-        """subagent_enabled=True 时 build_subagent 应设置 _subagent_runner。"""
+    def test_init_subagent_enabled(self, mock_llm_factory):
+        """subagent_enabled=True 时 _init_subagent 应设置 _subagent_runner。"""
         from kocor._cli.builder import AgentBuilder
         builder = AgentBuilder()
-        builder.build_llm()
-        result = builder.build_subagent()
-        assert result is builder
+        builder._init_llm()
+        builder._init_subagent()
         assert builder.tool_manager._subagent_runner is not None
 
-    def test_build_subagent_disabled(self, mock_llm_factory):
-        """subagent_enabled=False 时 _subagent_runner 应为 None。"""
+    def test_init_subagent_disabled(self, mock_llm_factory):
+        """subagent_enabled=False 时不应创建 SubagentRunner。"""
         cfg = Config.load()
         original = cfg.subagent_enabled
         cfg.subagent_enabled = False
         try:
             from kocor._cli.builder import AgentBuilder
             builder = AgentBuilder()
-            builder.build_llm()
-            builder.build_subagent()
-            assert builder.tool_manager._subagent_runner is None
+            builder._init_llm()
+            builder._init_subagent()
+            # tool_manager 未被创建，_subagent_runner 不存在
+            assert builder.tool_manager is None
         finally:
             cfg.subagent_enabled = original
 
@@ -91,41 +91,38 @@ class TestAgentBuilderSubagent:
 class TestAgentBuilderAssembly:
     """测试 AgentBuilder 组装逻辑。"""
 
-    def test_build_llm(self, mock_llm_factory):
-        """build_llm 应创建 LLM 并返回 self 以支持链式调用。"""
+    def test_init_llm(self, mock_llm_factory):
+        """_init_llm 应创建 LLM。"""
         from kocor._cli.builder import AgentBuilder
         builder = AgentBuilder()
-        result = builder.build_llm()
-        assert result is builder
+        builder._init_llm()
         assert builder.llm is not None
 
-    def test_build_tools(self):
-        """build_tools 应注册工具并返回 self。"""
+    def test_init_tool_manager(self):
+        """_init_tool_manager 应注册工具。"""
         from kocor._cli.builder import AgentBuilder
         builder = AgentBuilder()
-        result = builder.build_tools()
-        assert result is builder
+        builder._init_tool_manager()
         assert builder.tool_manager is not None
 
-    def test_build_permission(self):
-        """build_permission 应创建 PermissionManager 并返回 self。"""
+    def test_init_permission_mgr(self):
+        """_init_permission_mgr 应创建 PermissionManager。"""
         from kocor._cli.builder import AgentBuilder
         builder = AgentBuilder()
-        result = builder.build_permission()
-        assert result is builder
+        builder._init_permission_mgr()
         assert builder.permission_mgr is not None
         # 默认策略为 default
         assert builder.permission_mgr.policy == PermissionManager.POLICY_DEFAULT
 
-    def test_build_hooks(self, mock_llm_factory):
-        """build_hooks 应注册钩子并返回 self。"""
+    def test_init_hook_manager(self, mock_llm_factory):
+        """_init_hook_manager 应注册钩子。"""
         from kocor._cli.builder import AgentBuilder
         builder = AgentBuilder()
         logger = MagicMock()
-        result = builder.build_llm().build_hooks(logger=logger)
-        assert result is builder
+        builder._init_llm()
+        builder._init_hook_manager(logger=logger)
 
-    def test_build_session_enabled(self, monkeypatch):
+    def test_init_session_manager_enabled(self, monkeypatch):
         """session_enabled=True 时应有 session_manager。"""
         cfg = Config.load()
         original = cfg.session_enabled
@@ -133,13 +130,12 @@ class TestAgentBuilderAssembly:
         try:
             from kocor._cli.builder import AgentBuilder
             builder = AgentBuilder()
-            result = builder.build_session()
-            assert result is builder
+            builder._init_session_manager()
             assert builder.session_manager is not None
         finally:
             cfg.session_enabled = original
 
-    def test_build_session_disabled(self, monkeypatch):
+    def test_init_session_manager_disabled(self, monkeypatch):
         """session_enabled=False 时 session_manager 应为 None。"""
         cfg = Config.load()
         original = cfg.session_enabled
@@ -147,48 +143,80 @@ class TestAgentBuilderAssembly:
         try:
             from kocor._cli.builder import AgentBuilder
             builder = AgentBuilder()
-            result = builder.build_session()
-            assert result is builder
+            builder._init_session_manager()
             assert builder.session_manager is None
         finally:
             cfg.session_enabled = original
 
     def test_full_assembly(self, mock_llm_factory):
-        """完整链式调用应返回组装正确的 Agent。"""
+        """完整 build 流程应返回组装正确的 Agent。"""
         from kocor._cli.builder import AgentBuilder
-        agent = (
-            AgentBuilder()
-            .build_llm()
-            .build_tools()
-            .build_permission()
-            .build()
-        )
+        logger = MagicMock()
+        agent = AgentBuilder().build(logger=logger)
         assert isinstance(agent, Agent)
         assert agent.llm is not None
         assert agent.tool_manager is not None
         assert agent.permission_mgr is not None
+        # 新增组件：ctx、todo_store 应已装配
+        assert agent.context is not None
+        assert agent._todo_store is not None
+        assert agent.tool_manager.todo_store is agent._todo_store
 
     def test_agent_can_run(self, mock_llm_factory):
         """组装后的 Agent 应能正常执行 run()。"""
         from kocor._cli.builder import AgentBuilder
-        agent = (
-            AgentBuilder()
-            .build_llm()
-            .build_tools()
-            .build_permission()
-            .build()
-        )
+        logger = MagicMock()
+        agent = AgentBuilder().build(logger=logger)
         result = agent.run("hello")
         assert result == "ok"
 
-    def test_builder_chain_returns_self(self, mock_llm_factory):
-        """链式调用各方法应返回 self。"""
+    def test_init_returns_agent(self, mock_llm_factory):
+        """build() 应返回 Agent 实例。"""
         from kocor._cli.builder import AgentBuilder
         builder = AgentBuilder()
-        assert builder.build_llm() is builder
-        assert builder.build_tools() is builder
-        assert builder.build_permission() is builder
+        result = builder.build(logger=MagicMock())
+        assert isinstance(result, Agent)
+
+
+class TestAgentBuilderMemoryTodo:
+    """测试 Memory、Todo、Context 装配逻辑。"""
+
+    def test_init_todo_store(self, mock_llm_factory):
+        """_init_todo_store 应创建 TodoStore 并注入 tool_manager。"""
+        from kocor._cli.builder import AgentBuilder
+        builder = AgentBuilder()
+        builder._init_todo_store()
+        assert builder._todo_store is not None
+        assert builder.tool_manager.todo_store is builder._todo_store
+
+    def test_init_todo_store_wired_to_context(self, mock_llm_factory):
+        """完整 build 后 todo_store 应注入到 ctx。"""
+        from kocor._cli.builder import AgentBuilder
         logger = MagicMock()
-        assert builder.build_hooks(logger=logger) is builder
-        assert builder.build_session() is builder
-        assert builder.build() is not builder  # build() 返回 Agent，不是 self
+        agent = AgentBuilder().build(logger=logger)
+        assert agent.context.todo_store is agent._todo_store
+
+    def test_init_memory_disabled(self, mock_llm_factory):
+        """memory_enabled=False 时 _init_memory 不创建 MemoryStore。"""
+        cfg = Config.load()
+        original = cfg.memory_enabled
+        cfg.memory_enabled = False
+        try:
+            from kocor._cli.builder import AgentBuilder
+            builder = AgentBuilder()
+            builder._init_llm()
+            builder._init_memory()
+            assert builder._memory is None
+            assert builder._background_reviewer is None
+        finally:
+            cfg.memory_enabled = original
+
+    def test_init_context(self, mock_llm_factory):
+        """_init_context 应创建 ContextManager。"""
+        from kocor._cli.builder import AgentBuilder
+        builder = AgentBuilder()
+        builder._init_llm()
+        builder._init_todo_store()
+        builder._init_context()
+        assert builder.context is not None
+        assert builder.context.todo_store is builder._todo_store

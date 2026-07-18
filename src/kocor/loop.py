@@ -41,7 +41,7 @@ class Loop:
     def __init__(
         self,
         llm: LLMClient,
-        ctx: ContextManager,
+        context: ContextManager,
         tool_manager: ToolManager,
         permission_mgr: PermissionManager,
         hook_manager: HookManager,
@@ -49,7 +49,7 @@ class Loop:
         max_iterations: int,
     ):
         self.llm = llm
-        self.ctx = ctx
+        self.context = context
         self.tool_manager = tool_manager
         self.permission_mgr = permission_mgr
         self.hook_manager = hook_manager
@@ -72,13 +72,13 @@ class Loop:
     def run(self, user_input: str) -> str:
         """执行一次完整的 ReAct 循环。"""
         self._reset_state()
-        self.ctx.build_initial_context(user_input)
+        self.context.build_initial_context(user_input)
         return self.run_messages()
 
     def stream(self, user_input: str) -> Iterator[StreamChunk]:
         """流式执行 ReAct 循环。"""
         self._reset_state()
-        self.ctx.build_initial_context(user_input)
+        self.context.build_initial_context(user_input)
         yield from self.stream_messages()
 
     # ── 核心循环 ──
@@ -88,7 +88,7 @@ class Loop:
         self._stop_requested = True
 
     def _reset_state(self) -> None:
-        self.ctx.reset()
+        self.context.reset()
         self._consecutive_duplicate_count = 0
         self._last_tool_call_signature = None
         self._stop_requested = False
@@ -105,17 +105,17 @@ class Loop:
 
         try:
             # ── ReAct 主循环：LLM 生成 → 工具执行 → 下一轮 ──
-            while not self.ctx.iteration >= self.max_iterations:
+            while not self.context.iteration >= self.max_iterations:
                 # 外部停止信号（如用户 Ctrl+C 或钩子请求）
                 if self._stop_requested:
                     return self._stopped_message()
 
-                self.ctx.advance_iteration()
+                self.context.advance_iteration()
 
                 # 阶段 1：LLM 生成前——执行钩子（如审计注入），可中止循环
                 hook_msg = self._run_hooks(HookPoint.PRE_GENERATE)
-                self._emit_event(EventType.PRE_GENERATE, iteration=self.ctx.iteration,
-                           messages=self.ctx.messages,
+                self._emit_event(EventType.PRE_GENERATE, iteration=self.context.iteration,
+                           messages=self.context.messages,
                            tools=tools,
                            hook_result=hook_msg)
                 if hook_msg is not None:
@@ -124,34 +124,34 @@ class Loop:
                 # 阶段 2：调用 LLM 生成响应
                 try:
                     response = self.llm.generate(
-                        self.ctx.messages,
+                        self.context.messages,
                         tools=tools,
                     )
                 except LLMTimeoutError as e:
                     # 超时重试：注入提示让 LLM 简化或继续，最多重试 2 次
                     self._consecutive_timeouts += 1
-                    logger.warning("LLM timeout (iteration %d): %s", self.ctx.iteration, e)
+                    logger.warning("LLM timeout (iteration %d): %s", self.context.iteration, e)
                     if self._consecutive_timeouts > self._max_timeout_retries:
                         msg = f"LLM 连续 {self._consecutive_timeouts} 次超时，已终止。"
-                        self.ctx.append(Message(role="assistant", content=msg))
+                        self.context.append(Message(role="assistant", content=msg))
                         return msg
-                    self.ctx.append(Message(
+                    self.context.append(Message(
                         role="user",
                         content="[SYSTEM] 上次 LLM 请求超时。如有工具结果请继续执行，否则用更简洁的表述重试。",
                     ))
                     continue
                 except LLMConnectionError as e:
                     # 连接失败（如网络不可用、API Key 无效）——不可恢复，终止循环
-                    logger.error("LLM connection failed (iteration %d): %s", self.ctx.iteration, e)
+                    logger.error("LLM connection failed (iteration %d): %s", self.context.iteration, e)
                     result = f"LLM API 连接失败: {e}"
-                    self.ctx.append(Message(role="assistant", content=result))
+                    self.context.append(Message(role="assistant", content=result))
                     return result
                 self._consecutive_timeouts = 0  # 成功一次即重置超时计数
-                self.ctx.append(response)
+                self.context.append(response)
 
                 # 阶段 3：LLM 生成后——执行钩子，可中止循环
                 hook_msg = self._run_hooks(HookPoint.POST_GENERATE, response=response)
-                self._emit_event(EventType.POST_GENERATE, iteration=self.ctx.iteration, response=response,
+                self._emit_event(EventType.POST_GENERATE, iteration=self.context.iteration, response=response,
                            hook_result=hook_msg)
                 if hook_msg is not None:
                     return hook_msg or response.content or ""
@@ -168,15 +168,15 @@ class Loop:
                 for tool_call in response.tool_calls:
                     result_msg = self._execute_one_tool(tool_call)
                     if result_msg is not None:
-                        self.ctx.append(result_msg)
+                        self.context.append(result_msg)
 
                 # 工具结果已追加，压缩上下文供下一轮迭代使用
-                self.ctx.usage = response.usage
-                self.ctx.compress_if_needed()
+                self.context.usage = response.usage
+                self.context.compress_if_needed()
 
             # 迭代预算耗尽
             hook_msg = self._run_hooks(HookPoint.ON_BUDGET_EXHAUSTED)
-            self._emit_event(EventType.ON_BUDGET_EXHAUSTED, iteration=self.ctx.iteration,
+            self._emit_event(EventType.ON_BUDGET_EXHAUSTED, iteration=self.context.iteration,
                        max_iterations=self.max_iterations,
                        hook_result=hook_msg)
             return self._budget_exhausted_message()
@@ -185,7 +185,7 @@ class Loop:
         finally:
             # 状态归属收敛：循环结束后统一提取 session_history，
             # 避免调用方（Agent）手工补位导致遗漏或不一致
-            self.ctx.extract_session_history()
+            self.context.extract_session_history()
 
     def stream_messages(self) -> Iterator[StreamChunk]:
         """以流模式运行 ReAct 循环（消息已由 build_initial_context 或调用方预设）。
@@ -196,17 +196,17 @@ class Loop:
         tools = self.tool_manager.get_definitions()
 
         try:
-            while not self.ctx.iteration >= self.max_iterations:
+            while not self.context.iteration >= self.max_iterations:
                 if self._stop_requested:
                     msg = self._stopped_message()
                     yield StreamChunk(content="\n⏹️ " + msg, is_final=True)
                     return
 
-                self.ctx.advance_iteration()
+                self.context.advance_iteration()
 
                 hook_msg = self._run_hooks(HookPoint.PRE_GENERATE)
-                self._emit_event(EventType.PRE_GENERATE, iteration=self.ctx.iteration,
-                           messages=self.ctx.messages,
+                self._emit_event(EventType.PRE_GENERATE, iteration=self.context.iteration,
+                           messages=self.context.messages,
                            tools=tools,
                            hook_result=hook_msg)
                 if hook_msg is not None:
@@ -214,7 +214,7 @@ class Loop:
                     return
 
                 sess = StreamSession(self.llm.stream(
-                    self.ctx.messages,
+                    self.context.messages,
                     tools=tools,
                 ))
 
@@ -232,13 +232,13 @@ class Loop:
                 response = sess.message()
 
                 hook_msg = self._run_hooks(HookPoint.POST_GENERATE, response=response)
-                self._emit_event(EventType.POST_GENERATE, iteration=self.ctx.iteration,
+                self._emit_event(EventType.POST_GENERATE, iteration=self.context.iteration,
                            response=response, hook_result=hook_msg)
                 if hook_msg is not None:
                     yield StreamChunk(content=hook_msg or response.content or "", is_final=True)
                     return
 
-                self.ctx.append(response)
+                self.context.append(response)
 
                 if not sess.has_tool_calls:
                     # 纯文本回复：LLM 流的结束标记已被吸收，由循环层补发关闭当前轮
@@ -257,7 +257,7 @@ class Loop:
 
                     result_msg = self._execute_one_tool(tool_call)
                     if result_msg is not None:
-                        self.ctx.append(result_msg)
+                        self.context.append(result_msg)
                         yield StreamChunk(
                             tool_result=result_msg,
                             is_final=False,
@@ -269,11 +269,11 @@ class Loop:
                 yield StreamChunk(is_final=True)
 
                 # 工具结果已追加，压缩上下文供下一轮迭代使用
-                self.ctx.usage = response.usage
-                self.ctx.compress_if_needed()
+                self.context.usage = response.usage
+                self.context.compress_if_needed()
 
             hook_msg = self._run_hooks(HookPoint.ON_BUDGET_EXHAUSTED)
-            self._emit_event(EventType.ON_BUDGET_EXHAUSTED, iteration=self.ctx.iteration,
+            self._emit_event(EventType.ON_BUDGET_EXHAUSTED, iteration=self.context.iteration,
                        max_iterations=self.max_iterations,
                        hook_result=hook_msg)
             yield StreamChunk(content=self._budget_exhausted_message(), is_final=True)
@@ -283,7 +283,7 @@ class Loop:
             return
         finally:
             # 状态归属收敛：生成器结束时统一提取 session_history
-            self.ctx.extract_session_history()
+            self.context.extract_session_history()
 
     # ── 工具执行 ──
 
@@ -301,7 +301,7 @@ class Loop:
 
         # 阶段 2：工具执行前钩子——先执行钩子，再触发事件（事件携带钩子结果供观察者使用）
         hook_msg = self._run_hooks(HookPoint.PRE_TOOL, tool_call=tool_call)
-        self._emit_event(EventType.PRE_TOOL, iteration=self.ctx.iteration, tool_call=tool_call,
+        self._emit_event(EventType.PRE_TOOL, iteration=self.context.iteration, tool_call=tool_call,
                    hook_result=hook_msg)
         if hook_msg is not None:
             # 钩子跳过工具：不触发 POST_TOOL（工具未执行），
@@ -318,7 +318,7 @@ class Loop:
 
             # 阶段 4：工具执行后钩子——可请求终止循环
             hook_msg = self._run_hooks(HookPoint.POST_TOOL, tool_call=tool_call, tool_result=result)
-            self._emit_event(EventType.POST_TOOL, iteration=self.ctx.iteration,
+            self._emit_event(EventType.POST_TOOL, iteration=self.context.iteration,
                        tool_name=tool_name, duration=duration, success=True, result=result,
                        hook_result=hook_msg)
             if hook_msg is not None:
@@ -335,9 +335,9 @@ class Loop:
         except Exception as e:
             # 阶段 5：异常处理——记录错误事件，钩子可请求终止
             hook_msg = self._run_hooks(HookPoint.ON_ERROR, error=e)
-            self._emit_event(EventType.POST_TOOL, iteration=self.ctx.iteration,
+            self._emit_event(EventType.POST_TOOL, iteration=self.context.iteration,
                        tool_name=tool_name, duration=duration, success=False, error=str(e))
-            self._emit_event(EventType.ON_ERROR, iteration=self.ctx.iteration,
+            self._emit_event(EventType.ON_ERROR, iteration=self.context.iteration,
                        component="tool", error=str(e), hook_result=hook_msg)
             if hook_msg is not None:
                 self._stop_requested = True
@@ -385,14 +385,14 @@ class Loop:
 
         # 第 2 次重复时注入显式警告，让模型在下一轮看到并停止
         if self._consecutive_duplicate_count == 2:
-            self.ctx.append(Message(
+            self.context.append(Message(
                 role="user",
                 content="[SYSTEM] 检测到重复的工具调用。你正在重复调用相同的工具，请立即停止并回复用户。",
             ))
 
         if self._consecutive_duplicate_count >= 3:
             hook_msg = self._run_hooks(HookPoint.ON_BUDGET_EXHAUSTED)
-            self._emit_event(EventType.ON_BUDGET_EXHAUSTED, iteration=self.ctx.iteration,
+            self._emit_event(EventType.ON_BUDGET_EXHAUSTED, iteration=self.context.iteration,
                        max_iterations=self.max_iterations, reason="duplicate_tool_calls",
                        hook_result=hook_msg)
             return True
@@ -402,17 +402,17 @@ class Loop:
     # ── 辅助方法 ──
 
     def _budget_exhausted_message(self) -> str:
-        return f"Agent 在 {self.ctx.iteration} 次迭代后未完成。"
+        return f"Agent 在 {self.context.iteration} 次迭代后未完成。"
 
     def _stuck_in_loop_message(self) -> str:
         return (
-            f"Agent 在第 {self.ctx.iteration} 次迭代检测到重复工具调用"
+            f"Agent 在第 {self.context.iteration} 次迭代检测到重复工具调用"
             f"（连续 {self._consecutive_duplicate_count} 次），已提前终止。"
         )
 
     def _stopped_message(self) -> str:
         self._stop_requested = False
-        return f"Agent 在第 {self.ctx.iteration} 次迭代被终止。"
+        return f"Agent 在第 {self.context.iteration} 次迭代被终止。"
 
     def _run_hooks(self, point: HookPoint, **extra) -> str | None:
         """执行指定生命周期点的钩子。
@@ -435,12 +435,12 @@ class Loop:
                 extra_data[k] = v
         context_kwargs["extra"] = extra_data
 
-        ctx = HookContext(
-            iteration=self.ctx.iteration,
-            messages=self.ctx.messages,
+        context = HookContext(
+            iteration=self.context.iteration,
+            messages=self.context.messages,
             **context_kwargs,
         )
-        for r in self.hook_manager.run(point, ctx):
+        for r in self.hook_manager.run(point, context):
             if r.action == HookAction.ABORT:
                 return r.message
         return None
@@ -448,7 +448,7 @@ class Loop:
     def _emit_event(self, event_type: str, **data) -> None:
         self.event_emitter.fire(Event(
             type=event_type,
-            iteration=self.ctx.iteration,
+            iteration=self.context.iteration,
             data=data,
             timestamp=time.time(),
         ))

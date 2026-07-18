@@ -3,12 +3,10 @@
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from kocor.tools.permission import PermissionManager
-
-if TYPE_CHECKING:
-    from kocor.tools.toolsets.subagent.runner import SubagentRunner
+from kocor.tools.toolsets.subagent.runner import SubagentRunner
 
 
 class SubagentTool:

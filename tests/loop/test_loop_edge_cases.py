@@ -108,7 +108,7 @@ def _make_loop(llm_responses=None, max_iterations=10):
     from kocor.loop import Loop
 
     llm = MockLLM(responses=llm_responses or [Message(role="assistant", content="ok")])
-    ctx = MockContext()
+    mock_ctx = MockContext()
     tool_mgr = MockToolRegistry()
     pm = MagicMock()
     pm.check.return_value = True
@@ -116,7 +116,7 @@ def _make_loop(llm_responses=None, max_iterations=10):
     ee = EventEmitter()
     return Loop(
         llm=llm,
-        ctx=ctx,
+        context=mock_ctx,
         tool_manager=tool_mgr,
         permission_mgr=pm,
         hook_manager=hm,
@@ -176,7 +176,7 @@ class TestCheckRepetitionDirect:
         assert loop._consecutive_duplicate_count == 2
 
         # 验证警告消息被注入
-        warning_msgs = [m for m in loop.ctx.messages if "重复的工具调用" in m.content]
+        warning_msgs = [m for m in loop.context.messages if "重复的工具调用" in m.content]
         assert len(warning_msgs) == 1
 
     def test_third_duplicate_returns_true_and_emits_event(self):
@@ -345,14 +345,14 @@ class TestLoopMessageFormatting:
 
     def test_budget_exhausted_message_format(self):
         loop = _make_loop()
-        loop.ctx.iteration = 5
+        loop.context.iteration = 5
         msg = loop._budget_exhausted_message()
         assert "5" in msg
         assert "迭代" in msg
 
     def test_stuck_in_loop_message_format(self):
         loop = _make_loop()
-        loop.ctx.iteration = 3
+        loop.context.iteration = 3
         loop._consecutive_duplicate_count = 3
         msg = loop._stuck_in_loop_message()
         assert "3" in msg
@@ -360,7 +360,7 @@ class TestLoopMessageFormatting:
 
     def test_stopped_message_format(self):
         loop = _make_loop()
-        loop.ctx.iteration = 2
+        loop.context.iteration = 2
         msg = loop._stopped_message()
         assert "2" in msg
         assert "终止" in msg
@@ -460,15 +460,15 @@ class TestResetState:
     def test_reset_state_clears_all(self):
         """_reset_state 重置所有运行状态。"""
         loop = _make_loop()
-        loop.ctx.iteration = 5
+        loop.context.iteration = 5
         loop._consecutive_duplicate_count = 3
         loop._last_tool_call_signature = "something"
         loop._stop_requested = True
-        loop.ctx.messages = [Message(role="user", content="existing")]
+        loop.context.messages = [Message(role="user", content="existing")]
 
         loop._reset_state()
 
-        assert loop.ctx.iteration == 0
+        assert loop.context.iteration == 0
         assert loop._consecutive_duplicate_count == 0
         assert loop._last_tool_call_signature is None
         assert loop._stop_requested is False
@@ -476,12 +476,12 @@ class TestResetState:
     def test_reset_state_does_not_clear_session_history(self):
         """_reset_state 不清除 session_history（仅运行时状态）。"""
         loop = _make_loop()
-        loop.ctx.session_history = [Message(role="user", content="history")]
+        loop.context.session_history = [Message(role="user", content="history")]
 
         loop._reset_state()
 
         # session_history 保留
-        assert len(loop.ctx.session_history) == 1
+        assert len(loop.context.session_history) == 1
 
 
 # ═══════════════════════════════════════════════
@@ -493,7 +493,7 @@ class TestRunMessagesEdgeCases:
     def test_run_messages_with_empty_messages(self):
         """messages 为空时循环应仍运行（LLM 会收到空列表）。"""
         loop = _make_loop(llm_responses=[Message(role="assistant", content="response")])
-        loop.ctx.messages = []
+        loop.context.messages = []
 
         result = loop.run_messages()
 
@@ -502,21 +502,21 @@ class TestRunMessagesEdgeCases:
     def test_run_messages_extracts_session_history(self):
         """run_messages 结束后 session_history 自动填充。"""
         loop = _make_loop(llm_responses=[Message(role="assistant", content="ok")])
-        loop.ctx.messages = [
+        loop.context.messages = [
             Message(role="system", content="system"),
             Message(role="user", content="hello"),
         ]
 
         loop.run_messages()
 
-        assert len(loop.ctx.session_history) >= 1
-        roles = [m.role for m in loop.ctx.session_history]
+        assert len(loop.context.session_history) >= 1
+        roles = [m.role for m in loop.context.session_history]
         assert "assistant" in roles
 
     def test_stream_messages_forwarded(self):
         """stream_messages 逐块产出内容。"""
         loop = _make_loop(llm_responses=[Message(role="assistant", content="hello world")])
-        loop.ctx.messages = [
+        loop.context.messages = [
             Message(role="system", content="system"),
             Message(role="user", content="hi"),
         ]
@@ -530,15 +530,15 @@ class TestRunMessagesEdgeCases:
     def test_stream_messages_extracts_session_history(self):
         """stream_messages 消费完毕后 session_history 自动填充。"""
         loop = _make_loop(llm_responses=[Message(role="assistant", content="streaming")])
-        loop.ctx.messages = [
+        loop.context.messages = [
             Message(role="system", content="system"),
             Message(role="user", content="hi"),
         ]
 
         list(loop.stream_messages())
 
-        assert len(loop.ctx.session_history) >= 1
-        assert "streaming" in loop.ctx.session_history[-1].content
+        assert len(loop.context.session_history) >= 1
+        assert "streaming" in loop.context.session_history[-1].content
 
 
 # ═══════════════════════════════════════════════
@@ -550,7 +550,7 @@ class TestStopAndBudgetExhaustion:
     def test_stop_immediately_in_run(self):
         """stop() 后 run_messages 立即返回停止消息。"""
         loop = _make_loop(llm_responses=[Message(role="assistant", content="should not see")])
-        loop.ctx.messages = [Message(role="user", content="test")]
+        loop.context.messages = [Message(role="user", content="test")]
 
         # 在迭代开始前 stop
         loop.stop()
@@ -571,7 +571,7 @@ class TestStopAndBudgetExhaustion:
             ],
             max_iterations=1,
         )
-        loop.ctx.messages = [Message(role="user", content="do work")]
+        loop.context.messages = [Message(role="user", content="do work")]
 
         # 注册钩子
         hook_calls = []
@@ -598,7 +598,7 @@ class TestStopAndBudgetExhaustion:
     def test_stop_in_stream(self):
         """stop() 后 stream_messages 立即返回停止消息。"""
         loop = _make_loop(llm_responses=[Message(role="assistant", content="should not see")])
-        loop.ctx.messages = [Message(role="user", content="test")]
+        loop.context.messages = [Message(role="user", content="test")]
 
         loop.stop()
         chunks = list(loop.stream_messages())
@@ -616,7 +616,7 @@ class TestStopAndBudgetExhaustion:
 
         loop = _make_loop(llm_responses=[])
         loop.llm = InterruptingLLM(responses=[])
-        loop.ctx.messages = [Message(role="user", content="hi")]
+        loop.context.messages = [Message(role="user", content="hi")]
 
         result = loop.run_messages()
         assert "终止" in result or "中断" in result
@@ -624,7 +624,7 @@ class TestStopAndBudgetExhaustion:
     def test_pre_generate_post_generate_events(self):
         """pre_generate 和 post_generate 事件在循环中触发。"""
         loop = _make_loop(llm_responses=[Message(role="assistant", content="ok")])
-        loop.ctx.messages = [Message(role="user", content="test")]
+        loop.context.messages = [Message(role="user", content="test")]
 
         events = []
         loop.event_emitter.subscribe(EventType.PRE_GENERATE, lambda e: events.append(e.type))
@@ -641,7 +641,7 @@ class TestLoopEventHooks:
 
     def test_pre_generate_hook_is_called(self):
         loop = _make_loop(llm_responses=[Message(role="assistant", content="ok")])
-        loop.ctx.messages = [Message(role="user", content="hi")]
+        loop.context.messages = [Message(role="user", content="hi")]
 
         hook_calls = []
 
@@ -661,7 +661,7 @@ class TestLoopEventHooks:
 
     def test_post_generate_hook_is_called(self):
         loop = _make_loop(llm_responses=[Message(role="assistant", content="ok")])
-        loop.ctx.messages = [Message(role="user", content="hi")]
+        loop.context.messages = [Message(role="user", content="hi")]
 
         hook_calls = []
 
@@ -692,7 +692,7 @@ class TestLoopEventHooks:
                 Message(role="assistant", content="done"),
             ],
         )
-        loop.ctx.messages = [Message(role="user", content="read x.txt")]
+        loop.context.messages = [Message(role="user", content="read x.txt")]
 
         hook_calls = []
 
