@@ -128,7 +128,7 @@ class TestBackgroundReviewer:
         llm = FakeLLMClient()
         reviewer = BackgroundReviewer(llm=llm, store=store)
         try:
-            agent = make_agent(llm=llm, memory=store, background_reviewer=reviewer)
+            agent = make_agent(llm=llm, memory_store=store, background_reviewer=reviewer)
             # 注入 counter 为 nudge_interval - 1
             agent._turns_since_memory = 1
             agent.run("你好")

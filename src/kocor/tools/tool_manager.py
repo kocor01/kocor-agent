@@ -34,6 +34,9 @@ class ToolManager:
         self._env: LocalEnvironment | None = None
         self.mcp_manager = None
         self.skill_manager = None
+        # 记忆存储和任务列表（由 AgentBuilder/Agent 在装配时设置）
+        self.memory_store = None
+        self.todo_store = None
         # subagent 运行器（运行时注入，由 cli.py/Agent 在 LLM 创建后设置）
         self._subagent_runner = None
 
@@ -77,9 +80,6 @@ class ToolManager:
         from kocor.tools.toolsets.subagent.tool import SubagentTool
         from kocor.tools.toolsets.todo_tool import TodoTool
         from kocor.tools.toolsets.write_file_tool import WriteFileTool
-
-        self.memory_store = None
-        self.todo_store = None
 
         # 构建共享依赖字典。
         # memory_store/todo_store 在 Agent.__init__ 中设定（晚于注册），

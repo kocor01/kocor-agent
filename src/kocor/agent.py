@@ -49,7 +49,7 @@ class Agent:
         # 会话管理（可选）
         session_manager: _SessionManager | None = None,
         # 记忆/审查（可选，通过 if 守卫安全使用）
-        memory: MemoryStore | None = None,
+        memory_store: MemoryStore | None = None,
         background_reviewer: BackgroundReviewer | None = None,
     ):
         """初始化 Agent。
@@ -63,7 +63,7 @@ class Agent:
             event_emitter: 事件发射器
             max_iterations: 最大 ReAct 迭代次数
             session_manager: 会话管理器（None 为无会话持久化）
-            memory: 记忆存储（None 为无记忆）
+            memory_store: 记忆存储（None 为无记忆）
             background_reviewer: 后台记忆审查器（None 为无审查）
         """
         self.llm = llm
@@ -83,13 +83,12 @@ class Agent:
         self._metrics_collector = None
 
         # 上下文管理：记忆系统、后台审查、轮次计数器
-        self._memory: MemoryStore | None = memory
+        self._memory_store: MemoryStore | None = memory_store
         self._background_reviewer = background_reviewer
         self._turns_since_memory = 0
 
         # 任务列表
         self._todo_store = todo_store
-        self.tool_manager.todo_store = self._todo_store  # 共享给 todo 工具
 
         # 运行时上下文
         self.context = context
@@ -182,8 +181,8 @@ class Agent:
         """
         self.context.reset_conversation()
         self._persisted_msg_idx = 0
-        if self._memory:
-            self._memory.refresh_snapshot()
+        if self._memory_store:
+            self._memory_store.refresh_snapshot()
         if self.session_manager:
             self.session_manager.reset_session(self.session_manager.session_key)
         # 清空文件状态缓存，避免重置后仍被旧读记录影响
@@ -435,12 +434,12 @@ class Agent:
 
         审查后刷新记忆快照，使新写入的记忆对下一轮 LLM 调用可见。
         """
-        if not self._memory or not self._background_reviewer:
+        if not self._memory_store or not self._background_reviewer:
             return
         self._turns_since_memory += 1
         nudge_interval = Config.load().nudge_interval
         if self._turns_since_memory >= nudge_interval:
             self._background_reviewer.review(self.context.session_history)
             # 审查后刷新快照，使新记忆立即对 LLM 可见
-            self._memory.refresh_snapshot()
+            self._memory_store.refresh_snapshot()
             self._turns_since_memory = 0

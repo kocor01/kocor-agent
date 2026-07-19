@@ -40,7 +40,7 @@ class AgentBuilder:
         self._metrics: MetricsCollector | None = None
         # 记忆子系统：MemoryStore 负责持久化，BackgroundReviewer 负责审查。
         # 两者独立（pure data ≠ LLM process），但装配时成对出现。
-        self._memory: MemoryStore | None = None
+        self._memory_store: MemoryStore | None = None
         self._background_reviewer: BackgroundReviewer | None = None
         self._todo_store: TodoStore | None = None
         self.context: ContextManager | None = None
@@ -51,23 +51,19 @@ class AgentBuilder:
 
     def _init_memory(self) -> None:
         """创建 MemoryStore 和 BackgroundReviewer（可选）。"""
-        if Config.load().memory_enabled:
-            memory_dir = Config.load().memory_dir or None
-            if memory_dir:
-                self._memory = MemoryStore(
-                    memory_dir=memory_dir,
-                    memory_limit=Config.load().memory_char_limit,
-                    user_limit=Config.load().user_char_limit,
-                    user_enabled=Config.load().user_profile_enabled,
+        if Config.load().memory_enabled and Config.load().memory_dir:
+            self._memory_store = MemoryStore(
+                memory_dir=Config.load().memory_dir,
+                memory_limit=Config.load().memory_char_limit,
+                user_limit=Config.load().user_char_limit,
+                user_enabled=Config.load().user_profile_enabled,
+            )
+            self._memory_store.load_from_disk()
+            self.tool_manager.memory_store = self._memory_store
+            if Config.load().reviewer_enabled:
+                self._background_reviewer = BackgroundReviewer(
+                    llm=self.llm, store=self._memory_store
                 )
-                self._memory.load_from_disk()
-                if self.tool_manager is None:
-                    self.tool_manager = ToolManager()
-                self.tool_manager.memory_store = self._memory
-                if Config.load().reviewer_enabled:
-                    self._background_reviewer = BackgroundReviewer(
-                        llm=self.llm, store=self._memory
-                    )
 
     def _init_subagent(self) -> None:
         """创建 SubagentRunner（可选）。
@@ -77,10 +73,6 @@ class AgentBuilder:
         if Config.load().subagent_enabled:
             from kocor.tools.toolsets.subagent.runner import SubagentRunner
 
-            if self.tool_manager is None:
-                self.tool_manager = ToolManager()
-            if self.event_emitter is None:
-                self.event_emitter = EventEmitter()
             runner = SubagentRunner(
                 parent_llm=self.llm,
                 parent_tool_manager=self.tool_manager,
@@ -91,28 +83,26 @@ class AgentBuilder:
 
     def _init_todo_store(self) -> None:
         """创建 TodoStore 并注入 tool_manager。"""
-        if self.tool_manager is None:
-            self.tool_manager = ToolManager()
         self._todo_store = TodoStore()
         self.tool_manager.todo_store = self._todo_store
 
     def _init_tool_manager(self) -> None:
         """创建 ToolManager 并注册所有工具。"""
-        if self.tool_manager is None:
-            self.tool_manager = ToolManager()
+        self.tool_manager = ToolManager()
         self.tool_manager.register_all(
             include_subagent=Config.load().subagent_enabled,
         )
 
-    def _init_hook_manager(self, logger: Logger) -> None:
-        """创建 HookManager、EventEmitter 并注册钩子和事件订阅。"""
-        if self.hook_manager is None:
-            self.hook_manager = HookManager()
-        if self.event_emitter is None:
-            self.event_emitter = EventEmitter()
-        self.hook_manager.register_all(logger=logger)
+    def _init_event_emitter(self, logger: Logger) -> None:
+        """创建事件发射器、指标收集器并注册事件订阅。"""
+        self.event_emitter = EventEmitter()
         self._metrics = MetricsCollector()
         EventSubscribe(self.event_emitter).subscribe_all(logger=logger, metrics=self._metrics)
+
+    def _init_hook_manager(self, logger: Logger) -> None:
+        """创建 HookManager 并注册钩子。"""
+        self.hook_manager = HookManager()
+        self.hook_manager.register_all(logger=logger)
 
     def _init_session_manager(self) -> None:
         """创建会话管理器（可选）。"""
@@ -136,7 +126,7 @@ class AgentBuilder:
         """
         self.context = ContextManager(
             tools=self.tool_manager,
-            memory=self._memory,
+            memory=self._memory_store,
             todo_store=self._todo_store,
         )
 
@@ -144,13 +134,14 @@ class AgentBuilder:
         """组装并返回 Agent 实例。
 
         按依赖顺序依次调用各内部构建方法：
-        LLM → 记忆 → Subagent → Todo → 工具 → 权限 → 钩子 → 会话 → 上下文 → 组装
+        LLM → 工具 → 记忆 → Subagent → Todo → 事件 → 钩子 → 会话 → 上下文 → 组装
         """
         self._init_llm()
+        self._init_tool_manager()
         self._init_memory()
         self._init_subagent()
         self._init_todo_store()
-        self._init_tool_manager()
+        self._init_event_emitter(logger)
         self._init_hook_manager(logger)
         self._init_session_manager()
         self._init_context()
@@ -163,7 +154,7 @@ class AgentBuilder:
             event_emitter=self.event_emitter,
             max_iterations=Config.load().max_iterations,
             session_manager=self.session_manager,
-            memory=self._memory,
+            memory_store=self._memory_store,
             background_reviewer=self._background_reviewer,
         )
 

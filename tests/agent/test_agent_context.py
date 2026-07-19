@@ -66,7 +66,7 @@ class TestContextManagerIntegration:
         store = MemoryStore(memory_dir=mem_dir, memory_limit=2200, user_limit=1375, user_enabled=True)
         store.load_from_disk()
         try:
-            agent = make_agent(llm=llm, memory=store)
+            agent = make_agent(llm=llm, memory_store=store)
             agent.run("你好")
         finally:
             Config.load().memory_dir = None

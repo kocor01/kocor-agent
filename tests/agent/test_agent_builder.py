@@ -68,6 +68,7 @@ class TestAgentBuilderSubagent:
         from kocor._cli.agent_builder import AgentBuilder
         builder = AgentBuilder()
         builder._init_llm()
+        builder._init_tool_manager()
         builder._init_subagent()
         assert builder.tool_manager._subagent_runner is not None
 
@@ -80,9 +81,10 @@ class TestAgentBuilderSubagent:
             from kocor._cli.agent_builder import AgentBuilder
             builder = AgentBuilder()
             builder._init_llm()
+            builder._init_tool_manager()
             builder._init_subagent()
-            # tool_manager 未被创建，_subagent_runner 不存在
-            assert builder.tool_manager is None
+            # tool_manager 已创建，但 _subagent_runner 不存在
+            assert builder.tool_manager._subagent_runner is None
         finally:
             cfg.subagent_enabled = original
 
@@ -118,7 +120,7 @@ class TestAgentBuilderAssembly:
         builder = AgentBuilder()
         logger = MagicMock()
         builder._init_llm()
-        builder._init_hook_manager(logger=logger)
+        builder._init_event_emitter(logger=logger)
 
     def test_init_session_manager_enabled(self, monkeypatch):
         """session_enabled=True 时应有 session_manager。"""
@@ -183,6 +185,7 @@ class TestAgentBuilderMemoryTodo:
         """_init_todo_store 应创建 TodoStore 并注入 tool_manager。"""
         from kocor._cli.agent_builder import AgentBuilder
         builder = AgentBuilder()
+        builder._init_tool_manager()
         builder._init_todo_store()
         assert builder._todo_store is not None
         assert builder.tool_manager.todo_store is builder._todo_store
@@ -203,8 +206,9 @@ class TestAgentBuilderMemoryTodo:
             from kocor._cli.agent_builder import AgentBuilder
             builder = AgentBuilder()
             builder._init_llm()
+            builder._init_tool_manager()
             builder._init_memory()
-            assert builder._memory is None
+            assert builder._memory_store is None
             assert builder._background_reviewer is None
         finally:
             cfg.memory_enabled = original
@@ -220,8 +224,9 @@ class TestAgentBuilderMemoryTodo:
             from kocor._cli.agent_builder import AgentBuilder
             builder = AgentBuilder()
             builder._init_llm()
+            builder._init_tool_manager()
             builder._init_memory()
-            assert builder._memory is not None
+            assert builder._memory_store is not None
             assert builder._background_reviewer is None
         finally:
             cfg.reviewer_enabled = orig_reviewer
@@ -238,8 +243,9 @@ class TestAgentBuilderMemoryTodo:
             from kocor._cli.agent_builder import AgentBuilder
             builder = AgentBuilder()
             builder._init_llm()
+            builder._init_tool_manager()
             builder._init_memory()
-            assert builder._memory is not None
+            assert builder._memory_store is not None
             assert builder._background_reviewer is not None
         finally:
             cfg.reviewer_enabled = orig_reviewer
@@ -250,6 +256,7 @@ class TestAgentBuilderMemoryTodo:
         from kocor._cli.agent_builder import AgentBuilder
         builder = AgentBuilder()
         builder._init_llm()
+        builder._init_tool_manager()
         builder._init_todo_store()
         builder._init_context()
         assert builder.context is not None

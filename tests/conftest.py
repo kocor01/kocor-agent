@@ -39,8 +39,12 @@ def make_agent(llm, **kwargs):
     custom_pm = kwargs.pop("permission_mgr", None)
     if custom_pm is not None:
         tm.permission_mgr = custom_pm
-    memory = kwargs.get("memory")  # peek 而非 pop，传入 Agent 时保留
-    context = kwargs.pop("context", ContextManager(tools=tm, memory=memory, todo_store=todo))
+    memory_store = kwargs.get("memory_store")  # peek 而非 pop，传入 Agent 时保留
+    # 注入共享 store（与 AgentBuilder.build() 行为一致）
+    tm.todo_store = todo
+    if memory_store is not None:
+        tm.memory_store = memory_store
+    context = kwargs.pop("context", ContextManager(tools=tm, memory=memory_store, todo_store=todo))
     hm = kwargs.pop("hook_manager", HookManager())
     ee = kwargs.pop("event_emitter", EventEmitter())
     mi = kwargs.pop("max_iterations", Config.load().max_iterations)
