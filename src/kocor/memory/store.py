@@ -457,6 +457,7 @@ class _FileLock:
     def __exit__(self, exc_type, exc_val, exc_tb):
         if self._fh is None:
             return
+        lock_path = self.path.with_suffix(self.path.suffix + ".lock")
         try:
             if sys.platform == "win32":
                 import msvcrt
@@ -473,3 +474,8 @@ class _FileLock:
         finally:
             self._fh.close()
             self._fh = None
+            # 清理锁文件，避免长期积累
+            try:
+                lock_path.unlink(missing_ok=True)
+            except OSError:
+                pass

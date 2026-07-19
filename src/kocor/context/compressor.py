@@ -12,7 +12,7 @@ from kocor.config import Config
 from kocor.context.runtime_context import RuntimeContext
 from kocor.context.strategies import ContextStrategyApplier
 from kocor.context.token_counter import TokenCounter
-from kocor.context.types import ContextStrategy
+from kocor.context.types import ContextStrategy, resolve_strategy
 from kocor.llm_provider.message import Message
 
 
@@ -38,13 +38,7 @@ class ContextCompressor:
         self._token_counter = TokenCounter()
         self._strategy_applier = ContextStrategyApplier()
         if context_strategy is None:
-            resolved = Config.load().context_strategy
-            mapping = {
-                "default": ContextStrategy.DEFAULT,
-                "sliding": ContextStrategy.SLIDING_WINDOW,
-                "aggressive": ContextStrategy.AGGRESSIVE,
-            }
-            self._context_strategy = mapping.get(resolved.lower(), ContextStrategy.DEFAULT)
+            self._context_strategy = resolve_strategy(Config.load().context_strategy)
         else:
             self._context_strategy = context_strategy
 

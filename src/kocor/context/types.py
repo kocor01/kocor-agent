@@ -19,6 +19,19 @@ class ContextStrategy(Enum):
     AGGRESSIVE = "aggressive"
 
 
+def resolve_strategy(name: str) -> ContextStrategy:
+    """将策略名称字符串解析为 ContextStrategy 枚举值。
+
+    不区分大小写，未知名称回退到 DEFAULT。
+    """
+    mapping = {
+        "default": ContextStrategy.DEFAULT,
+        "sliding": ContextStrategy.SLIDING_WINDOW,
+        "aggressive": ContextStrategy.AGGRESSIVE,
+    }
+    return mapping.get(name.lower(), ContextStrategy.DEFAULT)
+
+
 @dataclass
 class SummaryNode:
     """摘要节点，代表一段被压缩的历史。"""

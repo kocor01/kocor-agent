@@ -15,7 +15,7 @@ from kocor.context.runtime_context import RuntimeContext
 from kocor.context.strategies import ContextStrategyApplier
 from kocor.context.system_prompt import SystemPromptBuilder
 from kocor.context.token_counter import TokenCounter
-from kocor.context.types import ContextStrategy
+from kocor.context.types import resolve_strategy
 from kocor.llm_provider.message import Message, Usage
 from kocor.tools.definitions import ToolDefinition
 
@@ -48,13 +48,7 @@ class ContextManager:
         # 逻辑组件（编排器组合）
         self._token_counter = TokenCounter()
         self._prompt_builder = SystemPromptBuilder(memory)
-        resolved = Config.load().context_strategy
-        mapping = {
-            "default": ContextStrategy.DEFAULT,
-            "sliding": ContextStrategy.SLIDING_WINDOW,
-            "aggressive": ContextStrategy.AGGRESSIVE,
-        }
-        self._context_strategy = mapping.get(resolved.lower(), ContextStrategy.DEFAULT)
+        self._context_strategy = resolve_strategy(Config.load().context_strategy)
         self._compressor = ContextCompressor(context_strategy=self._context_strategy)
         self._strategy_applier = ContextStrategyApplier()
 
