@@ -41,6 +41,8 @@ class ToolManager:
         self._subagent_runner = None
         # 工具定义缓存（注册完成后不变，避免每次 LLM 调用都重建）
         self._definitions_cache: list[ToolDefinition] | None = None
+        # 共享线程池，避免每次工具调用创建/销毁 ThreadPoolExecutor 的开销
+        self._executor = ThreadPoolExecutor(max_workers=1)
 
     def get_or_create_env(self) -> LocalEnvironment:
         """获取或创建 LocalEnvironment 实例（延迟初始化）。
@@ -50,6 +52,11 @@ class ToolManager:
         if self._env is None:
             self._env = LocalEnvironment(cwd=os.getcwd(), timeout=180)
         return self._env
+
+    def cleanup(self) -> None:
+        """释放共享资源：关闭线程池、清理执行环境。"""
+        self._executor.shutdown(wait=False)
+        self.reset_env()
 
     def reset_env(self) -> None:
         """重置执行环境（清理快照文件并重建）。"""
@@ -192,20 +199,18 @@ class ToolManager:
             )
 
         try:
-            # 使用 ThreadPoolExecutor 实现工具级超时，
-            # 因为 handler 可能是同步阻塞的（如 bash 命令长时间运行）
-            with ThreadPoolExecutor(max_workers=1) as pool:
-                defn = self._tools.get(name)
-                timeout = defn.timeout if defn is not None and defn.timeout is not None else Config.load().tool_timeout
-                future = pool.submit(self._handlers[name], **args)
-                result_timeout = None if timeout == 0 else timeout
-                try:
-                    result = future.result(timeout=result_timeout)
-                except KeyboardInterrupt:
-                    # 用户 Ctrl+C：通知子代理运行器停止，然后重新抛出中断
-                    if self._subagent_runner is not None:
-                        self._subagent_runner.stop()
-                    raise
+            # 使用共享线程池实现工具级超时（无需每次创建/销毁 executor）
+            defn = self._tools.get(name)
+            timeout = defn.timeout if defn is not None and defn.timeout is not None else Config.load().tool_timeout
+            future = self._executor.submit(self._handlers[name], **args)
+            result_timeout = None if timeout == 0 else timeout
+            try:
+                result = future.result(timeout=result_timeout)
+            except KeyboardInterrupt:
+                # 用户 Ctrl+C：通知子代理运行器停止，然后重新抛出中断
+                if self._subagent_runner is not None:
+                    self._subagent_runner.stop()
+                raise
             truncated = ToolOutputTruncator().truncate(str(result))
             return ToolResult(tool_call_id=tool_call.id, content=truncated)
         except PermissionError as e:

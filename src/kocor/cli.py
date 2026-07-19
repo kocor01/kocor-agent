@@ -180,6 +180,7 @@ def main() -> None:
         # 确保退出时释放所有资源，防止僵尸进程和泄露连接
         cron_worker.stop()                                # 停止 cron worker 子进程
         agent.tool_manager.mcp_manager.shutdown_all()  # 关闭所有 MCP 服务器连接
+        agent.tool_manager.cleanup()                     # 关闭共享线程池、清理执行环境
 
         # Debug 模式输出会话指标摘要
         if args.debug:
