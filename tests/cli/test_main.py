@@ -24,7 +24,7 @@ def _mock_cli_main_stack(argv: list[str], mock_agent: MagicMock | None = None) -
 
     if mock_agent is not None:
         mock_builder = _make_mock_agent_builder(mock_agent)
-        stack.enter_context(patch("kocor._cli.builder.AgentBuilder", return_value=mock_builder))
+        stack.enter_context(patch("kocor._cli.agent_builder.AgentBuilder", return_value=mock_builder))
     return stack
 
 
@@ -67,7 +67,7 @@ class TestCLIMain:
     """测试 CLI main 函数"""
 
     @patch("kocor.config.Config.load")
-    @patch("kocor._cli.builder.AgentBuilder")
+    @patch("kocor._cli.agent_builder.AgentBuilder")
     @patch("sys.argv", ["kocor", "你好"])
     def test_main_with_stream(self, mock_builder_cls, mock_config):
         """测试默认流式输出模式"""
@@ -90,7 +90,7 @@ class TestCLIMain:
         mock_agent.run.assert_not_called()
 
     @patch("kocor.config.Config.load")
-    @patch("kocor._cli.builder.AgentBuilder")
+    @patch("kocor._cli.agent_builder.AgentBuilder")
     @patch("sys.argv", ["kocor", "--no-stream", "你好"])
     def test_main_without_stream(self, mock_builder_cls, mock_config):
         """测试 --no-stream 模式"""
@@ -109,7 +109,7 @@ class TestCLIMain:
         mock_agent.stream.assert_not_called()
 
     @patch("kocor.config.Config.load")
-    @patch("kocor._cli.builder.AgentBuilder")
+    @patch("kocor._cli.agent_builder.AgentBuilder")
     @patch("sys.argv", ["kocor"])
     def test_main_no_input(self, mock_builder_cls, mock_config):
         """测试无输入时打印用法"""
@@ -133,7 +133,7 @@ class TestCLIMain:
         mock_exit.assert_called_with(1)
 
     @patch("kocor.config.Config.load")
-    @patch("kocor._cli.builder.AgentBuilder")
+    @patch("kocor._cli.agent_builder.AgentBuilder")
     @patch("sys.argv", ["kocor", "你好"])
     def test_stream_prints_tool_calls(self, mock_builder_cls, mock_config):
         """测试流式模式下工具调用输出"""
@@ -205,7 +205,7 @@ class TestCLIReasoning:
     """测试 CLI 流式模式下 reasoning 输出"""
 
     @patch("kocor.config.Config.load")
-    @patch("kocor._cli.builder.AgentBuilder")
+    @patch("kocor._cli.agent_builder.AgentBuilder")
     @patch("sys.argv", ["kocor", "你好"])
     def test_stream_prints_reasoning(self, mock_builder_cls, mock_config):
         """测试流式模式下 reasoning 内容输出"""
@@ -243,7 +243,7 @@ class TestCLIReasoning:
 
 _CLI_MAIN_MOCKS = [
     patch("kocor.config.Config.load"),
-    patch("kocor._cli.builder.AgentBuilder"),
+    patch("kocor._cli.agent_builder.AgentBuilder"),
 ]
 
 

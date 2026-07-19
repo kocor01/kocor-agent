@@ -16,6 +16,8 @@ class ToolDefinition:
         description: 工具描述
         parameters: JSON Schema 参数定义
         safety_level: 安全等级
+        timeout: 工具级超时覆盖（None 由注册方解析为 Config.tool_timeout，
+            0=不超时，正数=自定义秒数）
     """
 
     def __init__(

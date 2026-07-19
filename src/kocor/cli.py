@@ -141,7 +141,7 @@ def main() -> None:
     logger = Logger(Config.load().log_level, log_dir=Config.load().log_dir)
 
     # 使用 AgentBuilder 装配 Agent 及其所有依赖组件
-    from kocor._cli.builder import AgentBuilder
+    from kocor._cli.agent_builder import AgentBuilder
     agent = AgentBuilder().build(logger=logger)
 
     # cron worker 子进程：随 CLI 启动而启动，随 CLI 退出而停止

@@ -186,6 +186,8 @@ class Agent:
             self._memory.refresh_snapshot()
         if self.session_manager:
             self.session_manager.reset_session(self.session_manager.session_key)
+        # 清空文件状态缓存，避免重置后仍被旧读记录影响
+        self.tool_manager.file_state.reset()
 
     # ── 会话管理 ──
 
@@ -357,6 +359,8 @@ class Agent:
         self._persisted_msg_idx = 0
         self.context.session_history = messages
         self._hydrate_todo_store(messages)
+        # 清空文件状态缓存，避免新会话被旧会话残留的 dedup 记录阻断
+        self.tool_manager.file_state.reset()
 
         return f"✅ 已切换到会话 {target_id}（{len(messages)} 条消息）。\n你可以继续之前的对话了。"
 
