@@ -396,17 +396,14 @@ class Agent:
 
         if skill_def.skill_type == SkillType.PROMPT:
             # PROMPT 技能：渲染后的 prompt 走 ReAct 循环，让 LLM 处理后返回
-            messages = [
-                Message(role="system", content=self.system_prompt),
-            ]
+            # 使用 build_initial_context 构建完整上下文（含项目指令、环境信息、记忆、会话历史等）
+            self.context.build_initial_context(skill_args)
             if skill_def.prompt_role == "system":
                 # 技能注入为 system 消息（如设定角色行为）
-                messages.append(Message(role="system", content=result.content))
+                self.context.messages.append(Message(role="system", content=result.content))
             else:
-                # 技能注入为 user 消息（默认）
-                messages.append(Message(role="user", content=result.content))
-            self.context.reset()
-            self.context.messages = messages
+                # 替换最后一条 user 消息（build_initial_context 追加的 skill_args）为技能渲染结果
+                self.context.messages[-1] = Message(role="user", content=result.content)
             # 走 Loop 公共入口：循环结束后由 Loop 统一提取 session_history，
             # 随后 _session_after_run 据此持久化 PROMPT 技能触发的 LLM 回复
             return self.loop.run_messages()
