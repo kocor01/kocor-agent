@@ -34,9 +34,6 @@ class ToolManager:
         self._env: LocalEnvironment | None = None
         self.mcp_manager = None
         self.skill_manager = None
-        # cron worker 子进程（仅主进程持有；cron worker 子进程内的
-        # ToolManager 通过 include_cron=False 跳过，避免递归 spawn）
-        self._cron_worker = None
         # subagent 运行器（运行时注入，由 cli.py/Agent 在 LLM 创建后设置）
         self._subagent_runner = None
 
@@ -66,9 +63,8 @@ class ToolManager:
         注入共享依赖（file_state、env、memory_store 等）。
 
         Args:
-            include_cron: 是否注册 cronjob 工具并创建 cron worker。
-                主进程默认 True。cron worker 子进程内设 False —— 既不注册
-                cronjob 工具（防递归调用），也不创建 worker（避免递归 spawn）。
+            include_cron: 是否注册 cronjob 工具。主进程默认 True。
+                cron worker 子进程内设 False，避免递归调用。
             include_subagent: 是否注册 subagent 工具（子代理委派）。
                 cli.py 在注册时通过 ToolManager._subagent_runner 注入运行器。
         """
@@ -95,56 +91,25 @@ class ToolManager:
             "subagent_runner": self._subagent_runner,
         }
 
-        # 始终注册的核心工具
+        # 始终注册的核心工具（cron/subagent 按条件跳过）
         core_tools = [
             ReadFileTool, WriteFileTool, PatchFileTool, BashTool,
             SearchFilesTool, ProcessTool, MemoryTool, TodoTool,
         ]
+        if include_cron:
+            core_tools.append(CronTool)
+        if include_subagent:
+            core_tools.append(SubagentTool)
         for tool_cls in core_tools:
             handler = tool_cls.handler_factory(**deps)
+            timeout = getattr(tool_cls, 'TIMEOUT', None)
+            if timeout is None:
+                timeout = Config.load().tool_timeout
             self.register(
                 tool_cls.NAME, tool_cls.DESCRIPTION, tool_cls.PARAMETERS,
                 handler, tool_cls.SAFETY_LEVEL,
+                timeout=timeout,
             )
-
-        # cron 工具：主进程注册 cronjob 工具 + 创建 cron worker 子进程管理器。
-        if include_cron:
-            from kocor.tools.toolsets.cron.worker_process import CronWorkerProcess
-            if self._cron_worker is None:
-                self._cron_worker = CronWorkerProcess()
-            handler = CronTool.handler_factory(**deps)
-            self.register(
-                CronTool.NAME, CronTool.DESCRIPTION, CronTool.PARAMETERS,
-                handler, CronTool.SAFETY_LEVEL,
-            )
-
-        # subagent 工具：注册委派子代理工具。
-        # 非 orchestrator 角色（子代理自身）由 _build_child_tool_manager 管理。
-        # handler 在调用时解析 self._subagent_runner（延迟绑定），
-        # 避免 LLM 未就绪时 runner 不存在的问题。
-        if include_subagent:
-            handler = SubagentTool.handler_factory(**deps)
-            self.register(
-                SubagentTool.NAME, SubagentTool.DESCRIPTION, SubagentTool.PARAMETERS,
-                handler, SubagentTool.SAFETY_LEVEL,
-                timeout=0,  # 豁免全局超时（子代理通常需要数分钟）
-            )
-
-    def start_cron_scheduler(self) -> None:
-        """启动 cron worker 子进程。接口名保留以兼容 Agent。"""
-        if self._cron_worker is not None:
-            self._cron_worker.start()
-
-    def stop_cron_scheduler(self) -> None:
-        """停止 cron worker 子进程。接口名保留以兼容 Agent。"""
-        if self._cron_worker is not None:
-            self._cron_worker.stop()
-
-    @property
-    def cron_worker(self):
-        """获取 cron worker 子进程管理器实例。"""
-        return self._cron_worker
-
 
     def register_all(self, include_subagent: bool = False) -> None:
         """统一注册所有工具：内置工具 → MCP 工具 → 技能工具。
@@ -225,9 +190,7 @@ class ToolManager:
             # 因为 handler 可能是同步阻塞的（如 bash 命令长时间运行）
             with ThreadPoolExecutor(max_workers=1) as pool:
                 defn = self._tools.get(name)
-                timeout = defn.timeout if (
-                    defn is not None and defn.timeout is not None
-                ) else Config.load().tool_timeout
+                timeout = defn.timeout if defn is not None and defn.timeout is not None else Config.load().tool_timeout
                 future = pool.submit(self._handlers[name], **args)
                 result_timeout = None if timeout == 0 else timeout
                 try:

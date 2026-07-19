@@ -17,8 +17,8 @@ import sys
 
 logger = logging.getLogger(__name__)
 
-# 子进程入口模块：`python -m kocor.cron_worker`
-_WORKER_MODULE = "kocor.cron_worker"
+# 子进程入口模块：`python -m kocor.cron.cron_worker`
+_WORKER_MODULE = "kocor.cron.cron_worker"
 
 
 class CronWorkerProcess:

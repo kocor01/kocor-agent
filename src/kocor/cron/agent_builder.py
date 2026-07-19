@@ -21,7 +21,7 @@ def build_cron_agent() -> tuple:
 
     装配细则：
     - ToolManager 以 include_cron=False 注册，不添加 cronjob 工具
-      （防递归调用）且不创建 CronWorkerProcess（避免递归 spawn）。
+      （防递归调用）。
     - Agent 不设 memory_store：cron 自主作业不需要跨会话人类记忆，
       且避免与主进程并发读写 memory 文件。
     - CronScheduler 持有 Agent 引用：tick 到期 prompt 作业时
@@ -39,7 +39,7 @@ def build_cron_agent() -> tuple:
     from kocor.hook.hook_manager import HookManager
     from kocor.llm_provider.llm_factory import LlmFactory
     from kocor.tools.tool_manager import ToolManager
-    from kocor.tools.toolsets.cron.scheduler import CronScheduler
+    from kocor.cron.scheduler import CronScheduler
     from kocor.tools.toolsets.todo_tool import TodoStore
 
     # 独立 Agent（无 cronjob 工具，无 worker 子进程）

@@ -79,9 +79,6 @@ class Agent:
         # 用于自上次 persist 后增量写入，避免每次全量转储。
         self._persisted_msg_idx = 0
 
-        # Cron 调度器标志（首次使用时启动）
-        self._cron_started = False
-
         # 运行时指标收集器（由 AgentBuilder 在 build() 时通过 setattr 注入，初始为 None）
         self._metrics_collector = None
 
@@ -116,7 +113,6 @@ class Agent:
         返回 None 表示继续执行 ReAct 循环；
         返回非 None 表示命令已处理完毕（如内置命令、slash 命令），可直接返回结果。
         """
-        self._ensure_cron_started()
         if user_input.startswith("/"):
             cmd_result = self._handle_builtin_commands(user_input)
             if cmd_result is not None:
@@ -131,8 +127,6 @@ class Agent:
 
     def stop(self) -> None:
         """请求在当前迭代边界停止 ReAct 循环。"""
-        self.tool_manager.stop_cron_scheduler()
-        self._cron_started = False
         self.loop.stop()
 
     def metrics(self) -> dict | None:
@@ -170,18 +164,6 @@ class Agent:
             logger.debug("run_prompt skills not yet implemented: %s", skills)
         # 直接运行 ReAct 循环：loop.run 重置上下文 → build_initial_context → run_messages
         return self.loop.run(prompt)
-
-    def _ensure_cron_started(self) -> None:
-        """确保 cron worker 子进程已启动（首次 run 时，或崩溃后重新启动）。"""
-        worker = getattr(self.tool_manager, "cron_worker", None)
-        if worker is not None and not worker.is_running:
-            logger.info("cron worker 子进程未运行，重新启动")
-            
-            self.tool_manager.start_cron_scheduler()
-            self._cron_started = True
-        elif not self._cron_started:
-            self.tool_manager.start_cron_scheduler()
-            self._cron_started = True
 
     def stream(self, user_input: str) -> Iterator[StreamChunk]:
         """流式执行 Agent 循环。"""

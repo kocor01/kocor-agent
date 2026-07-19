@@ -98,12 +98,6 @@ class MockToolRegistry:
             content=f"Result of {tool_call.function.name}",
         )
 
-    def start_cron_scheduler(self):
-        pass
-
-    def stop_cron_scheduler(self):
-        pass
-
 
 def _make_loop(llm_responses=None, max_iterations=10):
     """创建最小 Loop 实例。"""
@@ -426,9 +420,6 @@ class TestExecuteOneToolEdgeCases:
 
             def execute(self, tool_call):
                 raise RuntimeError("connection timeout")
-
-            def stop_cron_scheduler(self):
-                pass
 
         loop = _make_loop()
         loop.tool_manager = ErrorToolRegistry()

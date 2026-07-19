@@ -18,6 +18,7 @@ import sys
 from kocor._cli.output import _print_stream_formatted, _print_welcome
 from kocor.agent import Agent
 from kocor.config import Config
+from kocor.cron.worker_process import CronWorkerProcess
 from kocor.logger import Logger
 from kocor.tools.permission import PermissionManager
 
@@ -143,28 +144,32 @@ def main() -> None:
     from kocor._cli.builder import AgentBuilder
     agent = AgentBuilder().build(logger=logger)
 
-    if is_repl:
-        print()
-        try:
-            import readline  # noqa: F401  # 提供行编辑和上下键历史
-        except ImportError:
-            pass
-        _print_welcome(agent.session_manager, agent.tool_manager.skill_manager)
-        _repl_loop(agent, stream_enabled)
-        return
-
-    if user_args:
-        user_input = " ".join(user_args)
-    else:
-        if not sys.stdin.isatty():
-            user_input = sys.stdin.read().strip()
-        else:
-            user_input = ""
-
-    if not user_input:
-        sys.exit(1)
+    # cron worker 子进程：随 CLI 启动而启动，随 CLI 退出而停止
+    cron_worker = CronWorkerProcess()
+    cron_worker.start()
 
     try:
+        if is_repl:
+            print()
+            try:
+                import readline  # noqa: F401  # 提供行编辑和上下键历史
+            except ImportError:
+                pass
+            _print_welcome(agent.session_manager, agent.tool_manager.skill_manager)
+            _repl_loop(agent, stream_enabled)
+            return
+
+        if user_args:
+            user_input = " ".join(user_args)
+        else:
+            if not sys.stdin.isatty():
+                user_input = sys.stdin.read().strip()
+            else:
+                user_input = ""
+
+        if not user_input:
+            sys.exit(1)
+
         if stream_enabled and hasattr(agent, "stream"):
             _print_stream_formatted(agent.stream(user_input))
         else:
@@ -173,8 +178,8 @@ def main() -> None:
                 print(result)
     finally:
         # 确保退出时释放所有资源，防止僵尸进程和泄露连接
+        cron_worker.stop()                                # 停止 cron worker 子进程
         agent.tool_manager.mcp_manager.shutdown_all()  # 关闭所有 MCP 服务器连接
-        agent.tool_manager.stop_cron_scheduler()        # 停止 cron worker 子进程
 
         # Debug 模式输出会话指标摘要
         if args.debug:

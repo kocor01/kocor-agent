@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from kocor.tools.toolsets.cron.jobs import create_job
+from kocor.cron.jobs import create_job
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -25,7 +25,7 @@ def cron_dir(tmp_path: Path) -> Path:
 @pytest.fixture(autouse=True)
 def patch_cron_dir(monkeypatch, cron_dir: Path):
     """将 CRON_DIR 指向临时目录。"""
-    import kocor.tools.toolsets.cron.jobs as jobs_module
+    import kocor.cron.jobs as jobs_module
 
     monkeypatch.setattr(jobs_module, "CRON_DIR", cron_dir)
     monkeypatch.setattr(jobs_module, "JOBS_FILE", cron_dir / "jobs.json")

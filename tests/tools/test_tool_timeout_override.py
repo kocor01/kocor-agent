@@ -29,7 +29,7 @@ class TestPerToolTimeout:
         )
 
     def test_definition_timeout_defaults_none(self):
-        """未指定 timeout 时，ToolDefinition.timeout 为 None（继承全局）。"""
+        """register() 直接调用不传 timeout 时，ToolDefinition.timeout 为 None。"""
         registry = ToolManager()
         registry.register(
             name="t", description="d", parameters={"type": "object"},

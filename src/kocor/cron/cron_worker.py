@@ -1,6 +1,6 @@
 """cron worker 子进程入口。
 
-由主进程（ToolManager.cron_worker）以 `python -m kocor.cron_worker` spawn。
+由主进程（CLI 层 CronWorkerProcess）以 `python -m kocor.cron.cron_worker` spawn。
 
 停止协议：
   主进程关闭其 stdin 管道末端 → 本进程 `sys.stdin.read()` 收到 EOF →
@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 def main() -> None:
     """cron worker 子进程主函数。"""
-    from kocor.tools.toolsets.cron.agent_builder import build_cron_agent
+    from kocor.cron.agent_builder import build_cron_agent
 
     agent, scheduler = build_cron_agent()
     scheduler.start()

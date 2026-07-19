@@ -53,12 +53,6 @@ class ToolRegistryMock:
     def execute(self, tool_call):
         return ToolResult(tool_call_id=tool_call.id, content="")
 
-    def start_cron_scheduler(self):
-        pass
-
-    def stop_cron_scheduler(self):
-        pass
-
 
 # ═══════════════════════════════════════════════
 # 内置命令边界
@@ -472,17 +466,6 @@ class TestSessionManagementEdgeCases:
 
 class TestAgentStopReset:
     """Agent stop() 和 reset_conversation() 边界。"""
-
-    def test_stop_resets_cron_flag(self):
-        """stop() 重置 cron 启动标志。"""
-        tool_mgr = MagicMock()
-        agent = make_agent(llm=FakeLLMClient(), tool_manager=tool_mgr)
-        agent._cron_started = True
-
-        agent.stop()
-
-        assert agent._cron_started is False
-        tool_mgr.stop_cron_scheduler.assert_called_once()
 
     def test_reset_conversation_clears_history(self):
         """reset_conversation() 清空历史。"""

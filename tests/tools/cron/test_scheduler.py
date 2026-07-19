@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from kocor.tools.toolsets.cron.jobs import (
+from kocor.cron.jobs import (
     claim_job_for_fire,
     create_job,
     get_due_jobs,
@@ -29,7 +29,7 @@ def cron_dir(tmp_path: Path) -> Path:
 
 @pytest.fixture(autouse=True)
 def patch_cron_dir(monkeypatch, cron_dir: Path):
-    import kocor.tools.toolsets.cron.jobs as jobs_module
+    import kocor.cron.jobs as jobs_module
 
     monkeypatch.setattr(jobs_module, "CRON_DIR", cron_dir)
     monkeypatch.setattr(jobs_module, "JOBS_FILE", cron_dir / "jobs.json")
@@ -48,7 +48,7 @@ class TestCronScheduler:
 
     def test_start_stop(self):
         """启动和停止调度器。"""
-        from kocor.tools.toolsets.cron.scheduler import CronScheduler
+        from kocor.cron.scheduler import CronScheduler
 
         scheduler = CronScheduler(tick_interval=0.1)
         assert not scheduler.is_running
@@ -61,7 +61,7 @@ class TestCronScheduler:
 
     def test_double_start(self):
         """重复启动无效。"""
-        from kocor.tools.toolsets.cron.scheduler import CronScheduler
+        from kocor.cron.scheduler import CronScheduler
 
         scheduler = CronScheduler(tick_interval=0.1)
         scheduler.start()
@@ -71,7 +71,7 @@ class TestCronScheduler:
 
     def test_double_stop(self):
         """重复停止无效。"""
-        from kocor.tools.toolsets.cron.scheduler import CronScheduler
+        from kocor.cron.scheduler import CronScheduler
 
         scheduler = CronScheduler(tick_interval=0.1)
         scheduler.start()
@@ -88,8 +88,8 @@ class TestCronScheduler:
         from datetime import datetime, timedelta
 
         # 将 next_run_at 设为已过期
-        import kocor.tools.toolsets.cron.jobs as jobs_module
-        from kocor.tools.toolsets.cron.scheduler import CronScheduler
+        import kocor.cron.jobs as jobs_module
+        from kocor.cron.scheduler import CronScheduler
 
         jobs = jobs_module.load_jobs()
         for j in jobs:
@@ -125,7 +125,7 @@ class TestCronScheduler:
         # 将 next_run_at 设为过去
         from datetime import datetime, timedelta
 
-        import kocor.tools.toolsets.cron.jobs as jobs_module
+        import kocor.cron.jobs as jobs_module
 
         jobs = load_jobs()
         for j in jobs:
@@ -149,7 +149,7 @@ class TestCronScheduler:
         job = create_job(prompt="track test", schedule="*/10 * * * *")
         job_id = job["id"]
 
-        from kocor.tools.toolsets.cron.jobs import get_job
+        from kocor.cron.jobs import get_job
 
         mark_job_run(job_id, success=True)
         refreshed = get_job(job_id)
@@ -163,7 +163,7 @@ class TestCronSchedulerEdgeCases:
 
     def test_daemon_thread_does_not_block_exit(self):
         """调度器线程是守护线程。"""
-        from kocor.tools.toolsets.cron.scheduler import CronScheduler
+        from kocor.cron.scheduler import CronScheduler
 
         scheduler = CronScheduler(tick_interval=10)
         scheduler.start()
@@ -173,7 +173,7 @@ class TestCronSchedulerEdgeCases:
 
     def test_tick_no_due_jobs_no_error(self):
         """无到期作业时 tick 不报错。"""
-        from kocor.tools.toolsets.cron.scheduler import CronScheduler
+        from kocor.cron.scheduler import CronScheduler
 
         scheduler = CronScheduler(tick_interval=0.1)
         scheduler._tick()  # 不应抛出异常
@@ -181,6 +181,6 @@ class TestCronSchedulerEdgeCases:
 
     def test_cron_disabled_toolsets(self):
         """验证 cron 禁用的工具集列表。"""
-        from kocor.tools.toolsets.cron.types import DISABLED_TOOLSETS_IN_CRON
+        from kocor.cron.types import DISABLED_TOOLSETS_IN_CRON
 
         assert "cronjob" in DISABLED_TOOLSETS_IN_CRON

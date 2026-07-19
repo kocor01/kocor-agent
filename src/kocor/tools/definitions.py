@@ -30,8 +30,9 @@ class ToolDefinition:
         self.description = description
         self.parameters = parameters
         self.safety_level = safety_level
-        # 工具级超时覆盖：None=继承 Config.tool_timeout（默认行为）；
-        # 0=不超时（供 subagent 等长生命周期工具）；正数=自定义秒数。
+        # 工具级超时覆盖：None 由 ToolManager.register 在注册时解析为
+        # Config.tool_timeout；0=不超时（供 subagent 等长生命周期工具）；
+        # 正数=自定义秒数。
         self.timeout = timeout
 
     def __repr__(self):

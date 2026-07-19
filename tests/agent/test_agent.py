@@ -291,106 +291,11 @@ class TestAgentStream:
 class ToolRegistryMock:
     skill_manager = None
 
-    def __init__(self):
-        # cron_worker 模拟：默认 is_running=False（未启动），可在测试中覆盖
-        class _Worker:
-            is_running = False
-        self._worker = _Worker()
-
-    @property
-    def cron_worker(self):
-        return self._worker
-
     def get_definitions(self):
         return []
 
     def execute(self, tool_call):
         return ToolResult(tool_call_id="call_1", content="")
-
-    def start_cron_scheduler(self):
-        """cron 调度器，测试中为空操作。"""
-        pass
-
-    def stop_cron_scheduler(self):
-        """cron 调度器，测试中为空操作。"""
-        pass
-
-
-class TestAgentCronRestart:
-    """测试 cron 调度器在 stop() 后能重启"""
-
-    def test_cron_restarts_after_stop(self):
-        """stop() 后再次 run() 应重新启动 cron 调度器"""
-        call_count = 0
-
-        class TrackingToolRegistryMock(ToolRegistryMock):
-            def start_cron_scheduler(self):
-                nonlocal call_count
-                call_count += 1
-
-        llm = FakeLLMClient([Message(role="assistant", content="hello")])
-        agent = make_agent(llm=llm, tool_manager=TrackingToolRegistryMock())
-
-        # 第一次 run → cron 启动（1 次）
-        agent.run("hi")
-        assert call_count == 1, f"首次 run 应启动 cron，实际: {call_count}"
-
-        # stop → cron 停止
-        agent.stop()
-
-        # 再次 run → cron 应重新启动（2 次）
-        agent.run("hello again")
-        assert call_count == 2, f"stop 后再次 run 应重新启动 cron，实际: {call_count}"
-
-
-class TestAgentCronRestartAfterCrash:
-    """子进程崩溃后再次 run 应重新启动。"""
-
-    def test_respawns_after_worker_dies(self):
-        """worker is_running=False 时再次 run 应重新调用 start_cron_scheduler。"""
-        call_count = 0
-
-        class TrackingToolRegistryMock(ToolRegistryMock):
-            def start_cron_scheduler(self):
-                nonlocal call_count
-                call_count += 1
-
-        llm = FakeLLMClient([Message(role="assistant", content="hello")])
-        agent = make_agent(llm=llm, tool_manager=TrackingToolRegistryMock())
-
-        # 第一次 run → cron 启动（1 次）
-        agent.run("hi")
-        assert call_count == 1
-
-        # 模拟子进程崩溃
-        agent.tool_manager._worker.is_running = False
-        # 重置 _cron_started 以模拟"已启动但崩溃"状态
-        agent._cron_started = True
-
-        # 再次 run → 检测到 is_running=False → 重新启动（2 次）
-        agent.run("again")
-        assert call_count == 2
-
-
-class TestAgentStreamStartsCron:
-    """stream() 也应启动 cron worker（与 run() 对齐）。"""
-
-    def test_stream_starts_cron(self):
-        """首次 stream() 应调用 start_cron_scheduler。"""
-        call_count = 0
-
-        class TrackingToolRegistryMock(ToolRegistryMock):
-            def start_cron_scheduler(self):
-                nonlocal call_count
-                call_count += 1
-
-        llm = FakeStreamLLMClient([
-            [StreamChunk(content="hello"), StreamChunk(is_final=True)]
-        ])
-        agent = make_agent(llm=llm, tool_manager=TrackingToolRegistryMock())
-
-        list(agent.stream("hi"))
-        assert call_count == 1, f"stream 应启动 cron，实际: {call_count}"
 
 
 class TestAgentRunPrompt:
@@ -402,20 +307,6 @@ class TestAgentRunPrompt:
         agent = make_agent(llm=llm)
         result = agent.run_prompt("run cron job")
         assert result == "cron-output"
-
-    def test_run_prompt_does_not_start_cron(self):
-        """run_prompt 不应启动 cron worker（防递归）。"""
-        call_count = 0
-
-        class Tracker(ToolRegistryMock):
-            def start_cron_scheduler(self):
-                nonlocal call_count
-                call_count += 1
-
-        llm = FakeLLMClient([Message(role="assistant", content="ok")])
-        agent = make_agent(llm=llm, tool_manager=Tracker())
-        agent.run_prompt("test")
-        assert call_count == 0, "run_prompt should not start cron"
 
     def test_run_prompt_skills_ignored(self):
         """skills 参数被日志记录但功能暂不实现。"""

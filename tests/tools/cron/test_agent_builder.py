@@ -58,7 +58,7 @@ class TestBuildCronAgent:
 
     def test_omits_cronjob_tool(self, mock_llm_factory, disable_memory):
         """cron worker 的 ToolManager 不应注册 cronjob 工具（防递归）。"""
-        from kocor.tools.toolsets.cron.agent_builder import build_cron_agent
+        from kocor.cron.agent_builder import build_cron_agent
 
         agent, scheduler = build_cron_agent()
         names = {d.name for d in agent.tool_manager.get_definitions()}
@@ -67,8 +67,8 @@ class TestBuildCronAgent:
     def test_returns_agent_and_scheduler(self, mock_llm_factory, disable_memory):
         """返回 (Agent, CronScheduler) 元组。"""
         from kocor.agent import Agent
-        from kocor.tools.toolsets.cron.agent_builder import build_cron_agent
-        from kocor.tools.toolsets.cron.scheduler import CronScheduler
+        from kocor.cron.agent_builder import build_cron_agent
+        from kocor.cron.scheduler import CronScheduler
 
         agent, scheduler = build_cron_agent()
         assert isinstance(agent, Agent)
@@ -76,14 +76,14 @@ class TestBuildCronAgent:
 
     def test_scheduler_holds_agent_ref(self, mock_llm_factory, disable_memory):
         """CronScheduler.agent 即 Agent 实例。"""
-        from kocor.tools.toolsets.cron.agent_builder import build_cron_agent
+        from kocor.cron.agent_builder import build_cron_agent
 
         agent, scheduler = build_cron_agent()
         assert scheduler.agent is agent
 
     def test_isolated_instances(self, mock_llm_factory, disable_memory):
         """两次 build 产生独立的 ToolManager（配置隔离）。"""
-        from kocor.tools.toolsets.cron.agent_builder import build_cron_agent
+        from kocor.cron.agent_builder import build_cron_agent
 
         a1, _ = build_cron_agent()
         a2, _ = build_cron_agent()

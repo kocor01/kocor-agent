@@ -18,7 +18,7 @@ import pytest
 
 def test_cron_worker_module_importable():
     """cron_worker 模块可导入且 main 函数存在。"""
-    from kocor.cron_worker import main
+    from kocor.cron.cron_worker import main
 
     assert callable(main)
 
@@ -34,7 +34,7 @@ def test_cron_worker_module_importable():
 def test_worker_spawn_exits_on_stdin_eof():
     """spawn cron_worker，关闭 stdin 后子进程应正常退出。"""
     proc = subprocess.Popen(
-        [sys.executable, "-m", "kocor.cron_worker"],
+        [sys.executable, "-m", "kocor.cron.cron_worker"],
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,

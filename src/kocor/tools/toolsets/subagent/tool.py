@@ -28,6 +28,7 @@ class SubagentTool:
         "以保护主上下文。支持批量并行。"
     )
     SAFETY_LEVEL = PermissionManager.SAFETY_CAUTION
+    TIMEOUT = 0  # 豁免全局超时（子代理通常需要数分钟）
     PARAMETERS = {
         "type": "object",
         "properties": {

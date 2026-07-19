@@ -4,8 +4,6 @@
 消除 CLI main() 中 100+ 行的组件组装代码。
 """
 
-import atexit
-
 from kocor.agent import Agent
 from kocor.config import Config
 from kocor.context.context_manager import ContextManager
@@ -184,6 +182,4 @@ class AgentBuilder:
 
             Config.register_reload_hook(on_config_reload)
 
-        # 注册进程退出清理
-        atexit.register(self.tool_manager.stop_cron_scheduler)
         return agent

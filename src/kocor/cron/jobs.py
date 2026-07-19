@@ -20,7 +20,7 @@ from pathlib import Path
 from typing import Any
 
 from kocor.config import Config
-from kocor.tools.toolsets.cron.types import (
+from kocor.cron.types import (
     CRON_DIR_NAME,
     JOBS_FILE_NAME,
     JOBS_LOCK_NAME,

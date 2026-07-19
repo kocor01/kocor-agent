@@ -10,30 +10,30 @@ import subprocess
 import sys
 from unittest.mock import MagicMock, patch
 
-from kocor.tools.toolsets.cron.worker_process import CronWorkerProcess
+from kocor.cron.worker_process import CronWorkerProcess
 
 
 class TestCronWorkerProcessStart:
     """启动逻辑。"""
 
     def test_start_spawns_subprocess(self):
-        """start() 以 `python -m kocor.cron_worker` spawn 子进程，stdin 接管道。"""
+        """start() 以 `python -m kocor.cron.cron_worker` spawn 子进程，stdin 接管道。"""
         proc = MagicMock()
         proc.poll.return_value = None  # 运行中
-        with patch("kocor.tools.toolsets.cron.worker_process.subprocess.Popen") as popen:
+        with patch("kocor.cron.worker_process.subprocess.Popen") as popen:
             popen.return_value = proc
             wp = CronWorkerProcess()
             wp.start()
 
         args, kwargs = popen.call_args
-        assert args[0] == [sys.executable, "-m", "kocor.cron_worker"]
+        assert args[0] == [sys.executable, "-m", "kocor.cron.cron_worker"]
         assert kwargs["stdin"] == subprocess.PIPE
 
     def test_start_idempotent_when_running(self):
         """已运行时重复 start 不再 spawn。"""
         proc = MagicMock()
         proc.poll.return_value = None
-        with patch("kocor.tools.toolsets.cron.worker_process.subprocess.Popen") as popen:
+        with patch("kocor.cron.worker_process.subprocess.Popen") as popen:
             popen.return_value = proc
             wp = CronWorkerProcess()
             wp.start()
@@ -43,7 +43,7 @@ class TestCronWorkerProcessStart:
     def test_is_running_true_after_start(self):
         proc = MagicMock()
         proc.poll.return_value = None
-        with patch("kocor.tools.toolsets.cron.worker_process.subprocess.Popen") as popen:
+        with patch("kocor.cron.worker_process.subprocess.Popen") as popen:
             popen.return_value = proc
             wp = CronWorkerProcess()
             assert not wp.is_running
@@ -53,7 +53,7 @@ class TestCronWorkerProcessStart:
     def test_is_running_false_after_proc_exited(self):
         proc = MagicMock()
         proc.poll.return_value = 0  # 已退出
-        with patch("kocor.tools.toolsets.cron.worker_process.subprocess.Popen") as popen:
+        with patch("kocor.cron.worker_process.subprocess.Popen") as popen:
             popen.return_value = proc
             wp = CronWorkerProcess()
             wp.start()
@@ -68,7 +68,7 @@ class TestCronWorkerProcessStop:
         proc = MagicMock()
         proc.stdin = MagicMock()
         proc.wait.return_value = 0
-        with patch("kocor.tools.toolsets.cron.worker_process.subprocess.Popen") as popen:
+        with patch("kocor.cron.worker_process.subprocess.Popen") as popen:
             popen.return_value = proc
             wp = CronWorkerProcess()
             wp.start()
@@ -84,7 +84,7 @@ class TestCronWorkerProcessStop:
         proc = MagicMock()
         proc.stdin = MagicMock()
         proc.wait.side_effect = [subprocess.TimeoutExpired(cmd="x", timeout=10), 0]
-        with patch("kocor.tools.toolsets.cron.worker_process.subprocess.Popen") as popen:
+        with patch("kocor.cron.worker_process.subprocess.Popen") as popen:
             popen.return_value = proc
             wp = CronWorkerProcess()
             wp.start()
@@ -104,7 +104,7 @@ class TestCronWorkerProcessStop:
             subprocess.TimeoutExpired(cmd="x", timeout=5),
             0,
         ]
-        with patch("kocor.tools.toolsets.cron.worker_process.subprocess.Popen") as popen:
+        with patch("kocor.cron.worker_process.subprocess.Popen") as popen:
             popen.return_value = proc
             wp = CronWorkerProcess()
             wp.start()
@@ -123,7 +123,7 @@ class TestCronWorkerProcessStop:
         proc = MagicMock()
         proc.stdin = MagicMock()
         proc.wait.return_value = 0
-        with patch("kocor.tools.toolsets.cron.worker_process.subprocess.Popen") as popen:
+        with patch("kocor.cron.worker_process.subprocess.Popen") as popen:
             popen.return_value = proc
             wp = CronWorkerProcess()
             wp.start()
@@ -138,7 +138,7 @@ class TestCronWorkerProcessStop:
         proc.stdin = MagicMock()
         proc.stdin.close.side_effect = OSError("broken pipe")
         proc.wait.return_value = 0
-        with patch("kocor.tools.toolsets.cron.worker_process.subprocess.Popen") as popen:
+        with patch("kocor.cron.worker_process.subprocess.Popen") as popen:
             popen.return_value = proc
             wp = CronWorkerProcess()
             wp.start()

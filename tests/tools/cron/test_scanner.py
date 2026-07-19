@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from kocor.tools.toolsets.cron.scanner import scan_cron_prompt, scan_cron_skill_assembled
+from kocor.cron.scanner import scan_cron_prompt, scan_cron_skill_assembled
 
 
 class TestScanCronPrompt:

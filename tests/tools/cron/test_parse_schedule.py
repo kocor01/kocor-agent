@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from kocor.tools.toolsets.cron.jobs import HAS_CRONITER, parse_schedule
+from kocor.cron.jobs import HAS_CRONITER, parse_schedule
 
 
 class TestParseSchedule:
