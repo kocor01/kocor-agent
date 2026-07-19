@@ -181,6 +181,7 @@ class Agent:
         """
         self.context.reset_conversation()
         self._persisted_msg_idx = 0
+        self._turns_since_memory = 0
         if self._memory_store:
             self._memory_store.refresh_snapshot()
         if self.session_manager:

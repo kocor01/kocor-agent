@@ -174,6 +174,16 @@ class MemoryStore:
 
         last_target: MemoryTarget | None = None
         for op in ops:
+            # 威胁扫描：add/replace 操作的内容必须通过严格模式检查
+            if op.action in ("add", "replace") and op.content:
+                if scan_strict(op.content):
+                    return MemoryOpResult(
+                        success=False,
+                        target=op.target,
+                        error="content blocked by threat scan",
+                        current_entries=self.list_entries(op.target),
+                        usage=self._usage_dict(op.target),
+                    )
             entries = target_groups[op.target]
             result = self._apply_op_to_entries(op, entries)
             if not result.success:

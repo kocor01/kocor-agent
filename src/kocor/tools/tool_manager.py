@@ -39,6 +39,8 @@ class ToolManager:
         self.todo_store = None
         # subagent 运行器（运行时注入，由 cli.py/Agent 在 LLM 创建后设置）
         self._subagent_runner = None
+        # 工具定义缓存（注册完成后不变，避免每次 LLM 调用都重建）
+        self._definitions_cache: list[ToolDefinition] | None = None
 
     def get_or_create_env(self) -> LocalEnvironment:
         """获取或创建 LocalEnvironment 实例（延迟初始化）。
@@ -156,10 +158,14 @@ class ToolManager:
         )
         self._handlers[name] = handler
         self.permission_mgr.update_safety(name, safety_level)
+        # 注册新工具时清除缓存，下次 get_definitions 重建
+        self._definitions_cache = None
 
     def get_definitions(self) -> list[ToolDefinition]:
-        """返回所有工具的 ToolDefinition 列表"""
-        return list(self._tools.values())
+        """返回所有工具的 ToolDefinition 列表（缓存结果）。"""
+        if self._definitions_cache is None:
+            self._definitions_cache = list(self._tools.values())
+        return self._definitions_cache
 
     def execute(self, tool_call: ToolCall) -> ToolResult:
         """执行工具调用。
