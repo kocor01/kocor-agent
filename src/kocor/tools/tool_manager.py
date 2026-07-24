@@ -54,7 +54,9 @@ class ToolManager:
         return self._env
 
     def cleanup(self) -> None:
-        """释放共享资源：关闭线程池、清理执行环境。"""
+        """释放共享资源：关闭 MCP 服务器、线程池、清理执行环境。"""
+        if self.mcp_manager:
+            self.mcp_manager.shutdown_all()
         self._executor.shutdown(wait=False)
         self.reset_env()
 
